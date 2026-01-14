@@ -2,7 +2,7 @@
 
 ## 1. Overview / Product Vision
 
-Project Planner is a task-based project management web application designed for individuals and teams who need a straightforward way to organize, track, and complete work items.
+Project Planner is a task-based project planning web application designed for individuals who need a straightforward way to organize, track, and complete work items across projects.
 
 ### Core Value Proposition
 
@@ -12,7 +12,7 @@ Project Planner is a task-based project management web application designed for 
 
 ### Platform
 
-Web application accessible via modern browsers, built with responsive design for desktop, tablet, and mobile use.
+Web application accessible via modern browsers, built with responsive design for desktop, tablet, and mobile use. V1 is single-user only (no shared workspaces or collaboration).
 
 ---
 
@@ -25,11 +25,11 @@ Web application accessible via modern browsers, built with responsive design for
 | **Product Managers** | Track feature requests, prioritize backlogs, monitor progress |
 | **Developers** | Manage bug fixes, technical improvements, and feature work |
 | **Freelancers** | Organize client projects with deadlines and time estimates |
-| **Small Teams** | Coordinate work items without enterprise-level overhead |
+| **Independent Operators** | Manage multiple personal or client projects without overhead |
 
 ### Core Use Cases
 
-1. **Personal Task Management**: Individual users maintaining their own task lists across multiple project categories
+1. **Personal Task Management**: Individual users maintaining their own task lists across multiple projects and categories
 2. **Work Planning**: Breaking down larger initiatives into trackable tasks with time estimates
 3. **Deadline Tracking**: Managing time-sensitive deliverables with due dates
 4. **Progress Visibility**: Understanding what's in progress, what's pending, and what's complete
@@ -38,17 +38,36 @@ Web application accessible via modern browsers, built with responsive design for
 
 ## 3. Core Concepts & Entities
 
-### 3.1 Tasks
+### 3.1 Projects
+
+A **Project** is the top-level container for tasks and categories.
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| **Name** | Yes | Project name (max 100 characters) |
+| **Description** | No | Optional summary or notes for the project |
+
+#### Project Behavior
+
+| Aspect | Behavior |
+|--------|----------|
+| **Multi-Project** | Each user can create and manage multiple projects |
+| **Scoped Data** | Tasks and categories belong to exactly one project |
+| **Active Project** | The UI always operates within a single selected project |
+| **Default Project** | A starter project is created at account setup |
+
+### 3.2 Tasks
 
 A **Task** is the fundamental unit of work in Project Planner.
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
+| **Project** | Yes | Parent project that owns the task |
 | **Title** | Yes | Brief name or summary of the task (max 200 characters) |
 | **Description** | No | Extended details, notes, or context for the task |
 | **Deadline** | No | Target completion date; optionally includes time |
 | **Time Estimate** | No | Expected effort required (value + unit) |
-| **Category** | No | Optional classification from user's category list |
+| **Category** | Yes | Classification from the project's category list |
 | **Status** | Yes | Current state of the task |
 | **Section** | Yes | Which temporal phase: Current, Future, or Past |
 | **Position** | Yes | Order within section/category (determines display order) |
@@ -66,6 +85,11 @@ Users select from the following units when estimating task duration:
 
 Example: "2 hours", "30 minutes", "3 days"
 
+#### Deadline Rules
+
+- Date-only deadlines are due at the end of that date in the user's local timezone.
+- Overdue calculations use the user's local timezone.
+
 #### Priority Levels
 
 | Level | Description |
@@ -77,19 +101,19 @@ Example: "2 hours", "30 minutes", "3 days"
 
 Priority works alongside position ordering: users can both drag-and-drop to reorder and assign explicit priority labels.
 
-### 3.2 Categories
+### 3.3 Categories
 
-A **Category** is a user-defined label used to classify and organize tasks.
+A **Category** is a project-defined label used to classify and organize tasks.
 
 | Aspect | Behavior |
 |--------|----------|
-| **User-Defined** | Users create, rename, and delete categories freely |
-| **Single Assignment** | Each task belongs to at most one category |
-| **No Limit** | No restriction on number of categories a user can create |
+| **Project-Defined** | Categories are created, renamed, and deleted within a project |
+| **Single Assignment** | Each task belongs to exactly one category |
+| **No Limit** | No restriction on number of categories a project can have |
 
 #### Default Categories
 
-New users receive the following pre-populated categories (all editable/removable):
+Each new project receives the following pre-populated categories (all editable/removable):
 
 - **Feature** - New functionality or capabilities
 - **Fix** - Bug fixes and corrections
@@ -97,7 +121,7 @@ New users receive the following pre-populated categories (all editable/removable
 - **Documentation** - Documentation and guides
 - **Research** - Investigation and exploration tasks
 
-### 3.3 Status
+### 3.4 Status
 
 A **Status** represents the current state of a task in the workflow.
 
@@ -122,7 +146,7 @@ A **Status** represents the current state of a task in the workflow.
 | **Visual Distinction** | Cancelled tasks display with strikethrough styling |
 | **Completion Date** | Set automatically when task moves to Completed status |
 
-### 3.4 Sections
+### 3.5 Sections
 
 A **Section** organizes tasks by temporal phase, representing where work sits in its lifecycle.
 
@@ -130,7 +154,7 @@ A **Section** organizes tasks by temporal phase, representing where work sits in
 |---------|-------------|
 | **Current** | Active work - tasks being worked on now or in the immediate focus |
 | **Future** | Planned work - backlog items for later |
-| **Past** | Archived work - completed or cancelled tasks |
+| **Past** | Archived view - typically completed or cancelled tasks |
 
 #### Section Behavior
 
@@ -141,6 +165,7 @@ A **Section** organizes tasks by temporal phase, representing where work sits in
 | **Auto-Archive** | Optionally, Completed/Cancelled tasks auto-move to Past |
 | **Category Grouping** | Within each section, tasks are displayed grouped by category |
 | **Default View** | Current section is shown on app load |
+| **Past Behavior** | Past is a view of the project's task list; all actions remain available |
 
 ---
 
@@ -152,31 +177,40 @@ A **Section** organizes tasks by temporal phase, representing where work sits in
 |---------|-------------|
 | **Account Creation** | Users register with email and password |
 | **Login/Logout** | Secure session management |
-| **Personal Workspace** | Each user has private access to their own tasks and categories |
+| **Single-User Scope** | Accounts are private; no sharing or collaboration in v1 |
 
-### 4.2 Category Management
+### 4.2 Project Management
 
 | Action | Behavior |
 |--------|----------|
-| **Create Category** | Add a new category with a unique name |
+| **Create Project** | Add a new project with a unique name |
+| **Rename Project** | Change an existing project's name |
+| **Delete Project** | Remove project and all its tasks/categories (with confirmation) |
+| **Switch Project** | Change the active project context |
+
+### 4.3 Category Management
+
+| Action | Behavior |
+|--------|----------|
+| **Create Category** | Add a new category with a unique name (per project) |
 | **Rename Category** | Change an existing category's display name |
-| **Delete Category** | Remove category; associated tasks become uncategorized |
-| **View Categories** | List all user categories including task counts |
+| **Delete Category** | Remove category; tasks must be reassigned to another category |
+| **View Categories** | List all categories in the active project including task counts |
 
 #### Constraints
 
-- Category names must be unique per user (case-insensitive)
+- Category names must be unique per project (case-insensitive)
 - Empty categories can be deleted without warning
-- Categories with tasks prompt confirmation before deletion
+- Categories with tasks require reassignment before deletion
 
-### 4.3 Task Management
+### 4.4 Task Management
 
 | Action | Behavior |
 |--------|----------|
 | **Create Task** | Add new task with required fields |
 | **Edit Task** | Modify any task attribute |
 | **Delete Task** | Remove task permanently (with confirmation) |
-| **Change Category** | Reassign task to a different category |
+| **Change Category** | Reassign task to a different category in the same project |
 | **Update Status** | Change task status freely between any values |
 | **Move to Section** | Move task between Current, Future, and Past |
 | **Reorder Tasks** | Drag-and-drop to change position within section/category |
@@ -186,11 +220,11 @@ A **Section** organizes tasks by temporal phase, representing where work sits in
 
 When creating a task, users must provide:
 - Title
+- Category (within the active project)
 
 Optional fields:
 - Deadline (date, optionally time)
 - Time estimate (value and unit)
-- Category (selected from existing categories)
 
 Defaults for new tasks:
 - Status: **"To Do"**
@@ -198,7 +232,7 @@ Defaults for new tasks:
 - Priority: *(None)*
 - Position: End of category list
 
-### 4.4 Task Views & Filtering
+### 4.5 Task Views & Filtering
 
 #### Primary Navigation: Sections
 
@@ -207,6 +241,12 @@ Defaults for new tasks:
 | **Current** | Active work and immediate focus (default view) |
 | **Future** | Planned backlog items |
 | **Past** | Archived completed and cancelled tasks |
+
+#### Project Context
+
+| Element | Description |
+|---------|-------------|
+| **Project Selector** | Switches the active project and reloads its tasks/categories |
 
 #### Within-Section Display
 
@@ -224,9 +264,12 @@ Defaults for new tasks:
 | **By Priority** | Show only tasks with a specific priority level |
 | **Overdue** | Tasks past their deadline (not Completed/Cancelled) |
 
+Filters apply only to the active project's tasks.
+
 #### Default View
 
 - Section: Current
+- Project: Last active project (or default on first login)
 - Grouping: By category
 - Sort: By position within category
 
@@ -240,11 +283,42 @@ Defaults for new tasks:
 1. User navigates to application
 2. User selects "Create Account"
 3. User enters email and password
-4. Account is created with default categories
-5. User is logged in and sees empty task list
+4. Account is created with a default project and categories
+5. User is logged in and sees empty task list in the default project
 ```
 
-### 5.2 Managing Categories
+### 5.2 Managing Projects
+
+#### Creating a Project
+
+```
+1. User opens project switcher
+2. User selects "New Project"
+3. User enters project name
+4. System validates uniqueness
+5. Project is created with default categories
+6. Project becomes the active context
+```
+
+#### Switching Projects
+
+```
+1. User opens project switcher
+2. User selects another project
+3. UI loads tasks and categories for the selected project
+```
+
+#### Deleting a Project
+
+```
+1. User opens project settings
+2. User selects "Delete Project"
+3. System displays confirmation with task count
+4. User confirms deletion
+5. Project and all associated tasks/categories are removed
+```
+
+### 5.3 Managing Categories
 
 #### Creating a Category
 
@@ -273,27 +347,28 @@ Defaults for new tasks:
 1. User navigates to category management
 2. User selects category to delete
 3. If category has tasks:
-   a. System displays confirmation with task count
+   a. System requires selecting a replacement category
    b. User confirms deletion
-   c. Tasks become uncategorized
+   c. Tasks are reassigned to the selected category
 4. If category is empty:
    a. Category is deleted immediately
 5. Category is removed from list
 ```
 
-### 5.3 Managing Tasks
+### 5.4 Managing Tasks
 
 #### Creating a Task
 
 ```
 1. User selects "New Task"
-2. User enters title
-3. User optionally enters description
-4. User sets deadline (date picker, optional time)
-5. User enters time estimate (value + unit dropdown)
-6. User optionally selects category from dropdown
-7. User saves task
-8. Task is created with status "To Do"
+2. User confirms active project
+3. User enters title
+4. User optionally enters description
+5. User sets deadline (date picker, optional time)
+6. User enters time estimate (value + unit dropdown)
+7. User selects category from dropdown
+8. User saves task
+9. Task is created with status "To Do"
 ```
 
 #### Editing a Task
@@ -322,7 +397,7 @@ Defaults for new tasks:
 4. Task is permanently removed
 ```
 
-### 5.4 Daily Workflow Example
+### 5.5 Daily Workflow Example
 
 ```
 1. User logs in
@@ -334,7 +409,7 @@ Defaults for new tasks:
 7. User logs out
 ```
 
-### 5.5 Working with Sections
+### 5.6 Working with Sections
 
 #### Moving Tasks Through Phases
 
@@ -421,8 +496,9 @@ Defaults for new tasks:
 
 | Term | Definition |
 |------|------------|
-| **Task** | A unit of work with title, deadline, estimate, category, and status |
-| **Category** | A user-defined label for organizing tasks |
-| **Status** | The current workflow state of a task (To Do, In Progress, Completed) |
+| **Project** | A container that owns tasks and categories |
+| **Task** | A unit of work with title, deadline, estimate, project, category, and status |
+| **Category** | A project-defined label for organizing tasks |
+| **Status** | The current workflow state of a task (To Do, In Progress, Completed, Cancelled) |
 | **Time Estimate** | Expected duration to complete a task |
 | **Deadline** | Target date (and optionally time) for task completion |
