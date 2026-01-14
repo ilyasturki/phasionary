@@ -55,6 +55,7 @@ A **Project** is the top-level container for tasks and categories.
 | **Scoped Data** | Tasks and categories belong to exactly one project |
 | **Active Project** | The UI always operates within a single selected project |
 | **Default Project** | A starter project is created at account setup |
+| **Unique Names** | Project names are unique per user (case-insensitive) |
 
 ### 3.2 Tasks
 
@@ -142,9 +143,13 @@ A **Status** represents the current state of a task in the workflow.
 
 | Behavior | Description |
 |----------|-------------|
-| **Auto-Archive Option** | Completed and Cancelled tasks can auto-move to Past section (user setting) |
+| **Auto-Archive Option** | Completed and Cancelled tasks can auto-move to Past section (per-user setting, default: on) |
 | **Visual Distinction** | Cancelled tasks display with strikethrough styling |
 | **Completion Date** | Set automatically when task moves to Completed status |
+
+#### Completion Date Rules
+
+- Completion Date is cleared if a task leaves Completed status.
 
 ### 3.5 Sections
 
@@ -161,11 +166,13 @@ A **Section** organizes tasks by temporal phase, representing where work sits in
 | Aspect | Behavior |
 |--------|----------|
 | **Fixed Sections** | Current, Future, and Past are system-defined (cannot be renamed or deleted) |
-| **Manual Movement** | Users can move tasks between sections freely |
+| **Manual Movement** | Users can move tasks between sections; moving to Past requires Completed or Cancelled status |
 | **Auto-Archive** | Optionally, Completed/Cancelled tasks auto-move to Past |
 | **Category Grouping** | Within each section, tasks are displayed grouped by category |
 | **Default View** | Current section is shown on app load |
-| **Past Behavior** | Past is a view of the project's task list; all actions remain available |
+| **Past Behavior** | Past contains only Completed/Cancelled tasks; non-terminal tasks moved to Past must first be marked Completed or Cancelled |
+
+When a task is reopened (status changed from Completed/Cancelled to another status), it moves to Current by default.
 
 ---
 
@@ -202,6 +209,7 @@ A **Section** organizes tasks by temporal phase, representing where work sits in
 - Category names must be unique per project (case-insensitive)
 - Empty categories can be deleted without warning
 - Categories with tasks require reassignment before deletion
+- Each project must always have at least one category; deleting the last category is not allowed
 
 ### 4.4 Task Management
 
@@ -231,6 +239,12 @@ Defaults for new tasks:
 - Section: **"Current"**
 - Priority: *(None)*
 - Position: End of category list
+
+#### Ordering Rules
+
+- Drag-and-drop sets a task's position within its section and category.
+- Moving a task to a different section or category places it at the end of the destination list unless the user drops it at a specific position.
+- Priority labels are informational only and do not auto-sort tasks.
 
 ### 4.5 Task Views & Filtering
 
@@ -262,7 +276,7 @@ Defaults for new tasks:
 | **By Category** | Show only tasks from a specific category |
 | **By Status** | Show only tasks with a specific status |
 | **By Priority** | Show only tasks with a specific priority level |
-| **Overdue** | Tasks past their deadline (not Completed/Cancelled) |
+| **Overdue** | Tasks past their deadline (not Completed/Cancelled); applies only to Current/Future |
 
 Filters apply only to the active project's tasks.
 
@@ -479,7 +493,7 @@ Filters apply only to the active project's tasks.
 | **Page Load** | Under 3 seconds on standard connection |
 | **Task Operations** | Under 1 second response time |
 | **Category Operations** | Under 1 second response time |
-| **Search/Filter** | Results displayed within 500ms |
+| **Filter** | Results displayed within 500ms |
 
 ### 6.5 Data & Reliability
 
