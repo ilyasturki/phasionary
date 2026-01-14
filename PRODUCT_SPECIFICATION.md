@@ -48,12 +48,11 @@ A **Task** is the fundamental unit of work in Project Planner.
 | **Description** | No | Extended details, notes, or context for the task |
 | **Deadline** | No | Target completion date; optionally includes time |
 | **Time Estimate** | No | Expected effort required (value + unit) |
-| **Category** | Yes | Classification from user's category list |
+| **Category** | No | Optional classification from user's category list |
 | **Status** | Yes | Current state of the task |
 | **Section** | Yes | Which temporal phase: Current, Future, or Past |
 | **Position** | Yes | Order within section/category (determines display order) |
 | **Priority** | No | Explicit priority level: High, Medium, or Low |
-| **Parent Task** | No | Reference to parent task (for subtasks only) |
 | **Notes** | No | Free-text annotations, links, or references |
 | **Completion Date** | No | Auto-set when task is marked Completed |
 
@@ -66,18 +65,6 @@ Users select from the following units when estimating task duration:
 - Days
 
 Example: "2 hours", "30 minutes", "3 days"
-
-#### Subtasks
-
-Tasks support one level of nesting via subtasks:
-
-| Aspect | Behavior |
-|--------|----------|
-| **Depth Limit** | One level only (parent → children, no deeper nesting) |
-| **Inheritance** | Subtasks inherit parent's section and category |
-| **Independence** | Subtasks have their own status, deadline, and estimate |
-| **Progress Display** | Parent task shows aggregate progress (e.g., "3/5 subtasks done") |
-| **Completion** | Parent can only be marked Completed when all subtasks are Completed/Cancelled |
 
 #### Priority Levels
 
@@ -97,7 +84,7 @@ A **Category** is a user-defined label used to classify and organize tasks.
 | Aspect | Behavior |
 |--------|----------|
 | **User-Defined** | Users create, rename, and delete categories freely |
-| **Single Assignment** | Each task belongs to exactly one category |
+| **Single Assignment** | Each task belongs to at most one category |
 | **No Limit** | No restriction on number of categories a user can create |
 
 #### Default Categories
@@ -109,12 +96,6 @@ New users receive the following pre-populated categories (all editable/removable
 - **Ergonomy** - User experience improvements
 - **Documentation** - Documentation and guides
 - **Research** - Investigation and exploration tasks
-
-#### System Category: Uncategorized
-
-- A protected system category named **"Uncategorized"** exists for all users
-- Cannot be renamed or deleted
-- Receives tasks when their original category is deleted
 
 ### 3.3 Status
 
@@ -179,13 +160,12 @@ A **Section** organizes tasks by temporal phase, representing where work sits in
 |--------|----------|
 | **Create Category** | Add a new category with a unique name |
 | **Rename Category** | Change an existing category's display name |
-| **Delete Category** | Remove category; all associated tasks move to "Uncategorized" |
+| **Delete Category** | Remove category; associated tasks become uncategorized |
 | **View Categories** | List all user categories including task counts |
 
 #### Constraints
 
 - Category names must be unique per user (case-insensitive)
-- "Uncategorized" is reserved and cannot be created, renamed, or deleted
 - Empty categories can be deleted without warning
 - Categories with tasks prompt confirmation before deletion
 
@@ -201,12 +181,13 @@ A **Section** organizes tasks by temporal phase, representing where work sits in
 | **Move to Section** | Move task between Current, Future, and Past |
 | **Reorder Tasks** | Drag-and-drop to change position within section/category |
 | **Set Priority** | Assign High, Medium, or Low priority label |
-| **Add Subtask** | Create a child task under an existing task |
 
 #### Task Creation Requirements
 
 When creating a task, users must provide:
 - Title
+
+Optional fields:
 - Deadline (date, optionally time)
 - Time estimate (value and unit)
 - Category (selected from existing categories)
@@ -216,14 +197,6 @@ Defaults for new tasks:
 - Section: **"Current"**
 - Priority: *(None)*
 - Position: End of category list
-
-#### Subtask Creation
-
-When creating a subtask:
-- User selects a parent task
-- Subtask inherits parent's section and category
-- Subtask requires its own title, deadline, and time estimate
-- Status defaults to "To Do"
 
 ### 4.4 Task Views & Filtering
 
@@ -241,7 +214,6 @@ When creating a subtask:
 |--------|----------|
 | **Category Grouping** | Tasks are grouped under category headers |
 | **Position Ordering** | Tasks appear in user-defined order (drag-and-drop) |
-| **Subtask Display** | Subtasks appear indented under their parent |
 
 #### Filters (Applied Within Any Section)
 
@@ -303,7 +275,7 @@ When creating a subtask:
 3. If category has tasks:
    a. System displays confirmation with task count
    b. User confirms deletion
-   c. Tasks are moved to "Uncategorized"
+   c. Tasks become uncategorized
 4. If category is empty:
    a. Category is deleted immediately
 5. Category is removed from list
@@ -319,7 +291,7 @@ When creating a subtask:
 3. User optionally enters description
 4. User sets deadline (date picker, optional time)
 5. User enters time estimate (value + unit dropdown)
-6. User selects category from dropdown
+6. User optionally selects category from dropdown
 7. User saves task
 8. Task is created with status "To Do"
 ```
@@ -407,7 +379,16 @@ When creating a subtask:
 | **Tablet** | Adapted layouts, touch-optimized controls |
 | **Mobile** | Single-column, essential features prioritized |
 
-### 6.2 Accessibility
+### 6.2 Visual Style
+
+| Aspect | Guideline |
+|--------|-----------|
+| **Aesthetic** | Terminal UI inspired design |
+| **Colors** | Solid, flat colors without gradients |
+| **Border Radius** | None (0px) - sharp, square corners throughout |
+| **Typography** | Clean, monospace-friendly presentation |
+
+### 6.3 Accessibility
 
 | Requirement | Description |
 |-------------|-------------|
@@ -416,7 +397,7 @@ When creating a subtask:
 | **Color Contrast** | WCAG AA compliance for text legibility |
 | **Focus Indicators** | Visible focus states for interactive elements |
 
-### 6.3 Performance Expectations
+### 6.4 Performance Expectations
 
 | Interaction | Target |
 |-------------|--------|
@@ -425,7 +406,7 @@ When creating a subtask:
 | **Category Operations** | Under 1 second response time |
 | **Search/Filter** | Results displayed within 500ms |
 
-### 6.4 Data & Reliability
+### 6.5 Data & Reliability
 
 | Aspect | Expectation |
 |--------|-------------|
@@ -445,4 +426,3 @@ When creating a subtask:
 | **Status** | The current workflow state of a task (To Do, In Progress, Completed) |
 | **Time Estimate** | Expected duration to complete a task |
 | **Deadline** | Target date (and optionally time) for task completion |
-| **Uncategorized** | System category for tasks whose original category was deleted |
