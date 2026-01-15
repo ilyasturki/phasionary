@@ -67,17 +67,7 @@ async function handleSignOut() {
 
       <!-- Main area -->
       <main class="lg:col-span-3">
-        <div class="border border-border bg-bg-surface p-4">
-          <h2 class="mb-2 text-lg font-semibold text-text-primary">
-            {{ activeProject.name }}
-          </h2>
-          <p v-if="activeProject.description" class="mb-4 text-sm text-text-secondary">
-            {{ activeProject.description }}
-          </p>
-          <p class="text-sm text-text-muted">
-            Tasks will appear here. Coming in Iteration 1c.
-          </p>
-        </div>
+        <TaskList />
       </main>
     </div>
 
