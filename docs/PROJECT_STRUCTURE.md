@@ -1,8 +1,8 @@
-# Project Planner - Project Structure
+# Phasionary - Project Structure
 
 ## Overview
 
-This document describes the directory structure for Project Planner, a Nuxt 4 full-stack application. The structure follows Nuxt 4 conventions with the `app/` directory for client-side code and `server/` directory for backend logic.
+This document describes the directory structure for Phasionary, a Nuxt 4 full-stack application. The structure follows Nuxt 4 conventions with the `app/` directory for client-side code and `server/` directory for backend logic.
 
 ---
 

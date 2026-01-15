@@ -1,4 +1,4 @@
-# Project Planner - Design System
+# Phasionary - Design System
 
 Terminal-inspired aesthetic: sharp edges, flat colors, monospace typography. No gradients, no rounded corners.
 

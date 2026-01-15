@@ -1,22 +1,28 @@
-# Project Planner - Database Schema
+# Phasionary - Database Schema
 
 ## Overview
 
 - **Database**: SQLite (single file)
 - **ORM**: Drizzle ORM
-- **Auth**: better-auth (manages user/session tables)
+- **Auth**: better-auth (manages auth tables and schema)
+
+---
+
+## Timestamp Storage
+
+- Store all timestamps in UTC using ISO 8601 strings (SQLite text).
+- Columns affected: `created_at`, `updated_at`, `deadline`, `completion_date`.
+- For date-only deadlines, set to end-of-day in the user's local timezone, then convert to UTC for storage.
+- Read/display timestamps in the user's local timezone.
 
 ---
 
 ## Tables
 
 ### users
-Managed by better-auth library.
-- `id` - text, primary key
-- `email` - text, unique, not null
-- `password_hash` - text, not null
-- `created_at` - timestamp
-- `updated_at` - timestamp
+Managed by better-auth. Use better-auth's schema/migrations; columns are not defined here.
+- `id` - text, primary key (referenced by `projects.user_id`)
+Note: expected auth tables include `users`, `sessions`, and `accounts` per better-auth configuration.
 
 ### projects
 - `id` - text, primary key (UUID)

@@ -126,7 +126,7 @@ Railway deployment notes:
 
 ```env
 # Database (SQLite path)
-DATABASE_PATH=./data/app.db
+NUXT_DATABASE_PATH=./data/app.db
 
 # Auth
 SESSION_SECRET=your-secret-key

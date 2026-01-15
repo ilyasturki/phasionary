@@ -1,12 +1,12 @@
-# Project Planner - User Personas
+# Phasionary - User Personas
 
 ## Overview
 
-This document defines the primary user personas for Project Planner. These personas guide product decisions, feature prioritization, and UX design choices. Each persona represents a real user archetype that benefits from a simple, focused task management tool.
+This document defines the primary user personas for Phasionary. These personas guide product decisions, feature prioritization, and UX design choices. Each persona represents a real user archetype that benefits from a simple, focused task management tool.
 
 ### Why These Personas?
 
-Project Planner targets **individuals who work solo** and need project-based task organization without the overhead of team collaboration features. The V1 single-user scope deliberately excludes team-oriented users in favor of those who value simplicity and personal productivity.
+Phasionary targets **individuals who work solo** and need project-based task organization without the overhead of team collaboration features. The V1 single-user scope deliberately excludes team-oriented users in favor of those who value simplicity and personal productivity.
 
 ---
 
@@ -45,7 +45,7 @@ Maya starts her morning reviewing what's due this week. She has a brand guide re
 - **Feature bloat**: Doesn't need Gantt charts, team permissions, or integrations she'll never use
 - **Visual noise**: Bright colors and busy interfaces feel distracting, not helpful
 
-#### Why Project Planner Works for Maya
+#### Why Phasionary Works for Maya
 
 The terminal-inspired aesthetic feels focused and professional. She can create a project per client, use categories for task types (Deliverable, Revision, Admin), and quickly see what's due. No team features to configure, no complex views to set up — just tasks organized the way she thinks.
 
@@ -84,7 +84,7 @@ After work, Daniel has about two hours for his side project. He opens his task m
 - **Todo apps too simple**: Todoist doesn't understand "projects" the way a developer does
 - **Context loss**: Switching between work tools and personal tools is jarring
 
-#### Why Project Planner Works for Daniel
+#### Why Phasionary Works for Daniel
 
 The developer-friendly aesthetic (terminal UI, monospace fonts, sharp corners) feels native. He can use the default categories (Feature, Fix, Research) or customize them. Sections map to his mental model: Current = this week's sprint, Future = backlog, Past = shipped work. No integrations needed — it's a focused space for personal project planning.
 
@@ -123,7 +123,7 @@ Priya's day involves client calls, deliverable work, and business operations. In
 - **Mobile friction**: Needs to add tasks on phone between meetings, most apps are clunky
 - **Over-engineering**: Tried Asana, spent more time configuring than using
 
-#### Why Project Planner Works for Priya
+#### Why Phasionary Works for Priya
 
 She creates a project per client plus one for "Business Operations." Categories help distinguish deliverables from admin work. The responsive design means she can add tasks from her phone during a coffee break. The clean interface shows her what matters without overwhelming her with features she doesn't need.
 
@@ -131,11 +131,11 @@ She creates a project per client plus one for "Business Operations." Categories 
 
 ## Competitive Landscape
 
-Project Planner occupies a specific niche: **project-based task management for individuals**. Here's how it compares to alternatives and why users might choose it.
+Phasionary occupies a specific niche: **project-based task management for individuals**. Here's how it compares to alternatives and why users might choose it.
 
 ### Positioning Map
 
-| Tool | Target User | Strength | Gap Project Planner Fills |
+| Tool | Target User | Strength | Gap Phasionary Fills |
 |------|-------------|----------|---------------------------|
 | **Todoist** | General consumers | Simple, fast capture | No project structure, limited organization |
 | **Notion** | Power users, teams | Flexible, all-in-one | Overcomplicated for task-focused workflows |
@@ -167,7 +167,7 @@ Team-oriented tools carry overhead that solo users don't need. The mental model 
 
 Board-based tools work for some workflows but struggle with prioritization and deadline tracking across many items.
 
-### Project Planner's Position
+### Phasionary's Position
 
 **Simple project-based task management with a developer-friendly aesthetic.**
 
