@@ -19,7 +19,12 @@ const { data: session, isPending } = await auth.useSession(useFetch)
           >
             Dashboard
           </NuxtLink>
-          <span class="hidden text-sm text-text-muted sm:inline">{{ session.user.email }}</span>
+          <span
+            v-if="session?.user?.email"
+            class="hidden text-sm text-text-muted sm:inline"
+          >
+            {{ session.user.email }}
+          </span>
         </nav>
 
         <nav v-else-if="!isPending" class="flex items-center gap-2 sm:gap-4">
