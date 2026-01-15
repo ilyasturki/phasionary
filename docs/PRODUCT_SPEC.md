@@ -16,29 +16,9 @@ Web application accessible via modern browsers, built with responsive design for
 
 ---
 
-## 2. Target Users & Use Cases
+## 2. Core Concepts & Entities
 
-### Primary Users
-
-| User Type | Description |
-|-----------|-------------|
-| **Product Managers** | Track feature requests, prioritize backlogs, monitor progress |
-| **Developers** | Manage bug fixes, technical improvements, and feature work |
-| **Freelancers** | Organize client projects with deadlines and time estimates |
-| **Independent Operators** | Manage multiple personal or client projects without overhead |
-
-### Core Use Cases
-
-1. **Personal Task Management**: Individual users maintaining their own task lists across multiple projects and categories
-2. **Work Planning**: Breaking down larger initiatives into trackable tasks with time estimates
-3. **Deadline Tracking**: Managing time-sensitive deliverables with due dates
-4. **Progress Visibility**: Understanding what's in progress, what's pending, and what's complete
-
----
-
-## 3. Core Concepts & Entities
-
-### 3.1 Projects
+### 2.1 Projects
 
 A **Project** is the top-level container for tasks and categories.
 
@@ -57,7 +37,7 @@ A **Project** is the top-level container for tasks and categories.
 | **Default Project** | A starter project is created at account setup |
 | **Unique Names** | Project names are unique per user (case-insensitive) |
 
-### 3.2 Tasks
+### 2.2 Tasks
 
 A **Task** is the fundamental unit of work in Phasionary.
 
@@ -102,7 +82,7 @@ Example: "2 hours", "30 minutes", "3 days"
 
 Priority works alongside position ordering: users can both drag-and-drop to reorder and assign explicit priority labels.
 
-### 3.3 Categories
+### 2.3 Categories
 
 A **Category** is a project-defined label used to classify and organize tasks.
 
@@ -122,7 +102,7 @@ Each new project receives the following pre-populated categories (all editable/r
 - **Documentation** - Documentation and guides
 - **Research** - Investigation and exploration tasks
 
-### 3.4 Status
+### 2.4 Status
 
 A **Status** represents the current state of a task in the workflow.
 
@@ -151,7 +131,7 @@ A **Status** represents the current state of a task in the workflow.
 
 - Completion Date is cleared if a task leaves Completed status.
 
-### 3.5 Sections
+### 2.5 Sections
 
 A **Section** organizes tasks by temporal phase, representing where work sits in its lifecycle.
 
@@ -176,9 +156,9 @@ When a task is reopened (status changed from Completed/Cancelled to another stat
 
 ---
 
-## 4. Key Features
+## 3. Key Features
 
-### 4.1 User Authentication
+### 3.1 User Authentication
 
 | Feature | Description |
 |---------|-------------|
@@ -186,7 +166,7 @@ When a task is reopened (status changed from Completed/Cancelled to another stat
 | **Login/Logout** | Secure session management |
 | **Single-User Scope** | Accounts are private; no sharing or collaboration in v1 |
 
-### 4.2 Project Management
+### 3.2 Project Management
 
 | Action | Behavior |
 |--------|----------|
@@ -195,7 +175,7 @@ When a task is reopened (status changed from Completed/Cancelled to another stat
 | **Delete Project** | Remove project and all its tasks/categories (with confirmation) |
 | **Switch Project** | Change the active project context |
 
-### 4.3 Category Management
+### 3.3 Category Management
 
 | Action | Behavior |
 |--------|----------|
@@ -211,7 +191,7 @@ When a task is reopened (status changed from Completed/Cancelled to another stat
 - Categories with tasks require reassignment before deletion
 - Each project must always have at least one category; deleting the last category is not allowed
 
-### 4.4 Task Management
+### 3.4 Task Management
 
 | Action | Behavior |
 |--------|----------|
@@ -246,7 +226,7 @@ Defaults for new tasks:
 - Moving a task to a different section or category places it at the end of the destination list unless the user drops it at a specific position.
 - Priority labels are informational only and do not auto-sort tasks.
 
-### 4.5 Task Views & Filtering
+### 3.5 Task Views & Filtering
 
 #### Primary Navigation: Sections
 
@@ -289,9 +269,9 @@ Filters apply only to the active project's tasks.
 
 ---
 
-## 5. User Flows
+## 4. User Flows
 
-### 5.1 Account Setup
+### 4.1 Account Setup
 
 ```
 1. User navigates to application
@@ -301,7 +281,7 @@ Filters apply only to the active project's tasks.
 5. User is logged in and sees empty task list in the default project
 ```
 
-### 5.2 Managing Projects
+### 4.2 Managing Projects
 
 #### Creating a Project
 
@@ -332,7 +312,7 @@ Filters apply only to the active project's tasks.
 5. Project and all associated tasks/categories are removed
 ```
 
-### 5.3 Managing Categories
+### 4.3 Managing Categories
 
 #### Creating a Category
 
@@ -369,7 +349,7 @@ Filters apply only to the active project's tasks.
 5. Category is removed from list
 ```
 
-### 5.4 Managing Tasks
+### 4.4 Managing Tasks
 
 #### Creating a Task
 
@@ -411,7 +391,7 @@ Filters apply only to the active project's tasks.
 4. Task is permanently removed
 ```
 
-### 5.5 Daily Workflow Example
+### 4.5 Daily Workflow Example
 
 ```
 1. User logs in
@@ -423,7 +403,7 @@ Filters apply only to the active project's tasks.
 7. User logs out
 ```
 
-### 5.6 Working with Sections
+### 4.6 Working with Sections
 
 #### Moving Tasks Through Phases
 
@@ -458,9 +438,9 @@ Filters apply only to the active project's tasks.
 
 ---
 
-## 6. UX & Non-Functional Guidelines
+## 5. UX & Non-Functional Guidelines
 
-### 6.1 Responsive Design
+### 5.1 Responsive Design
 
 | Device | Expectation |
 |--------|-------------|
@@ -468,34 +448,7 @@ Filters apply only to the active project's tasks.
 | **Tablet** | Adapted layouts, touch-optimized controls |
 | **Mobile** | Single-column, essential features prioritized |
 
-### 6.2 Visual Style
-
-| Aspect | Guideline |
-|--------|-----------|
-| **Aesthetic** | Terminal UI inspired design |
-| **Colors** | Solid, flat colors without gradients |
-| **Border Radius** | None (0px) - sharp, square corners throughout |
-| **Typography** | Clean, monospace-friendly presentation |
-
-### 6.3 Accessibility
-
-| Requirement | Description |
-|-------------|-------------|
-| **Keyboard Navigation** | All features accessible via keyboard |
-| **Screen Reader Support** | Proper ARIA labels and semantic HTML |
-| **Color Contrast** | WCAG AA compliance for text legibility |
-| **Focus Indicators** | Visible focus states for interactive elements |
-
-### 6.4 Performance Expectations
-
-| Interaction | Target |
-|-------------|--------|
-| **Page Load** | Under 3 seconds on standard connection |
-| **Task Operations** | Under 1 second response time |
-| **Category Operations** | Under 1 second response time |
-| **Filter** | Results displayed within 500ms |
-
-### 6.5 Data & Reliability
+### 5.2 Data & Reliability
 
 | Aspect | Expectation |
 |--------|-------------|
