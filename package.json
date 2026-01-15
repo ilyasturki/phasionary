@@ -1,0 +1,38 @@
+{
+  "name": "phasionary",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@nuxt/icon": "^2.2.0",
+    "@pinia/nuxt": "^0.11.3",
+    "@tailwindcss/vite": "^4.1.18",
+    "@vee-validate/nuxt": "^4.15.1",
+    "@vee-validate/valibot": "^4.15.1",
+    "@vueuse/core": "^14.1.0",
+    "@vueuse/nuxt": "^14.1.0",
+    "better-auth": "^1.4.13",
+    "better-sqlite3": "^11.10.0",
+    "drizzle-orm": "^0.44.2",
+    "nuxt": "^4.2.2",
+    "tailwindcss": "^4.1.18",
+    "valibot": "^1.2.0",
+    "vee-validate": "^4.15.1",
+    "vue": "^3.5.26",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "drizzle-kit": "^0.31.1"
+  }
+}
