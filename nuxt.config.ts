@@ -13,6 +13,9 @@ export default defineNuxtConfig({
     '@vueuse/nuxt',
     '@vee-validate/nuxt',
   ],
+  veeValidate: {
+    typedSchemaPackage: 'valibot',
+  },
   vite: {
     plugins: [tailwindcss()],
   },
