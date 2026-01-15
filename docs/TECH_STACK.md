@@ -38,7 +38,6 @@ Configuration notes for terminal UI aesthetic:
 ### UI Components & Interactions
 
 - **shadcn-vue** - Accessible, customizable component library (modify components/styles as needed)
-- **VueDraggable (vue-draggable-plus)** - Drag-and-drop for task reordering
 - **@vueuse/core** - Composables for keyboard navigation, focus management
 
 ### Forms & Validation

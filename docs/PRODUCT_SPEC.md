@@ -51,7 +51,6 @@ A **Task** is the fundamental unit of work in Phasionary.
 | **Category** | Yes | Classification from the project's category list |
 | **Status** | Yes | Current state of the task |
 | **Section** | Yes | Which temporal phase: Current, Future, or Past |
-| **Position** | Yes | Order within section/category (determines display order) |
 | **Priority** | No | Explicit priority level: High, Medium, or Low |
 | **Notes** | No | Free-text annotations, links, or references |
 | **Completion Date** | No | Auto-set when task is marked Completed |
@@ -80,7 +79,7 @@ Example: "2 hours", "30 minutes", "3 days"
 | **Low** | Can be deferred if needed |
 | *(None)* | No explicit priority assigned (default) |
 
-Priority works alongside position ordering: users can both drag-and-drop to reorder and assign explicit priority labels.
+Priority is one of the automatic sort criteria for task ordering (see Ordering Rules).
 
 ### 2.3 Categories
 
@@ -201,7 +200,6 @@ When a task is reopened (status changed from Completed/Cancelled to another stat
 | **Change Category** | Reassign task to a different category in the same project |
 | **Update Status** | Change task status freely between any values |
 | **Move to Section** | Move task between Current, Future, and Past |
-| **Reorder Tasks** | Drag-and-drop to change position within section/category |
 | **Set Priority** | Assign High, Medium, or Low priority label |
 
 #### Task Creation Requirements
@@ -218,13 +216,17 @@ Defaults for new tasks:
 - Status: **"To Do"**
 - Section: **"Current"**
 - Priority: *(None)*
-- Position: End of category list
 
 #### Ordering Rules
 
-- Drag-and-drop sets a task's position within its section and category.
-- Moving a task to a different section or category places it at the end of the destination list unless the user drops it at a specific position.
-- Priority labels are informational only and do not auto-sort tasks.
+Tasks are automatically sorted within each category group using the following criteria (in order):
+
+1. **Priority** - High → Medium → Low → None
+2. **Deadline** - Earliest first, tasks without deadlines last
+3. **Time Estimate** - Shortest first (normalized to minutes), tasks without estimates last
+4. **Title** - Alphabetical (case-insensitive)
+
+This automatic ordering ensures urgent and time-sensitive tasks surface to the top without manual reordering.
 
 ### 3.5 Task Views & Filtering
 
@@ -247,7 +249,7 @@ Defaults for new tasks:
 | Aspect | Behavior |
 |--------|----------|
 | **Category Grouping** | Tasks are grouped under category headers |
-| **Position Ordering** | Tasks appear in user-defined order (drag-and-drop) |
+| **Automatic Ordering** | Tasks sorted by priority → deadline → time estimate → title |
 
 #### Filters (Applied Within Any Section)
 
@@ -265,7 +267,7 @@ Filters apply only to the active project's tasks.
 - Section: Current
 - Project: Last active project (or default on first login)
 - Grouping: By category
-- Sort: By position within category
+- Sort: Automatic (priority → deadline → time estimate → title)
 
 ---
 
@@ -409,8 +411,8 @@ Filters apply only to the active project's tasks.
 
 ```
 1. User opens app (Current section shown by default)
-2. User sees tasks grouped by category
-3. User drags tasks to reorder priority within category
+2. User sees tasks grouped by category, sorted automatically
+3. User sets priority on important tasks to move them up in the list
 4. User completes task (auto-moves to Past, or manual move)
 5. User switches to Future tab to review backlog
 6. User moves a Future task to Current to start work on it

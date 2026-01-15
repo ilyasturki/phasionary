@@ -50,7 +50,6 @@ Note: expected auth tables include `users`, `sessions`, and `accounts` per bette
 - `status` - text, not null (todo/in_progress/completed/cancelled)
 - `section` - text, not null (current/future/past)
 - `priority` - text, nullable (high/medium/low)
-- `position` - integer, not null
 - `notes` - text, nullable
 - `completion_date` - timestamp, nullable
 - `project_id` - text, foreign key → projects.id
