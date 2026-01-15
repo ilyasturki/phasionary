@@ -8,6 +8,13 @@
       "when": 1768480796001,
       "tag": "0000_serious_roulette",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1768483992281,
+      "tag": "0001_fuzzy_nightshade",
+      "breakpoints": true
     }
   ]
 }
