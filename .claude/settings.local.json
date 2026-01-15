@@ -1,5 +1,10 @@
 {
   "enabledPlugins": {
     "ralph-loop@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(/home/yasso/.claude/plugins/cache/claude-plugins-official/ralph-loop/f70b65538da0/scripts/setup-ralph-loop.sh:*)"
+    ]
   }
 }
