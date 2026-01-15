@@ -1,8 +1,8 @@
-# Project Planner - Tech Stack Document
+# Phasionary - Tech Stack Document
 
 ## Overview
 
-This document defines the technology stack for Project Planner, a task-based project planning web application. The stack prioritizes developer experience, type safety, and performance while maintaining simplicity for a single-user V1 scope.
+This document defines the technology stack for Phasionary, a task-based project planning web application. The stack prioritizes developer experience, type safety, and performance while maintaining simplicity for a single-user V1 scope.
 
 ---
 

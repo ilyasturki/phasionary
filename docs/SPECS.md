@@ -1,8 +1,8 @@
-# Project Planner - Product Specification
+# Phasionary - Product Specification
 
 ## 1. Overview / Product Vision
 
-Project Planner is a task-based project planning web application designed for individuals who need a straightforward way to organize, track, and complete work items across projects.
+Phasionary is a task-based project planning web application designed for individuals who need a straightforward way to organize, track, and complete work items across projects.
 
 ### Core Value Proposition
 
@@ -59,7 +59,7 @@ A **Project** is the top-level container for tasks and categories.
 
 ### 3.2 Tasks
 
-A **Task** is the fundamental unit of work in Project Planner.
+A **Task** is the fundamental unit of work in Phasionary.
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
