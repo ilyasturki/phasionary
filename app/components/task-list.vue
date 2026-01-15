@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import type { Task, TaskSection, TaskStatus } from '~/stores/tasks'
+import type { Task, TaskSection, TaskStatus, TaskPriority } from '~/stores/tasks'
 
 const tasksStore = useTasksStore()
 const categoriesStore = useCategoriesStore()
-const { tasksByCategory, isLoading, filters } = storeToRefs(tasksStore)
+const { sortedTasks, isLoading, filters } = storeToRefs(tasksStore)
 const { categories } = storeToRefs(categoriesStore)
 
 const activeSection = ref<TaskSection>('current')
 const showTaskForm = ref(false)
 const editingTask = ref<Task | null>(null)
 const deletingTask = ref<Task | null>(null)
+
+// Filter states
+const filterCategory = ref<string | null>(null)
+const filterStatus = ref<TaskStatus | null>(null)
+const filterPriority = ref<TaskPriority>(null)
+const filterOverdue = ref(false)
 
 const sections: { value: TaskSection; label: string }[] = [
   { value: 'current', label: 'Current' },
@@ -23,9 +29,50 @@ watch(
   async (section) => {
     tasksStore.setFilters({ section })
     await tasksStore.fetchTasks()
+    // Reset filters when changing section
+    filterCategory.value = null
+    filterStatus.value = null
+    filterPriority.value = null
+    filterOverdue.value = false
   },
   { immediate: true }
 )
+
+// Apply client-side filters
+const filteredTasks = computed(() => {
+  let tasks = [...sortedTasks.value]
+
+  if (filterCategory.value) {
+    tasks = tasks.filter((t) => t.categoryId === filterCategory.value)
+  }
+  if (filterStatus.value) {
+    tasks = tasks.filter((t) => t.status === filterStatus.value)
+  }
+  if (filterPriority.value) {
+    tasks = tasks.filter((t) => t.priority === filterPriority.value)
+  }
+  if (filterOverdue.value && activeSection.value !== 'past') {
+    const now = new Date()
+    tasks = tasks.filter((t) => {
+      if (!t.deadline) return false
+      if (t.status === 'completed' || t.status === 'cancelled') return false
+      return new Date(t.deadline) < now
+    })
+  }
+
+  return tasks
+})
+
+// Group filtered tasks by category
+const tasksByCategory = computed(() => {
+  const grouped = new Map<string, Task[]>()
+  for (const task of filteredTasks.value) {
+    const list = grouped.get(task.categoryId) || []
+    list.push(task)
+    grouped.set(task.categoryId, list)
+  }
+  return grouped
+})
 
 function getCategoryName(categoryId: string): string {
   const cat = categories.value.find((c) => c.id === categoryId)
@@ -104,7 +151,7 @@ const categoriesWithTasks = computed(() => {
 <template>
   <div>
     <!-- Section tabs and create button -->
-    <div class="mb-4 flex items-center justify-between">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
       <div class="flex gap-1">
         <button
           v-for="sec in sections"
@@ -130,6 +177,15 @@ const categoriesWithTasks = computed(() => {
         New Task
       </button>
     </div>
+
+    <!-- Filters -->
+    <TaskFilters
+      class="mb-4"
+      @update:category="filterCategory = $event"
+      @update:status="filterStatus = $event"
+      @update:priority="filterPriority = $event"
+      @update:overdue="filterOverdue = $event"
+    />
 
     <!-- Loading state -->
     <div v-if="isLoading" class="py-8 text-center text-text-muted">

@@ -39,9 +39,33 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-text-muted',
 }
 
+const isOverdue = computed(() => {
+  if (!props.task.deadline) return false
+  if (props.task.status === 'completed' || props.task.status === 'cancelled') return false
+  return new Date(props.task.deadline) < new Date()
+})
+
 function formatDeadline(deadline: string | null): string {
   if (!deadline) return ''
   const date = new Date(deadline)
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  // Check if it's today
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today'
+  }
+  // Check if it's tomorrow
+  if (date.toDateString() === tomorrow.toDateString()) {
+    return 'Tomorrow'
+  }
+  // Check if it's in the past
+  if (date < today) {
+    const daysAgo = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    return `${daysAgo}d overdue`
+  }
+
   return date.toLocaleDateString()
 }
 
@@ -89,7 +113,11 @@ function onStatusChange(event: Event) {
         <!-- Metadata row -->
         <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-text-muted">
           <!-- Deadline -->
-          <span v-if="task.deadline" class="flex items-center gap-1">
+          <span
+            v-if="task.deadline"
+            class="flex items-center gap-1"
+            :class="{ 'text-error font-medium': isOverdue }"
+          >
             <Icon name="lucide:calendar" class="h-3 w-3" />
             {{ formatDeadline(task.deadline) }}
           </span>
