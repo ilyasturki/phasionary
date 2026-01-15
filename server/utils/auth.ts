@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from '../db/schema'
+import { bootstrapUser } from './bootstrap'
 
 let _auth: ReturnType<typeof betterAuth> | null = null
 
@@ -34,6 +35,19 @@ export function getAuth() {
         },
       },
       trustedOrigins: config.public.appUrl ? [config.public.appUrl] : [],
+      user: {
+        additionalFields: {},
+      },
+      databaseHooks: {
+        user: {
+          create: {
+            after: async (user) => {
+              // Bootstrap user with default project and categories
+              await bootstrapUser(user.id)
+            },
+          },
+        },
+      },
     })
   }
   return _auth
