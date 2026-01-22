@@ -139,7 +139,7 @@ func Run(dataDir string, projectSelector string) error {
 		categories: categories,
 		positions:  positions,
 		selected:   selected,
-	})
+	}, tea.WithAltScreen())
 	_, err = program.Run()
 	return err
 }
