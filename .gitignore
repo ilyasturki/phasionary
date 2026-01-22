@@ -16,3 +16,6 @@ coverage.*
 .DS_Store
 .idea/
 .vscode/
+
+# Local data
+data/
