@@ -17,7 +17,15 @@ type categoryView struct {
 	Tasks []domain.Task
 }
 
-type taskPosition struct {
+type focusKind int
+
+const (
+	focusCategory focusKind = iota
+	focusTask
+)
+
+type focusPosition struct {
+	Kind          focusKind
 	CategoryIndex int
 	TaskIndex     int
 }
@@ -25,7 +33,7 @@ type taskPosition struct {
 type model struct {
 	project    domain.Project
 	categories []categoryView
-	positions  []taskPosition
+	positions  []focusPosition
 	selected   int
 	width      int
 	height     int
@@ -63,7 +71,9 @@ func (m model) View() string {
 		if i > 0 {
 			bodyBuilder.WriteString("\n")
 		}
-		bodyBuilder.WriteString(ui.CategoryStyle.Render(category.Name))
+		isSelected := cursor == m.selected
+		bodyBuilder.WriteString(renderCategoryLine(category.Name, isSelected))
+		cursor++
 		if len(category.Tasks) == 0 {
 			bodyBuilder.WriteString("\n")
 			bodyBuilder.WriteString(ui.MutedStyle.Render("  (no tasks)"))
@@ -72,7 +82,7 @@ func (m model) View() string {
 		}
 		bodyBuilder.WriteString("\n")
 		for _, task := range category.Tasks {
-			isSelected := cursor == m.selected
+			isSelected = cursor == m.selected
 			bodyBuilder.WriteString(renderTaskLine(task, isSelected))
 			bodyBuilder.WriteString("\n")
 			cursor++
@@ -81,8 +91,9 @@ func (m model) View() string {
 
 	body := strings.TrimRight(bodyBuilder.String(), "\n")
 	statusLine := m.statusLine()
+	shortcuts := m.shortcutsLine()
 
-	return header + "  " + project + "\n\n" + body + "\n\n" + statusLine + "\n"
+	return header + "  " + project + "\n\n" + body + "\n\n" + statusLine + "\n" + shortcuts + "\n"
 }
 
 func Run(dataDir string, projectSelector string) error {
@@ -115,6 +126,12 @@ func Run(dataDir string, projectSelector string) error {
 	selected := -1
 	if len(positions) > 0 {
 		selected = 0
+		for i, position := range positions {
+			if position.Kind == focusTask {
+				selected = i
+				break
+			}
+		}
 	}
 
 	program := tea.NewProgram(model{
@@ -127,9 +144,9 @@ func Run(dataDir string, projectSelector string) error {
 	return err
 }
 
-func buildViews(project domain.Project) ([]categoryView, []taskPosition) {
+func buildViews(project domain.Project) ([]categoryView, []focusPosition) {
 	categories := make([]categoryView, 0, len(project.Categories))
-	positions := make([]taskPosition, 0)
+	positions := make([]focusPosition, 0)
 	for _, category := range project.Categories {
 		tasks := append([]domain.Task(nil), category.Tasks...)
 		domain.SortTasks(tasks)
@@ -139,14 +156,32 @@ func buildViews(project domain.Project) ([]categoryView, []taskPosition) {
 		})
 	}
 	for cIndex, category := range categories {
+		positions = append(positions, focusPosition{
+			Kind:          focusCategory,
+			CategoryIndex: cIndex,
+			TaskIndex:     -1,
+		})
 		for tIndex := range category.Tasks {
-			positions = append(positions, taskPosition{
+			positions = append(positions, focusPosition{
+				Kind:          focusTask,
 				CategoryIndex: cIndex,
 				TaskIndex:     tIndex,
 			})
 		}
 	}
 	return categories, positions
+}
+
+func renderCategoryLine(name string, selected bool) string {
+	prefix := "  "
+	if selected {
+		prefix = "> "
+	}
+	line := fmt.Sprintf("%s%s", prefix, name)
+	if selected {
+		return ui.SelectedStyle.Render(line)
+	}
+	return ui.CategoryStyle.Render(line)
 }
 
 func renderTaskLine(task domain.Task, selected bool) string {
@@ -190,20 +225,27 @@ func (m *model) moveSelection(delta int) {
 }
 
 func (m model) statusLine() string {
-	task, category, ok := m.selectedTask()
+	position, ok := m.selectedPosition()
 	if !ok {
-		return ui.StatusLineStyle.Render("No tasks to display.")
+		return ui.StatusLineStyle.Render("No items to display.")
 	}
-	summary := fmt.Sprintf("Selected: %s / %s (%s · %s)", category, task.Title, task.Status, task.Section)
+	category := m.categories[position.CategoryIndex]
+	if position.Kind == focusCategory {
+		summary := fmt.Sprintf("Category: %s (%d tasks)", category.Name, len(category.Tasks))
+		return ui.StatusLineStyle.Render(summary)
+	}
+	task := category.Tasks[position.TaskIndex]
+	summary := fmt.Sprintf("Selected: %s / %s (%s - %s)", category.Name, task.Title, task.Status, task.Section)
 	return ui.StatusLineStyle.Render(summary)
 }
 
-func (m model) selectedTask() (domain.Task, string, bool) {
+func (m model) shortcutsLine() string {
+	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | q/ctrl+c quit")
+}
+
+func (m model) selectedPosition() (focusPosition, bool) {
 	if m.selected < 0 || m.selected >= len(m.positions) {
-		return domain.Task{}, "", false
+		return focusPosition{}, false
 	}
-	position := m.positions[m.selected]
-	category := m.categories[position.CategoryIndex]
-	task := category.Tasks[position.TaskIndex]
-	return task, category.Name, true
+	return m.positions[m.selected], true
 }

@@ -2,17 +2,17 @@
 build:
     go build -o phasionary ./cmd/phasionary
 
-# Run the CLI binary.
+# Run the CLI binary with the test data
 run:
+    ./phasionary --data ./data
+
+# Run the CLI binary with the default data
+run-default:
     ./phasionary --data ./data
 
 # Run all tests.
 test:
     go test ./...
-
-# Run tests for domain package only.
-test-domain:
-    go test -v ./internal/domain/...
 
 # Format Go files.
 fmt:
