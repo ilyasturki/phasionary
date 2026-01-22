@@ -38,8 +38,6 @@ func PriorityIcon(priority string) string {
 	switch priority {
 	case "high":
 		return "▲"
-	case "medium":
-		return "●"
 	case "low":
 		return "▼"
 	default:

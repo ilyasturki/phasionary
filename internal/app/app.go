@@ -210,23 +210,26 @@ func renderTaskLine(task domain.Task, selected bool) string {
 	priorityIcon := ui.PriorityIcon(task.Priority)
 	if !selected {
 		status := formatStatus(task.Status)
+		icon := ""
+		if priorityIcon != "" {
+			icon = ui.PriorityStyle(task.Priority).Render(priorityIcon) + " "
+		}
 		titleStyle := ui.PriorityStyle(task.Priority)
 		title := titleStyle.Render(task.Title)
-		if priorityIcon != "" {
-			title = fmt.Sprintf("%s %s", title, titleStyle.Render(priorityIcon))
-		}
-		return fmt.Sprintf("%s[%s] %s", prefix, status, title)
+		return fmt.Sprintf("%s[%s] %s%s", prefix, status, icon, title)
 	}
 	statusText := statusLabel(task.Status)
 	statusStyle := ui.StatusStyle(task.Status).Bold(true).Reverse(true)
 	titleStyle := ui.PriorityStyle(task.Priority).Bold(true).Reverse(true)
-	title := titleStyle.Render(task.Title)
+	icon := ""
 	if priorityIcon != "" {
-		title = fmt.Sprintf("%s %s", title, titleStyle.Render(priorityIcon))
+		icon = titleStyle.Render(priorityIcon) + " "
 	}
+	title := titleStyle.Render(task.Title)
 	return ui.SelectedStyle.Render(prefix+"[") +
 		statusStyle.Render(statusText) +
 		ui.SelectedStyle.Render("] ") +
+		icon +
 		title
 }
 
@@ -431,18 +434,18 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	cursorStyle := ui.SelectedStyle
 	titleStyle := ui.PriorityStyle(task.Priority)
 	icon := ui.PriorityIcon(task.Priority)
-	iconSuffix := ""
+	iconPrefix := ""
 	if icon != "" {
-		iconSuffix = " " + titleStyle.Render(icon)
+		iconPrefix = titleStyle.Render(icon) + " "
 	}
 	return fmt.Sprintf(
 		"%s[%s] %s%s%s%s",
 		prefix,
 		statusText,
+		iconPrefix,
 		titleStyle.Render(left),
 		cursorStyle.Render(cursorChar),
 		titleStyle.Render(right),
-		iconSuffix,
 	)
 }
 
