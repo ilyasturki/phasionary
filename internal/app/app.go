@@ -37,6 +37,9 @@ type model struct {
 	selected   int
 	width      int
 	height     int
+	editing    bool
+	editValue  string
+	editCursor int
 	store      *data.Store
 }
 
@@ -50,6 +53,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tea.KeyMsg:
+		if m.editing {
+			m.handleEditKey(msg)
+			break
+		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -59,6 +66,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.moveSelection(1)
 		case " ":
 			m.toggleSelectedTask()
+		case "enter":
+			m.startEditing()
 		}
 	}
 	return m, nil
@@ -86,10 +95,15 @@ func (m model) View() string {
 		bodyBuilder.WriteString("\n")
 		for _, task := range category.Tasks {
 			isSelected = cursor == m.selected
-			bodyBuilder.WriteString(renderTaskLine(task, isSelected))
+			if m.editing && isSelected {
+				bodyBuilder.WriteString(m.renderEditTaskLine(task))
+			} else {
+				bodyBuilder.WriteString(renderTaskLine(task, isSelected))
+			}
 			bodyBuilder.WriteString("\n")
 			cursor++
 		}
+
 	}
 
 	body := strings.TrimRight(bodyBuilder.String(), "\n")
@@ -193,15 +207,27 @@ func renderTaskLine(task domain.Task, selected bool) string {
 	if selected {
 		prefix = "> "
 	}
+	priorityIcon := ui.PriorityIcon(task.Priority)
 	if !selected {
 		status := formatStatus(task.Status)
-		return fmt.Sprintf("%s[%s] %s", prefix, status, task.Title)
+		titleStyle := ui.PriorityStyle(task.Priority)
+		title := titleStyle.Render(task.Title)
+		if priorityIcon != "" {
+			title = fmt.Sprintf("%s %s", title, titleStyle.Render(priorityIcon))
+		}
+		return fmt.Sprintf("%s[%s] %s", prefix, status, title)
 	}
 	statusText := statusLabel(task.Status)
 	statusStyle := ui.StatusStyle(task.Status).Bold(true).Reverse(true)
+	titleStyle := ui.PriorityStyle(task.Priority).Bold(true).Reverse(true)
+	title := titleStyle.Render(task.Title)
+	if priorityIcon != "" {
+		title = fmt.Sprintf("%s %s", title, titleStyle.Render(priorityIcon))
+	}
 	return ui.SelectedStyle.Render(prefix+"[") +
 		statusStyle.Render(statusText) +
-		ui.SelectedStyle.Render("] "+task.Title)
+		ui.SelectedStyle.Render("] ") +
+		title
 }
 
 func statusLabel(status string) string {
@@ -222,7 +248,7 @@ func formatStatus(status string) string {
 }
 
 func (m *model) moveSelection(delta int) {
-	if len(m.positions) == 0 {
+	if m.editing || len(m.positions) == 0 {
 		return
 	}
 	next := m.selected + delta
@@ -251,7 +277,173 @@ func (m model) statusLine() string {
 }
 
 func (m model) shortcutsLine() string {
-	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | space toggle status | q/ctrl+c quit")
+	if m.editing {
+		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor")
+	}
+	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | enter edit title | space toggle status | q/ctrl+c quit")
+}
+
+func (m *model) startEditing() {
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		return
+	}
+	category := m.categories[position.CategoryIndex]
+	task := category.Tasks[position.TaskIndex]
+	m.editing = true
+	m.editValue = task.Title
+	m.editCursor = len([]rune(m.editValue))
+}
+
+func (m *model) handleEditKey(msg tea.KeyMsg) {
+	switch msg.String() {
+	case "enter":
+		m.finishEditing()
+	case "esc":
+		m.cancelEditing()
+	case "left":
+		m.moveEditCursor(-1)
+	case "right":
+		m.moveEditCursor(1)
+	case "backspace":
+		m.deleteEditRune(-1)
+	case "delete":
+		m.deleteEditRune(0)
+	case " ", "space":
+		m.insertEditRunes([]rune(" "))
+	default:
+		if msg.Type == tea.KeyRunes {
+			m.insertEditRunes(msg.Runes)
+		}
+	}
+}
+
+func (m *model) finishEditing() {
+	if !m.editing {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		m.cancelEditing()
+		return
+	}
+	trimmed := strings.TrimSpace(m.editValue)
+	if trimmed == "" {
+		m.cancelEditing()
+		return
+	}
+	category := &m.categories[position.CategoryIndex]
+	task := &category.Tasks[position.TaskIndex]
+	if task.Title != trimmed {
+		task.Title = trimmed
+		task.UpdatedAt = domain.NowTimestamp()
+		m.syncTaskToProject(position, *task)
+		m.storeTaskUpdate()
+	}
+	m.refreshTaskView(position)
+	m.editing = false
+	m.editValue = ""
+	m.editCursor = 0
+}
+
+func (m *model) cancelEditing() {
+	m.editing = false
+	m.editValue = ""
+	m.editCursor = 0
+}
+
+func (m *model) moveEditCursor(delta int) {
+	runes := []rune(m.editValue)
+	next := m.editCursor + delta
+	if next < 0 {
+		next = 0
+	}
+	if next > len(runes) {
+		next = len(runes)
+	}
+	m.editCursor = next
+}
+
+func (m *model) insertEditRunes(runesToInsert []rune) {
+	if len(runesToInsert) == 0 {
+		return
+	}
+	runes := []rune(m.editValue)
+	cursor := m.editCursor
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > len(runes) {
+		cursor = len(runes)
+	}
+	updated := make([]rune, 0, len(runes)+len(runesToInsert))
+	updated = append(updated, runes[:cursor]...)
+	updated = append(updated, runesToInsert...)
+	updated = append(updated, runes[cursor:]...)
+	m.editValue = string(updated)
+	m.editCursor = cursor + len(runesToInsert)
+}
+
+func (m *model) deleteEditRune(offset int) {
+	runes := []rune(m.editValue)
+	if len(runes) == 0 {
+		return
+	}
+	index := m.editCursor + offset
+	if offset < 0 {
+		index = m.editCursor - 1
+	}
+	if index < 0 || index >= len(runes) {
+		return
+	}
+	updated := append([]rune{}, runes[:index]...)
+	updated = append(updated, runes[index+1:]...)
+	m.editValue = string(updated)
+	if offset < 0 {
+		m.editCursor = index
+	} else if m.editCursor > len(updated) {
+		m.editCursor = len(updated)
+	}
+}
+
+func (m model) renderEditTaskLine(task domain.Task) string {
+	prefix := "> "
+	statusText := formatStatus(task.Status)
+	edited := m.editValue
+	if edited == "" {
+		edited = " "
+	}
+	runes := []rune(edited)
+	cursor := m.editCursor
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > len(runes) {
+		cursor = len(runes)
+	}
+	left := string(runes[:cursor])
+	right := string(runes[cursor:])
+	cursorChar := " "
+	if cursor < len(runes) {
+		cursorChar = string(runes[cursor])
+		right = string(runes[cursor+1:])
+	}
+	cursorStyle := ui.SelectedStyle
+	titleStyle := ui.PriorityStyle(task.Priority)
+	icon := ui.PriorityIcon(task.Priority)
+	iconSuffix := ""
+	if icon != "" {
+		iconSuffix = " " + titleStyle.Render(icon)
+	}
+	return fmt.Sprintf(
+		"%s[%s] %s%s%s%s",
+		prefix,
+		statusText,
+		titleStyle.Render(left),
+		cursorStyle.Render(cursorChar),
+		titleStyle.Render(right),
+		iconSuffix,
+	)
 }
 
 func (m model) selectedPosition() (focusPosition, bool) {
@@ -262,6 +454,9 @@ func (m model) selectedPosition() (focusPosition, bool) {
 }
 
 func (m *model) toggleSelectedTask() {
+	if m.editing {
+		return
+	}
 	position, ok := m.selectedPosition()
 	if !ok || position.Kind != focusTask {
 		return
@@ -329,4 +524,55 @@ func (m *model) storeTaskUpdate() {
 		return
 	}
 	_ = m.store.SaveProject(m.project)
+}
+
+func (m *model) refreshTaskView(position focusPosition) {
+	if position.CategoryIndex < 0 || position.CategoryIndex >= len(m.categories) {
+		return
+	}
+	category := &m.categories[position.CategoryIndex]
+	sorted := append([]domain.Task(nil), category.Tasks...)
+	domain.SortTasks(sorted)
+	category.Tasks = sorted
+	m.positions = rebuildPositions(m.categories)
+	m.selected = m.findPositionForTask(position, category.Tasks)
+}
+
+func rebuildPositions(categories []categoryView) []focusPosition {
+	positions := make([]focusPosition, 0)
+	for cIndex, category := range categories {
+		positions = append(positions, focusPosition{
+			Kind:          focusCategory,
+			CategoryIndex: cIndex,
+			TaskIndex:     -1,
+		})
+		for tIndex := range category.Tasks {
+			positions = append(positions, focusPosition{
+				Kind:          focusTask,
+				CategoryIndex: cIndex,
+				TaskIndex:     tIndex,
+			})
+		}
+	}
+	return positions
+}
+
+func (m *model) findPositionForTask(previous focusPosition, tasks []domain.Task) int {
+	if previous.CategoryIndex < 0 || previous.CategoryIndex >= len(m.categories) {
+		return m.selected
+	}
+	if previous.TaskIndex < 0 || previous.TaskIndex >= len(m.categories[previous.CategoryIndex].Tasks) {
+		return m.selected
+	}
+	taskID := m.categories[previous.CategoryIndex].Tasks[previous.TaskIndex].ID
+	for index, position := range m.positions {
+		if position.Kind == focusTask &&
+			position.CategoryIndex == previous.CategoryIndex &&
+			position.TaskIndex >= 0 &&
+			position.TaskIndex < len(tasks) &&
+			tasks[position.TaskIndex].ID == taskID {
+			return index
+		}
+	}
+	return m.selected
 }

@@ -22,3 +22,27 @@ func StatusStyle(status string) lipgloss.Style {
 		return lipgloss.NewStyle()
 	}
 }
+
+func PriorityStyle(priority string) lipgloss.Style {
+	switch priority {
+	case "high":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	case "low":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	default:
+		return lipgloss.NewStyle()
+	}
+}
+
+func PriorityIcon(priority string) string {
+	switch priority {
+	case "high":
+		return "▲"
+	case "medium":
+		return "●"
+	case "low":
+		return "▼"
+	default:
+		return ""
+	}
+}
