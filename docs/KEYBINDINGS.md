@@ -7,7 +7,7 @@
 - `:` Command palette
 - `Tab` Next pane
 - `Shift+Tab` Previous pane
-- `Ctrl+r` Refresh from DB
+- `Ctrl+r` Reload from disk
 
 ## Navigation
 - `j/k` or `↑/↓` Move selection

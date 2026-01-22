@@ -63,7 +63,7 @@ Tasks sort within each category by:
 - Launch into last-used project, current section
 - Quick capture: title + category, optional fields inline
 - Triage: change status, section, priority
-- Category management with reassignment on delete
+- Category management with cascade delete (removes all nested tasks)
 - Project switching via sidebar or command palette
 - Search/filter by text, status, section, category, priority, overdue
 
@@ -75,6 +75,6 @@ Tasks sort within each category by:
 
 ## Data
 
-- Data directory with per-project JSON files, auto-created on first run
+- Data directory auto-created on startup if missing; default project created via `phasionary init` or on first TUI launch
 - Export/import: JSON and CSV
 - Backups: JSON snapshots or exports
