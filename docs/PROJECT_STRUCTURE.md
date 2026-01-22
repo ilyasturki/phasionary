@@ -16,7 +16,6 @@ phasionary/
 │   ├── data/         # JSON storage access
 │   ├── config/       # Config loading
 │   └── export/       # Import/export helpers
-├── migrations/
 ├── docs/
 ```
 

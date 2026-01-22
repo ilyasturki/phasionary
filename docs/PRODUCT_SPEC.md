@@ -6,7 +6,7 @@ Phasionary is a terminal-first, single-user project planning tool. Local-only, o
 
 **Goals:**
 - Keyboard-first navigation
-- Single local database file
+- Per-project JSON files in a data directory
 - Fast task capture and triage
 - Works over SSH and low-bandwidth terminals
 
@@ -33,7 +33,7 @@ User-defined labels scoped to a project.
 
 - Unique per project (case-insensitive)
 - Tasks belong to one category
-- Defaults on init: Feature, Fix, Ergonomy, Documentation, Research
+- Defaults on init: Feature, Fix, Ergonomy, Documentation, Research (Ergonomy is intentional shorthand)
 
 ### Status
 
@@ -69,12 +69,12 @@ Tasks sort within each category by:
 
 ## CLI
 
-- Shares local JSON data file with TUI
+- Shares local JSON data directory with TUI
 - Human-readable tables by default, JSON for scripting
 - Focused on automation, import/export, quick edits
 
 ## Data
 
-- Local JSON file auto-created on first run
+- Data directory with per-project JSON files, auto-created on first run
 - Export/import: JSON and CSV
 - Backups: JSON snapshots or exports

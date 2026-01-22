@@ -5,7 +5,7 @@ The implementation will target Go + Bubble Tea.
 
 ## Shared Requirements
 - Single binary distribution (Linux only for now)
-- Local JSON data file, no network dependency
+- Local JSON files (one per project), no network dependency
 - Config file + theme overrides
 - JSON/CSV import/export
 - Deterministic builds and reproducible releases
@@ -13,8 +13,6 @@ The implementation will target Go + Bubble Tea.
 ## Go + Bubble Tea
 - TUI: bubbletea + lipgloss
 - CLI: cobra + viper
-- DB: modernc.org/sqlite or mattn/go-sqlite3
-- Migrations: goose or golang-migrate
 - Tests: go test + testify
 
 ## Packaging
