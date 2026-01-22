@@ -1,75 +1,67 @@
-# Phasionary - Database Schema
+# Phasionary - Data Schema (JSON)
 
 ## Overview
+- Storage: Multiple JSON files (one per project)
+- Single-user, no auth tables
+- Store timestamps in UTC ISO 8601 strings
+- Directory auto-created on startup if missing
 
-- **Database**: SQLite (single file)
-- **ORM**: Drizzle ORM
-- **Auth**: better-auth (manages auth tables and schema)
+## Storage Locations
+- Linux: `~/.local/share/phasionary/`
+- Override with `PHASIONARY_DATA_PATH`
 
----
+## Directory Structure
+```
+~/.local/share/phasionary/
+├── {project-uuid-1}.json
+├── {project-uuid-2}.json
+└── ...
+```
 
-## Timestamp Storage
+## File Schema (per project)
+```json
+{
+  "id": "uuid",
+  "name": "Project name",
+  "created_at": "2026-01-22T10:00:00Z",
+  "updated_at": "2026-01-22T10:00:00Z",
+  "categories": [
+    {
+      "id": "uuid",
+      "name": "Category name",
+      "created_at": "2026-01-22T10:00:00Z",
+      "tasks": [
+        {
+          "id": "uuid",
+          "title": "Task title",
+          "status": "todo",
+          "section": "current",
+          "created_at": "2026-01-22T10:00:00Z",
+          "updated_at": "2026-01-22T10:00:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
 
-- Store all timestamps in UTC using ISO 8601 strings (SQLite text).
-- Columns affected: `created_at`, `updated_at`, `deadline`, `completion_date`.
-- For date-only deadlines, set to end-of-day in the user's local timezone, then convert to UTC for storage.
-- Read/display timestamps in the user's local timezone.
+## Optional Fields
+- Projects: `description`
+- Categories: none
+- Tasks: `description`, `deadline`, `time_estimate_value`, `time_estimate_unit`, `priority`, `notes`, `completion_date`
 
----
+## Constraints
+- Project names are unique (case-insensitive)
+- Category names are unique within a project (case-insensitive)
+- `status` is `todo`, `in_progress`, `completed`, or `cancelled`
+- `section` is `current`, `future`, or `past`
+- `time_estimate_unit` is `minutes`, `hours`, or `days`
 
-## Tables
-
-### users
-Managed by better-auth. Use better-auth's schema/migrations; columns are not defined here.
-- `id` - text, primary key (referenced by `projects.user_id`)
-Note: expected auth tables include `users`, `sessions`, and `accounts` per better-auth configuration.
-
-### projects
-- `id` - text, primary key (UUID)
-- `name` - text, not null, max 100 chars
-- `description` - text, nullable
-- `user_id` - text, foreign key → users.id
-- `created_at` - timestamp
-- `updated_at` - timestamp
-- **Constraint**: unique(user_id, name) - case-insensitive
-
-### categories
-- `id` - text, primary key (UUID)
-- `name` - text, not null
-- `project_id` - text, foreign key → projects.id
-- `created_at` - timestamp
-- **Constraint**: unique(project_id, name) - case-insensitive
-
-### tasks
-- `id` - text, primary key (UUID)
-- `title` - text, not null, max 200 chars
-- `description` - text, nullable
-- `deadline` - timestamp, nullable
-- `time_estimate_value` - integer, nullable
-- `time_estimate_unit` - text, nullable (minutes/hours/days)
-- `status` - text, not null (todo/in_progress/completed/cancelled)
-- `section` - text, not null (current/future/past)
-- `priority` - text, nullable (high/medium/low)
-- `notes` - text, nullable
-- `completion_date` - timestamp, nullable
-- `project_id` - text, foreign key → projects.id
-- `category_id` - text, foreign key → categories.id
-- `created_at` - timestamp
-- `updated_at` - timestamp
-
----
-
-## Relationships
-
-- **users → projects**: one-to-many (user owns projects)
-- **projects → categories**: one-to-many (project contains categories)
-- **projects → tasks**: one-to-many (project contains tasks)
-- **categories → tasks**: one-to-many (category groups tasks)
-
----
+## Relationships (Nested Hierarchy)
+- Projects contain categories
+- Categories contain tasks
+- No foreign key IDs needed (implied by nesting)
 
 ## Cascade Rules
-
-- Delete user → delete all projects
-- Delete project → delete all categories and tasks
-- Delete category → blocked (reassign tasks first)
+- Delete project → deletes entire file (including all categories and tasks)
+- Delete category → deletes all nested tasks
