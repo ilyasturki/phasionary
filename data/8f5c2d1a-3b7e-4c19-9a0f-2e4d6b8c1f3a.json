@@ -1,0 +1,152 @@
+{
+  "id": "8f5c2d1a-3b7e-4c19-9a0f-2e4d6b8c1f3a",
+  "name": "Phasionary Launch",
+  "description": "Roadmap for the first public alpha.",
+  "created_at": "2026-01-22T10:00:00Z",
+  "updated_at": "2026-01-22T10:00:00Z",
+  "categories": [
+    {
+      "id": "2a7f9c10-1b3d-4a57-8c6e-0e1d4f9b2a61",
+      "name": "Feature",
+      "created_at": "2026-01-22T10:00:00Z",
+      "tasks": [
+        {
+          "id": "3f1a2b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",
+          "title": "Scaffold read-only TUI",
+          "description": "Show tasks grouped by category with selection state.",
+          "status": "completed",
+          "section": "past",
+          "created_at": "2026-01-15T09:00:00Z",
+          "updated_at": "2026-01-20T15:30:00Z",
+          "completion_date": "2026-01-20T15:30:00Z",
+          "priority": "high"
+        },
+        {
+          "id": "6b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+          "title": "Quick capture form",
+          "description": "Minimal title + category capture with optional fields.",
+          "status": "in_progress",
+          "section": "current",
+          "created_at": "2026-01-21T11:00:00Z",
+          "updated_at": "2026-01-22T09:10:00Z",
+          "deadline": "2026-01-30",
+          "time_estimate_value": 2,
+          "time_estimate_unit": "hours",
+          "priority": "high"
+        },
+        {
+          "id": "9c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f",
+          "title": "Project switcher",
+          "status": "todo",
+          "section": "future",
+          "created_at": "2026-01-22T10:00:00Z",
+          "updated_at": "2026-01-22T10:00:00Z",
+          "deadline": "2026-02-10",
+          "time_estimate_value": 4,
+          "time_estimate_unit": "hours",
+          "priority": "medium"
+        }
+      ]
+    },
+    {
+      "id": "4b5c6d7e-8f90-4a1b-9c2d-3e4f5a6b7c8d",
+      "name": "Fix",
+      "created_at": "2026-01-22T10:00:00Z",
+      "tasks": [
+        {
+          "id": "7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d",
+          "title": "Handle missing data dir gracefully",
+          "status": "completed",
+          "section": "past",
+          "created_at": "2026-01-12T08:00:00Z",
+          "updated_at": "2026-01-13T12:00:00Z",
+          "completion_date": "2026-01-13T12:00:00Z",
+          "priority": "medium"
+        },
+        {
+          "id": "0d1e2f3a-4b5c-4d6e-8f90-1a2b3c4d5e6f",
+          "title": "Fix selection wrap bug",
+          "status": "todo",
+          "section": "current",
+          "created_at": "2026-01-22T10:00:00Z",
+          "updated_at": "2026-01-22T10:00:00Z",
+          "priority": "low"
+        }
+      ]
+    },
+    {
+      "id": "5c6d7e8f-9012-4a3b-8c4d-5e6f7a8b9c0e",
+      "name": "Ergonomy",
+      "created_at": "2026-01-22T10:00:00Z",
+      "tasks": [
+        {
+          "id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+          "title": "Refine status line copy",
+          "status": "todo",
+          "section": "current",
+          "created_at": "2026-01-22T10:00:00Z",
+          "updated_at": "2026-01-22T10:00:00Z",
+          "time_estimate_value": 30,
+          "time_estimate_unit": "minutes",
+          "priority": "low"
+        }
+      ]
+    },
+    {
+      "id": "6d7e8f90-1234-4a5b-8c6d-7e8f9a0b1c2d",
+      "name": "Documentation",
+      "created_at": "2026-01-22T10:00:00Z",
+      "tasks": [
+        {
+          "id": "2b3c4d5e-6f70-4a8b-9c0d-1e2f3a4b5c6d",
+          "title": "Write README usage",
+          "status": "in_progress",
+          "section": "current",
+          "created_at": "2026-01-20T13:00:00Z",
+          "updated_at": "2026-01-22T08:30:00Z",
+          "deadline": "2026-01-25",
+          "time_estimate_value": 2,
+          "time_estimate_unit": "hours",
+          "priority": "medium"
+        },
+        {
+          "id": "3c4d5e6f-7081-4b9c-0d1e-2f3a4b5c6d7e",
+          "title": "Add CLI examples",
+          "status": "completed",
+          "section": "past",
+          "created_at": "2026-01-14T09:00:00Z",
+          "updated_at": "2026-01-18T16:45:00Z",
+          "completion_date": "2026-01-18T16:45:00Z",
+          "priority": "medium"
+        }
+      ]
+    },
+    {
+      "id": "7e8f9012-3456-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "Research",
+      "created_at": "2026-01-22T10:00:00Z",
+      "tasks": [
+        {
+          "id": "4d5e6f70-8192-4c0d-1e2f-3a4b5c6d7e8f",
+          "title": "Evaluate JSON schema migration",
+          "status": "cancelled",
+          "section": "past",
+          "created_at": "2026-01-10T10:00:00Z",
+          "updated_at": "2026-01-16T14:00:00Z",
+          "priority": "low"
+        },
+        {
+          "id": "5e6f7081-92a3-4d1e-2f3a-4b5c6d7e8f90",
+          "title": "Explore import/export formats",
+          "status": "todo",
+          "section": "future",
+          "created_at": "2026-01-22T10:00:00Z",
+          "updated_at": "2026-01-22T10:00:00Z",
+          "time_estimate_value": 1,
+          "time_estimate_unit": "days",
+          "priority": "medium"
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,22 @@ package ui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	HeaderStyle = lipgloss.NewStyle().Bold(true)
-	MutedStyle  = lipgloss.NewStyle().Faint(true)
+	HeaderStyle     = lipgloss.NewStyle().Bold(true)
+	MutedStyle      = lipgloss.NewStyle().Faint(true)
+	CategoryStyle   = lipgloss.NewStyle().Bold(true)
+	SelectedStyle   = lipgloss.NewStyle().Bold(true).Reverse(true)
+	StatusLineStyle = lipgloss.NewStyle().Faint(true)
 )
+
+func StatusStyle(status string) lipgloss.Style {
+	switch status {
+	case "in_progress":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+	case "completed":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	case "cancelled":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	default:
+		return lipgloss.NewStyle()
+	}
+}
