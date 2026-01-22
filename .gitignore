@@ -1,0 +1,18 @@
+# Binaries
+/phasionary
+*.exe
+*.test
+*.out
+
+# Build artifacts
+/bin/
+/dist/
+
+# Coverage
+*.cover
+coverage.*
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
