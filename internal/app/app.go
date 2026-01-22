@@ -37,6 +37,7 @@ type model struct {
 	selected   int
 	width      int
 	height     int
+	store      *data.Store
 }
 
 func (m model) Init() tea.Cmd {
@@ -56,6 +57,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.moveSelection(-1)
 		case "down", "j":
 			m.moveSelection(1)
+		case " ":
+			m.toggleSelectedTask()
 		}
 	}
 	return m, nil
@@ -139,6 +142,7 @@ func Run(dataDir string, projectSelector string) error {
 		categories: categories,
 		positions:  positions,
 		selected:   selected,
+		store:      store,
 	}, tea.WithAltScreen())
 	_, err = program.Run()
 	return err
@@ -189,25 +193,32 @@ func renderTaskLine(task domain.Task, selected bool) string {
 	if selected {
 		prefix = "> "
 	}
-	status := formatStatus(task.Status)
-	line := fmt.Sprintf("%s[%s] %s", prefix, status, task.Title)
-	if selected {
-		return ui.SelectedStyle.Render(line)
+	if !selected {
+		status := formatStatus(task.Status)
+		return fmt.Sprintf("%s[%s] %s", prefix, status, task.Title)
 	}
-	return line
+	statusText := statusLabel(task.Status)
+	statusStyle := ui.StatusStyle(task.Status).Bold(true).Reverse(true)
+	return ui.SelectedStyle.Render(prefix+"[") +
+		statusStyle.Render(statusText) +
+		ui.SelectedStyle.Render("] "+task.Title)
+}
+
+func statusLabel(status string) string {
+	switch status {
+	case domain.StatusInProgress:
+		return "in progress"
+	case domain.StatusCompleted:
+		return "completed"
+	case domain.StatusCancelled:
+		return "cancelled"
+	default:
+		return "todo"
+	}
 }
 
 func formatStatus(status string) string {
-	switch status {
-	case domain.StatusInProgress:
-		return ui.StatusStyle(status).Render("in progress")
-	case domain.StatusCompleted:
-		return ui.StatusStyle(status).Render("completed")
-	case domain.StatusCancelled:
-		return ui.StatusStyle(status).Render("cancelled")
-	default:
-		return ui.StatusStyle(status).Render("todo")
-	}
+	return ui.StatusStyle(status).Render(statusLabel(status))
 }
 
 func (m *model) moveSelection(delta int) {
@@ -240,7 +251,7 @@ func (m model) statusLine() string {
 }
 
 func (m model) shortcutsLine() string {
-	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | q/ctrl+c quit")
+	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | space toggle status | q/ctrl+c quit")
 }
 
 func (m model) selectedPosition() (focusPosition, bool) {
@@ -248,4 +259,74 @@ func (m model) selectedPosition() (focusPosition, bool) {
 		return focusPosition{}, false
 	}
 	return m.positions[m.selected], true
+}
+
+func (m *model) toggleSelectedTask() {
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		return
+	}
+	category := &m.categories[position.CategoryIndex]
+	task := &category.Tasks[position.TaskIndex]
+	nextStatus := nextTaskStatus(task.Status)
+	if nextStatus == task.Status {
+		return
+	}
+	updateTaskStatus(task, nextStatus)
+	m.syncTaskToProject(position, *task)
+	m.storeTaskUpdate()
+}
+
+func nextTaskStatus(current string) string {
+	switch current {
+	case domain.StatusTodo:
+		return domain.StatusInProgress
+	case domain.StatusInProgress:
+		return domain.StatusCompleted
+	case domain.StatusCompleted:
+		return domain.StatusTodo
+	case domain.StatusCancelled:
+		return domain.StatusTodo
+	default:
+		return domain.StatusTodo
+	}
+}
+
+func updateTaskStatus(task *domain.Task, status string) {
+	task.Status = status
+	task.UpdatedAt = domain.NowTimestamp()
+	if status == domain.StatusCompleted {
+		task.CompletionDate = domain.NowTimestamp()
+		task.Section = domain.SectionPast
+		return
+	}
+	if status == domain.StatusCancelled {
+		task.Section = domain.SectionPast
+		return
+	}
+	if task.Section == domain.SectionPast {
+		task.Section = domain.SectionCurrent
+	}
+	task.CompletionDate = ""
+}
+
+func (m *model) syncTaskToProject(position focusPosition, task domain.Task) {
+	if position.CategoryIndex < 0 || position.CategoryIndex >= len(m.project.Categories) {
+		return
+	}
+	projectCategory := &m.project.Categories[position.CategoryIndex]
+	for index := range projectCategory.Tasks {
+		if projectCategory.Tasks[index].ID == task.ID {
+			projectCategory.Tasks[index] = task
+			return
+		}
+	}
+	projectCategory.Tasks = append(projectCategory.Tasks, task)
+}
+
+func (m *model) storeTaskUpdate() {
+	if m.store == nil {
+		return
+	}
+	_ = m.store.SaveProject(m.project)
 }
