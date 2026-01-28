@@ -2,6 +2,69 @@ package app
 
 import "phasionary/internal/domain"
 
+func (m *model) deleteSelected() {
+	if m.editing {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok {
+		return
+	}
+	switch position.Kind {
+	case focusTask:
+		m.deleteTask(position)
+	case focusCategory:
+		m.deleteCategory(position)
+	}
+}
+
+func (m *model) deleteTask(position focusPosition) {
+	catIndex := position.CategoryIndex
+	taskIndex := position.TaskIndex
+	taskID := m.categories[catIndex].Tasks[taskIndex].ID
+
+	// Remove from view categories
+	m.categories[catIndex].Tasks = append(
+		m.categories[catIndex].Tasks[:taskIndex],
+		m.categories[catIndex].Tasks[taskIndex+1:]...,
+	)
+
+	// Remove from project categories (match by ID)
+	projTasks := m.project.Categories[catIndex].Tasks
+	for i, t := range projTasks {
+		if t.ID == taskID {
+			m.project.Categories[catIndex].Tasks = append(projTasks[:i], projTasks[i+1:]...)
+			break
+		}
+	}
+
+	m.rebuildAndClamp()
+	m.storeTaskUpdate()
+}
+
+func (m *model) deleteCategory(position focusPosition) {
+	catIndex := position.CategoryIndex
+
+	// Remove from view categories
+	m.categories = append(m.categories[:catIndex], m.categories[catIndex+1:]...)
+
+	// Remove from project categories
+	m.project.Categories = append(m.project.Categories[:catIndex], m.project.Categories[catIndex+1:]...)
+
+	m.rebuildAndClamp()
+	m.storeTaskUpdate()
+}
+
+func (m *model) rebuildAndClamp() {
+	m.positions = rebuildPositions(m.categories)
+	if m.selected >= len(m.positions) {
+		m.selected = len(m.positions) - 1
+	}
+	if m.selected < 0 && len(m.positions) > 0 {
+		m.selected = 0
+	}
+}
+
 func (m *model) toggleSelectedTask() {
 	if m.editing {
 		return

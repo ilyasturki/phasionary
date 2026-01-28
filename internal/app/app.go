@@ -106,6 +106,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.increasePriority()
 		case "y":
 			return m, m.copySelected()
+		case "d":
+			m.deleteSelected()
 		}
 	}
 	return m, nil

@@ -186,7 +186,7 @@ func (m model) shortcutsLine() string {
 	if m.editing {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | a add task | A add category | enter edit | space status | h/l priority | y copy | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | a add task | A add category | enter edit | space status | h/l priority | y copy | d delete | ? help | q quit")
 }
 
 func placeOverlay(bg, fg string, width, height int) string {
@@ -225,6 +225,7 @@ func (m model) helpView() string {
 		"  space toggle task status",
 		"  h/l change priority",
 		"  y copy selected text",
+		"  d delete selected item",
 		"  q or ctrl+c quit",
 		"",
 		"Editing:",
