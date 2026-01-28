@@ -6,8 +6,8 @@ func (m *model) deleteSelected() {
 	if m.editing {
 		return
 	}
-	_, ok := m.selectedPosition()
-	if !ok {
+	pos, ok := m.selectedPosition()
+	if !ok || pos.Kind == focusProject {
 		return
 	}
 	m.confirmDelete = true

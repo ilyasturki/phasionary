@@ -37,6 +37,11 @@ func (m *model) refreshtaskview(position focusPosition) {
 
 func rebuildPositions(categories []categoryView) []focusPosition {
 	positions := make([]focusPosition, 0)
+	positions = append(positions, focusPosition{
+		Kind:          focusProject,
+		CategoryIndex: -1,
+		TaskIndex:     -1,
+	})
 	for cIndex, category := range categories {
 		positions = append(positions, focusPosition{
 			Kind:          focusCategory,

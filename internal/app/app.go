@@ -24,7 +24,8 @@ type categoryView struct {
 type focusKind int
 
 const (
-	focusCategory focusKind = iota
+	focusProject focusKind = iota
+	focusCategory
 	focusTask
 )
 
@@ -129,9 +130,12 @@ func (m model) copySelected() tea.Cmd {
 		return nil
 	}
 	var text string
-	if pos.Kind == focusCategory {
+	switch pos.Kind {
+	case focusProject:
+		text = m.project.Name
+	case focusCategory:
 		text = m.categories[pos.CategoryIndex].Name
-	} else {
+	default:
 		text = m.categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
 	}
 	return func() tea.Msg {
@@ -140,11 +144,19 @@ func (m model) copySelected() tea.Cmd {
 }
 
 func (m model) View() string {
-	header := ui.HeaderStyle.Render("Phasionary")
-	project := ui.MutedStyle.Render(fmt.Sprintf("Project: %s", m.project.Name))
-
 	var bodyBuilder strings.Builder
 	cursor := 0
+
+	// Project line (first focusable item)
+	isProjectSelected := cursor == m.selected
+	if m.editing && isProjectSelected {
+		bodyBuilder.WriteString(m.renderEditProjectLine())
+	} else {
+		bodyBuilder.WriteString(renderProjectLine(m.project.Name, isProjectSelected))
+	}
+	cursor++
+	bodyBuilder.WriteString("\n\n")
+
 	for i, category := range m.categories {
 		if i > 0 {
 			bodyBuilder.WriteString("\n")
@@ -179,7 +191,7 @@ func (m model) View() string {
 	body := strings.TrimRight(bodyBuilder.String(), "\n")
 	statusLine := m.statusLine()
 	shortcuts := m.shortcutsLine()
-	content := header + "  " + project + "\n\n" + body + "\n\n" + statusLine + "\n" + shortcuts + "\n"
+	content := body + "\n\n" + statusLine + "\n" + shortcuts + "\n"
 	if m.showHelp {
 		help := m.helpView()
 		if m.width > 0 && m.height > 0 {
@@ -250,7 +262,6 @@ func Run(dataDir string, projectSelector string) error {
 
 func buildViews(project domain.Project) ([]categoryView, []focusPosition) {
 	categories := make([]categoryView, 0, len(project.Categories))
-	positions := make([]focusPosition, 0)
 	for _, category := range project.Categories {
 		tasks := append([]domain.Task(nil), category.Tasks...)
 		domain.SortTasks(tasks)
@@ -259,19 +270,6 @@ func buildViews(project domain.Project) ([]categoryView, []focusPosition) {
 			Tasks: tasks,
 		})
 	}
-	for cIndex, category := range categories {
-		positions = append(positions, focusPosition{
-			Kind:          focusCategory,
-			CategoryIndex: cIndex,
-			TaskIndex:     -1,
-		})
-		for tIndex := range category.Tasks {
-			positions = append(positions, focusPosition{
-				Kind:          focusTask,
-				CategoryIndex: cIndex,
-				TaskIndex:     tIndex,
-			})
-		}
-	}
+	positions := rebuildPositions(categories)
 	return categories, positions
 }

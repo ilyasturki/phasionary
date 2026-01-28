@@ -14,6 +14,10 @@ func (m *model) startEditing() {
 		return
 	}
 	switch position.Kind {
+	case focusProject:
+		m.editing = true
+		m.editValue = m.project.Name
+		m.editCursor = len([]rune(m.editValue))
 	case focusTask:
 		task := m.categories[position.CategoryIndex].Tasks[position.TaskIndex]
 		m.editing = true
@@ -176,6 +180,10 @@ func (m *model) finishEditing() {
 		return
 	}
 	switch position.Kind {
+	case focusProject:
+		m.project.Name = trimmed
+		m.project.UpdatedAt = domain.NowTimestamp()
+		m.storeTaskUpdate()
 	case focusTask:
 		category := &m.categories[position.CategoryIndex]
 		task := &category.Tasks[position.TaskIndex]

@@ -11,6 +11,52 @@ import (
 	"phasionary/internal/ui"
 )
 
+func renderProjectLine(name string, selected bool) string {
+	prefix := "  "
+	if selected {
+		prefix = "> "
+	}
+	line := fmt.Sprintf("%s■ %s", prefix, name)
+	if selected {
+		return ui.SelectedStyle.Render(line)
+	}
+	return ui.HeaderStyle.Render(line)
+}
+
+func (m model) renderEditProjectLine() string {
+	prefix := "> "
+	icon := "■ "
+
+	edited := m.editValue
+	if edited == "" {
+		edited = " "
+	}
+	runes := []rune(edited)
+	cursor := m.editCursor
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > len(runes) {
+		cursor = len(runes)
+	}
+	left := string(runes[:cursor])
+	right := string(runes[cursor:])
+	cursorChar := " "
+	if cursor < len(runes) {
+		cursorChar = string(runes[cursor])
+		right = string(runes[cursor+1:])
+	}
+	cursorStyle := ui.SelectedStyle
+	return fmt.Sprintf(
+		"%s%s%s%s%s",
+		prefix,
+		ui.HeaderStyle.Render(icon),
+		ui.HeaderStyle.Render(left),
+		cursorStyle.Render(cursorChar),
+		ui.HeaderStyle.Render(right),
+	)
+}
+
 func renderCategoryLine(name string, selected bool) string {
 	prefix := "  "
 	if selected {
@@ -172,6 +218,10 @@ func (m model) statusLine() string {
 	if !ok {
 		return ui.StatusLineStyle.Render("No items to display.")
 	}
+	if position.Kind == focusProject {
+		summary := fmt.Sprintf("Project: %s", m.project.Name)
+		return ui.StatusLineStyle.Render(summary)
+	}
 	category := m.categories[position.CategoryIndex]
 	if position.Kind == focusCategory {
 		summary := fmt.Sprintf("Category: %s (%d tasks)", category.Name, len(category.Tasks))
@@ -224,7 +274,7 @@ func truncateText(s string, max int) string {
 
 func (m model) confirmDeleteView() string {
 	position, ok := m.selectedPosition()
-	if !ok {
+	if !ok || position.Kind == focusProject {
 		return ""
 	}
 	var message string
