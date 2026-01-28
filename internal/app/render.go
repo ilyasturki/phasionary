@@ -70,6 +70,14 @@ func formatStatus(status string) string {
 
 func (m model) renderEditCategoryLine() string {
 	prefix := "> "
+
+	// Show placeholder when adding a new category with empty value
+	if m.addingCategory && m.editValue == "" {
+		placeholder := ui.MutedStyle.Render("Enter category name...")
+		cursorStyle := ui.SelectedStyle
+		return fmt.Sprintf("%s%s%s", prefix, cursorStyle.Render(" "), placeholder)
+	}
+
 	edited := m.editValue
 	if edited == "" {
 		edited = " "
@@ -175,7 +183,7 @@ func (m model) shortcutsLine() string {
 	if m.editing {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | a add | enter edit | space status | h/l priority | y copy | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | a add task | A add category | enter edit | space status | h/l priority | y copy | ? help | q quit")
 }
 
 func (m model) helpView() string {
@@ -184,6 +192,7 @@ func (m model) helpView() string {
 		"  ? toggle help  (q/esc to close)",
 		"  up/down or j/k move selection",
 		"  a add new task",
+		"  A add new category",
 		"  enter edit selected item",
 		"  space toggle task status",
 		"  h/l change priority",

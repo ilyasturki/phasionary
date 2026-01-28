@@ -67,6 +67,77 @@ func (m *model) startAddingTask() {
 	m.editCursor = 0
 }
 
+func (m *model) startAddingCategory() {
+	position, ok := m.selectedPosition()
+	if !ok {
+		return
+	}
+	insertIndex := position.CategoryIndex + 1
+
+	newCat, err := domain.NewCategory("")
+	if err != nil {
+		return
+	}
+
+	// Insert into view categories
+	m.categories = append(m.categories, categoryView{})
+	copy(m.categories[insertIndex+1:], m.categories[insertIndex:])
+	m.categories[insertIndex] = categoryView{Name: "", Tasks: nil}
+
+	// Insert into project categories
+	m.project.Categories = append(m.project.Categories, domain.Category{})
+	copy(m.project.Categories[insertIndex+1:], m.project.Categories[insertIndex:])
+	m.project.Categories[insertIndex] = newCat
+
+	// Rebuild positions and select the new category
+	m.positions = rebuildPositions(m.categories)
+	for i, pos := range m.positions {
+		if pos.Kind == focusCategory && pos.CategoryIndex == insertIndex {
+			m.selected = i
+			break
+		}
+	}
+
+	m.editing = true
+	m.addingCategory = true
+	m.newCategoryID = newCat.ID
+	m.editValue = ""
+	m.editCursor = 0
+}
+
+func (m *model) removeNewCategory() {
+	if m.newCategoryID == "" {
+		return
+	}
+
+	// Find the category index by ID
+	catIndex := -1
+	for i, cat := range m.project.Categories {
+		if cat.ID == m.newCategoryID {
+			catIndex = i
+			break
+		}
+	}
+	if catIndex < 0 {
+		return
+	}
+
+	// Remove from view categories
+	m.categories = append(m.categories[:catIndex], m.categories[catIndex+1:]...)
+
+	// Remove from project categories
+	m.project.Categories = append(m.project.Categories[:catIndex], m.project.Categories[catIndex+1:]...)
+
+	// Rebuild positions and clamp selection
+	m.positions = rebuildPositions(m.categories)
+	if m.selected >= len(m.positions) {
+		m.selected = len(m.positions) - 1
+	}
+	if m.selected < 0 && len(m.positions) > 0 {
+		m.selected = 0
+	}
+}
+
 func (m *model) handleEditKey(msg tea.KeyMsg) {
 	switch msg.String() {
 	case "enter":
@@ -126,13 +197,18 @@ func (m *model) finishEditing() {
 	m.editCursor = 0
 	m.addingTask = false
 	m.newTaskID = ""
+	m.addingCategory = false
+	m.newCategoryID = ""
 }
 
 func (m *model) finishCategoryEditing(position focusPosition, name string) {
 	// Check for duplicate name (case-insensitive) among other categories
 	for i, cat := range m.categories {
 		if i != position.CategoryIndex && strings.EqualFold(cat.Name, name) {
-			// Duplicate found — revert
+			// Duplicate found — remove phantom category if adding
+			if m.addingCategory {
+				m.removeNewCategory()
+			}
 			return
 		}
 	}
@@ -146,11 +222,16 @@ func (m *model) cancelEditing() {
 	if m.addingTask {
 		m.removeNewTask()
 	}
+	if m.addingCategory {
+		m.removeNewCategory()
+	}
 	m.editing = false
 	m.editValue = ""
 	m.editCursor = 0
 	m.addingTask = false
 	m.newTaskID = ""
+	m.addingCategory = false
+	m.newCategoryID = ""
 }
 
 func (m *model) removeNewTask() {

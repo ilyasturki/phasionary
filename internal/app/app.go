@@ -46,8 +46,10 @@ type model struct {
 	editValue  string
 	editCursor int
 	store      *data.Store
-	addingTask bool   // true when adding a new task (vs editing existing)
-	newTaskID  string // ID of task being added (for removal on cancel)
+	addingTask     bool   // true when adding a new task (vs editing existing)
+	newTaskID      string // ID of task being added (for removal on cancel)
+	addingCategory bool   // true when adding a new category
+	newCategoryID  string // ID of category being added (for removal on cancel)
 	statusMsg  string // temporary status message (e.g., "Copied!")
 }
 
@@ -96,6 +98,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.startEditing()
 		case "a":
 			m.startAddingTask()
+		case "A":
+			m.startAddingCategory()
 		case "h":
 			m.decreasePriority()
 		case "l":
