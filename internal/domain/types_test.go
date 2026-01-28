@@ -24,10 +24,10 @@ func TestSortTasks(t *testing.T) {
 	}
 
 	want := []string{
+		"Delta",
 		"Gamma",
 		"Beta",
 		"Alpha",
-		"Delta",
 		"Echo",
 		"aardvark",
 		"Foxtrot",

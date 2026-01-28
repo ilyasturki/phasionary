@@ -425,7 +425,7 @@ func (m *model) finishEditing() {
 		m.syncTaskToProject(position, *task)
 		m.storeTaskUpdate()
 	}
-	m.refreshTaskView(position)
+	m.refreshtaskview(position)
 	m.editing = false
 	m.editValue = ""
 	m.editCursor = 0
@@ -666,7 +666,7 @@ func (m *model) increasePriority() {
 	task.UpdatedAt = domain.NowTimestamp()
 	m.syncTaskToProject(position, *task)
 	m.storeTaskUpdate()
-	m.refreshTaskView(position)
+	m.refreshtaskview(position)
 }
 
 func (m *model) decreasePriority() {
@@ -687,7 +687,7 @@ func (m *model) decreasePriority() {
 	task.UpdatedAt = domain.NowTimestamp()
 	m.syncTaskToProject(position, *task)
 	m.storeTaskUpdate()
-	m.refreshTaskView(position)
+	m.refreshtaskview(position)
 }
 
 func nextPriorityUp(current string) string {
@@ -737,7 +737,7 @@ func (m *model) storeTaskUpdate() {
 	_ = m.store.SaveProject(m.project)
 }
 
-func (m *model) refreshTaskView(position focusPosition) {
+func (m *model) refreshtaskview(position focusPosition) {
 	if position.CategoryIndex < 0 || position.CategoryIndex >= len(m.categories) {
 		return
 	}

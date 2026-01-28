@@ -165,9 +165,6 @@ func ValidatePriority(priority string) error {
 func SortTasks(tasks []Task) {
 	sort.SliceStable(tasks, func(i, j int) bool {
 		a, b := tasks[i], tasks[j]
-		if rankPriority(a.Priority) != rankPriority(b.Priority) {
-			return rankPriority(a.Priority) < rankPriority(b.Priority)
-		}
 		if dlA, okA := parseDeadline(a.Deadline); okA {
 			if dlB, okB := parseDeadline(b.Deadline); okB {
 				if !dlA.Equal(dlB) {
