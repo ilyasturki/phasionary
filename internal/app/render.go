@@ -154,6 +154,9 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 }
 
 func (m model) statusLine() string {
+	if m.statusMsg != "" {
+		return ui.StatusLineStyle.Render(m.statusMsg)
+	}
 	position, ok := m.selectedPosition()
 	if !ok {
 		return ui.StatusLineStyle.Render("No items to display.")
@@ -172,7 +175,7 @@ func (m model) shortcutsLine() string {
 	if m.editing {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | a add | enter edit | space status | h/l priority | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | a add | enter edit | space status | h/l priority | y copy | ? help | q quit")
 }
 
 func (m model) helpView() string {
@@ -184,6 +187,7 @@ func (m model) helpView() string {
 		"  enter edit selected item",
 		"  space toggle task status",
 		"  h/l change priority",
+		"  y copy selected text",
 		"  q or ctrl+c quit",
 		"",
 		"Editing:",

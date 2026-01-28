@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -12,6 +13,8 @@ import (
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
 )
+
+type clipboardResultMsg struct{ err error }
 
 type categoryView struct {
 	Name  string
@@ -45,6 +48,7 @@ type model struct {
 	store      *data.Store
 	addingTask bool   // true when adding a new task (vs editing existing)
 	newTaskID  string // ID of task being added (for removal on cancel)
+	statusMsg  string // temporary status message (e.g., "Copied!")
 }
 
 func (m model) Init() tea.Cmd {
@@ -56,7 +60,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+	case clipboardResultMsg:
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
+		} else {
+			m.statusMsg = "Copied!"
+		}
 	case tea.KeyMsg:
+		m.statusMsg = ""
 		if msg.String() == "?" {
 			m.showHelp = !m.showHelp
 			break
@@ -82,9 +93,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.decreasePriority()
 		case "l":
 			m.increasePriority()
+		case "y":
+			return m, m.copySelected()
 		}
 	}
 	return m, nil
+}
+
+func (m model) copySelected() tea.Cmd {
+	pos, ok := m.selectedPosition()
+	if !ok {
+		return nil
+	}
+	var text string
+	if pos.Kind == focusCategory {
+		text = m.categories[pos.CategoryIndex].Name
+	} else {
+		text = m.categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
+	}
+	return func() tea.Msg {
+		return clipboardResultMsg{err: clipboard.WriteAll(text)}
+	}
 }
 
 func (m model) View() string {
