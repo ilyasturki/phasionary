@@ -57,24 +57,53 @@ func (m model) renderEditProjectLine() string {
 	)
 }
 
-func renderCategoryLine(name string, selected bool) string {
+func renderCategoryLine(name string, selected bool, width int) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
-	line := fmt.Sprintf("%s%s", prefix, name)
-	if selected {
-		return ui.SelectedStyle.Render(line)
+
+	if width <= 0 {
+		line := fmt.Sprintf("%s%s", prefix, name)
+		if selected {
+			return ui.SelectedStyle.Render(line)
+		}
+		return ui.CategoryStyle.Render(line)
 	}
-	return ui.CategoryStyle.Render(line)
+
+	const prefixWidth = 2
+	availableWidth := width - prefixWidth
+	if availableWidth < 1 {
+		availableWidth = 1
+	}
+
+	wrapped := ansi.Wrap(name, availableWidth, "")
+	lines := strings.Split(wrapped, "\n")
+	indent := strings.Repeat(" ", prefixWidth)
+
+	var result []string
+	for i, line := range lines {
+		if i == 0 {
+			result = append(result, prefix+line)
+		} else {
+			result = append(result, indent+line)
+		}
+	}
+
+	fullText := strings.Join(result, "\n")
+	if selected {
+		return ui.SelectedStyle.Render(fullText)
+	}
+	return ui.CategoryStyle.Render(fullText)
 }
 
-func renderTaskLine(task domain.Task, selected bool) string {
+func renderTaskLine(task domain.Task, selected bool, width int) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
 	priorityIcon := ui.PriorityIcon(task.Priority)
+
 	if !selected {
 		status := formatStatus(task.Status)
 		icon := ""
@@ -82,9 +111,36 @@ func renderTaskLine(task domain.Task, selected bool) string {
 			icon = ui.PriorityStyle(task.Priority).Render(priorityIcon) + " "
 		}
 		titleStyle := ui.PriorityStyle(task.Priority)
-		title := titleStyle.Render(task.Title)
-		return fmt.Sprintf("%s[%s] %s%s", prefix, status, icon, title)
+
+		if width <= 0 {
+			title := titleStyle.Render(task.Title)
+			return fmt.Sprintf("%s[%s] %s%s", prefix, status, icon, title)
+		}
+
+		prefixPart := fmt.Sprintf("%s[%s] %s", prefix, status, icon)
+		overhead := ansi.StringWidth(prefixPart)
+		availableWidth := width - overhead
+		if availableWidth < 1 {
+			availableWidth = 1
+		}
+
+		wrapped := ansi.Wrap(task.Title, availableWidth, "")
+		wrapLines := strings.Split(wrapped, "\n")
+		indent := strings.Repeat(" ", overhead)
+
+		var result []string
+		for i, line := range wrapLines {
+			styledLine := titleStyle.Render(line)
+			if i == 0 {
+				result = append(result, fmt.Sprintf("%s[%s] %s%s", prefix, status, icon, styledLine))
+			} else {
+				result = append(result, indent+styledLine)
+			}
+		}
+		return strings.Join(result, "\n")
 	}
+
+	// Selected task
 	statusText := statusLabel(task.Status)
 	priorityStyle := ui.SelectedPriorityStyle(task.Priority)
 	statusStyle := ui.SelectedStatusStyle(task.Status)
@@ -92,12 +148,47 @@ func renderTaskLine(task domain.Task, selected bool) string {
 	if priorityIcon != "" {
 		icon = priorityStyle.Render(priorityIcon + " ")
 	}
-	title := priorityStyle.Render(task.Title)
-	return ui.SelectedStyle.Render(prefix+"[") +
-		statusStyle.Render(statusText) +
-		ui.SelectedStyle.Render("] ") +
-		icon +
-		title
+
+	if width <= 0 {
+		title := priorityStyle.Render(task.Title)
+		return ui.SelectedStyle.Render(prefix+"[") +
+			statusStyle.Render(statusText) +
+			ui.SelectedStyle.Render("] ") +
+			icon +
+			title
+	}
+
+	// Calculate visible overhead: "> [" + statusText + "] " + icon
+	iconText := ""
+	if priorityIcon != "" {
+		iconText = priorityIcon + " "
+	}
+	overhead := ansi.StringWidth(prefix + "[" + statusText + "] " + iconText)
+	availableWidth := width - overhead
+	if availableWidth < 1 {
+		availableWidth = 1
+	}
+
+	wrapped := ansi.Wrap(task.Title, availableWidth, "")
+	wrapLines := strings.Split(wrapped, "\n")
+	indent := strings.Repeat(" ", overhead)
+
+	var result []string
+	for i, line := range wrapLines {
+		styledTitle := priorityStyle.Render(line)
+		if i == 0 {
+			firstLine := ui.SelectedStyle.Render(prefix+"[") +
+				statusStyle.Render(statusText) +
+				ui.SelectedStyle.Render("] ") +
+				icon +
+				styledTitle
+			result = append(result, firstLine)
+		} else {
+			styledIndent := ui.SelectedStyle.Render(indent)
+			result = append(result, styledIndent+styledTitle)
+		}
+	}
+	return strings.Join(result, "\n")
 }
 
 func statusLabel(status string) string {
@@ -119,12 +210,32 @@ func formatStatus(status string) string {
 
 func (m model) renderEditCategoryLine() string {
 	prefix := "> "
+	const prefixWidth = 2
 
 	// Show placeholder when adding a new category with empty value
 	if m.addingCategory && m.editValue == "" {
-		placeholder := ui.MutedStyle.Render("Enter category name...")
 		cursorStyle := ui.SelectedStyle
-		return fmt.Sprintf("%s%s%s", prefix, cursorStyle.Render(" "), placeholder)
+		placeholder := ui.MutedStyle.Render("Enter category name...")
+		styledText := cursorStyle.Render(" ") + placeholder
+
+		if m.width > 0 {
+			availableWidth := m.width - prefixWidth
+			if availableWidth < 1 {
+				availableWidth = 1
+			}
+			wrapped := ansi.Wrap(styledText, availableWidth, "")
+			lines := strings.Split(wrapped, "\n")
+			indent := strings.Repeat(" ", prefixWidth)
+			for i, line := range lines {
+				if i == 0 {
+					lines[i] = prefix + line
+				} else {
+					lines[i] = indent + line
+				}
+			}
+			return strings.Join(lines, "\n")
+		}
+		return fmt.Sprintf("%s%s", prefix, styledText)
 	}
 
 	edited := m.editValue
@@ -147,6 +258,45 @@ func (m model) renderEditCategoryLine() string {
 		right = string(runes[cursor+1:])
 	}
 	cursorStyle := ui.SelectedStyle
+
+	if m.width > 0 {
+		availableWidth := m.width - prefixWidth
+		if availableWidth < 1 {
+			availableWidth = 1
+		}
+		wrapped := ansi.Wrap(edited, availableWidth, "")
+		wrapLines := strings.Split(wrapped, "\n")
+		indent := strings.Repeat(" ", prefixWidth)
+
+		pos := 0
+		var result []string
+		for i, line := range wrapLines {
+			lineRunes := []rune(line)
+			lineLen := len(lineRunes)
+			var styledLine string
+
+			if cursor >= pos && cursor < pos+lineLen {
+				offset := cursor - pos
+				l := string(lineRunes[:offset])
+				c := string(lineRunes[offset])
+				r := string(lineRunes[offset+1:])
+				styledLine = ui.CategoryStyle.Render(l) + cursorStyle.Render(c) + ui.CategoryStyle.Render(r)
+			} else if cursor == pos+lineLen {
+				styledLine = ui.CategoryStyle.Render(line) + cursorStyle.Render(" ")
+			} else {
+				styledLine = ui.CategoryStyle.Render(line)
+			}
+
+			if i == 0 {
+				result = append(result, prefix+styledLine)
+			} else {
+				result = append(result, indent+styledLine)
+			}
+			pos += lineLen + 1
+		}
+		return strings.Join(result, "\n")
+	}
+
 	return fmt.Sprintf(
 		"%s%s%s%s",
 		prefix,
@@ -160,17 +310,43 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	prefix := "> "
 	statusText := formatStatus(task.Status)
 
+	titleStyle := ui.PriorityStyle(task.Priority)
+	icon := ui.PriorityIcon(task.Priority)
+	iconPrefix := ""
+	iconPlain := ""
+	if icon != "" {
+		iconPrefix = titleStyle.Render(icon) + " "
+		iconPlain = icon + " "
+	}
+
+	// Build the prefix part (everything before the editable text)
+	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, statusText, iconPrefix)
+	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status) + "] " + iconPlain)
+
 	// Show placeholder text when adding a new task with empty value
 	if m.addingTask && m.editValue == "" {
-		placeholder := ui.MutedStyle.Render("Enter task title...")
 		cursorStyle := ui.SelectedStyle
-		return fmt.Sprintf(
-			"%s[%s] %s%s",
-			prefix,
-			statusText,
-			cursorStyle.Render(" "),
-			placeholder,
-		)
+		placeholder := ui.MutedStyle.Render("Enter task title...")
+		styledText := cursorStyle.Render(" ") + placeholder
+
+		if m.width > 0 {
+			availableWidth := m.width - overhead
+			if availableWidth < 1 {
+				availableWidth = 1
+			}
+			wrapped := ansi.Wrap(styledText, availableWidth, "")
+			lines := strings.Split(wrapped, "\n")
+			indent := strings.Repeat(" ", overhead)
+			for i, line := range lines {
+				if i == 0 {
+					lines[i] = prefixPart + line
+				} else {
+					lines[i] = indent + line
+				}
+			}
+			return strings.Join(lines, "\n")
+		}
+		return prefixPart + styledText
 	}
 
 	edited := m.editValue
@@ -193,17 +369,48 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		right = string(runes[cursor+1:])
 	}
 	cursorStyle := ui.SelectedStyle
-	titleStyle := ui.PriorityStyle(task.Priority)
-	icon := ui.PriorityIcon(task.Priority)
-	iconPrefix := ""
-	if icon != "" {
-		iconPrefix = titleStyle.Render(icon) + " "
+
+	if m.width > 0 {
+		availableWidth := m.width - overhead
+		if availableWidth < 1 {
+			availableWidth = 1
+		}
+		wrapped := ansi.Wrap(edited, availableWidth, "")
+		wrapLines := strings.Split(wrapped, "\n")
+		indent := strings.Repeat(" ", overhead)
+
+		pos := 0
+		var result []string
+		for i, line := range wrapLines {
+			lineRunes := []rune(line)
+			lineLen := len(lineRunes)
+			var styledLine string
+
+			if cursor >= pos && cursor < pos+lineLen {
+				offset := cursor - pos
+				l := string(lineRunes[:offset])
+				c := string(lineRunes[offset])
+				r := string(lineRunes[offset+1:])
+				styledLine = titleStyle.Render(l) + cursorStyle.Render(c) + titleStyle.Render(r)
+			} else if cursor == pos+lineLen {
+				styledLine = titleStyle.Render(line) + cursorStyle.Render(" ")
+			} else {
+				styledLine = titleStyle.Render(line)
+			}
+
+			if i == 0 {
+				result = append(result, prefixPart+styledLine)
+			} else {
+				result = append(result, indent+styledLine)
+			}
+			pos += lineLen + 1
+		}
+		return strings.Join(result, "\n")
 	}
+
 	return fmt.Sprintf(
-		"%s[%s] %s%s%s%s",
-		prefix,
-		statusText,
-		iconPrefix,
+		"%s%s%s%s",
+		prefixPart,
 		titleStyle.Render(left),
 		cursorStyle.Render(cursorChar),
 		titleStyle.Render(right),

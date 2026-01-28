@@ -165,7 +165,7 @@ func (m model) View() string {
 		if m.editing && isSelected {
 			bodyBuilder.WriteString(m.renderEditCategoryLine())
 		} else {
-			bodyBuilder.WriteString(renderCategoryLine(category.Name, isSelected))
+			bodyBuilder.WriteString(renderCategoryLine(category.Name, isSelected, m.width))
 		}
 		cursor++
 		if len(category.Tasks) == 0 {
@@ -180,7 +180,7 @@ func (m model) View() string {
 			if m.editing && isSelected {
 				bodyBuilder.WriteString(m.renderEditTaskLine(task))
 			} else {
-				bodyBuilder.WriteString(renderTaskLine(task, isSelected))
+				bodyBuilder.WriteString(renderTaskLine(task, isSelected, m.width))
 			}
 			bodyBuilder.WriteString("\n")
 			cursor++
