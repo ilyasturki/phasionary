@@ -50,7 +50,8 @@ type model struct {
 	newTaskID      string // ID of task being added (for removal on cancel)
 	addingCategory bool   // true when adding a new category
 	newCategoryID  string // ID of category being added (for removal on cancel)
-	statusMsg  string // temporary status message (e.g., "Copied!")
+	statusMsg     string // temporary status message (e.g., "Copied!")
+	confirmDelete bool   // true when delete confirmation dialog is shown
 }
 
 func (m model) Init() tea.Cmd {
@@ -78,6 +79,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "q", "esc":
 				m.showHelp = false
+			}
+			break
+		}
+		if m.confirmDelete {
+			switch msg.String() {
+			case "y", "enter":
+				m.confirmDeleteAction()
+			case "n", "esc":
+				m.confirmDelete = false
 			}
 			break
 		}
@@ -177,6 +187,14 @@ func (m model) View() string {
 			return placeOverlay(bg, help, m.width, m.height)
 		}
 		return help
+	}
+	if m.confirmDelete {
+		dialog := m.confirmDeleteView()
+		if m.width > 0 && m.height > 0 {
+			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
+			return placeOverlay(bg, dialog, m.width, m.height)
+		}
+		return dialog
 	}
 	return content
 }

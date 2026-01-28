@@ -214,6 +214,35 @@ func placeOverlay(bg, fg string, width, height int) string {
 	return strings.Join(bgLines, "\n")
 }
 
+func truncateText(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max]) + "..."
+}
+
+func (m model) confirmDeleteView() string {
+	position, ok := m.selectedPosition()
+	if !ok {
+		return ""
+	}
+	var message string
+	if position.Kind == focusTask {
+		task := m.categories[position.CategoryIndex].Tasks[position.TaskIndex]
+		message = fmt.Sprintf("Delete task %q?", truncateText(task.Title, 30))
+	} else {
+		cat := m.categories[position.CategoryIndex]
+		message = fmt.Sprintf("Delete category %q and %d tasks?", truncateText(cat.Name, 30), len(cat.Tasks))
+	}
+	lines := []string{
+		message,
+		"",
+		"y/enter confirm | n/esc cancel",
+	}
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
 func (m model) helpView() string {
 	lines := []string{
 		"Shortcuts:",

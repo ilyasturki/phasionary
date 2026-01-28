@@ -6,6 +6,15 @@ func (m *model) deleteSelected() {
 	if m.editing {
 		return
 	}
+	_, ok := m.selectedPosition()
+	if !ok {
+		return
+	}
+	m.confirmDelete = true
+}
+
+func (m *model) confirmDeleteAction() {
+	m.confirmDelete = false
 	position, ok := m.selectedPosition()
 	if !ok {
 		return
