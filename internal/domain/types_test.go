@@ -7,13 +7,13 @@ import (
 
 func TestSortTasks(t *testing.T) {
 	tasks := []Task{
-		{Title: "Alpha", Priority: PriorityHigh, Deadline: "2026-01-10", TimeEstimateValue: 2, TimeEstimateUnit: EstimateHours},
-		{Title: "Beta", Priority: PriorityHigh, Deadline: "2026-01-05", TimeEstimateValue: 4, TimeEstimateUnit: EstimateHours},
-		{Title: "Gamma", Priority: PriorityHigh, Deadline: "2026-01-05", TimeEstimateValue: 60, TimeEstimateUnit: EstimateMinutes},
-		{Title: "Delta", Priority: PriorityMedium, Deadline: "2026-01-01"},
-		{Title: "Echo", Priority: PriorityMedium, TimeEstimateValue: 30, TimeEstimateUnit: EstimateMinutes},
-		{Title: "Foxtrot", Priority: PriorityMedium, TimeEstimateValue: 1, TimeEstimateUnit: EstimateHours},
-		{Title: "aardvark", Priority: PriorityMedium, TimeEstimateValue: 1, TimeEstimateUnit: EstimateHours},
+		{Title: "Alpha", Priority: PriorityHigh},
+		{Title: "Beta", Priority: PriorityHigh},
+		{Title: "Gamma", Priority: PriorityHigh},
+		{Title: "Delta", Priority: PriorityMedium},
+		{Title: "Echo", Priority: PriorityMedium},
+		{Title: "Foxtrot", Priority: PriorityMedium},
+		{Title: "aardvark", Priority: PriorityMedium},
 	}
 
 	SortTasks(tasks)
@@ -24,12 +24,12 @@ func TestSortTasks(t *testing.T) {
 	}
 
 	want := []string{
-		"Delta",
-		"Gamma",
-		"Beta",
 		"Alpha",
-		"Echo",
+		"Beta",
+		"Gamma",
 		"aardvark",
+		"Delta",
+		"Echo",
 		"Foxtrot",
 	}
 

@@ -15,19 +15,9 @@ const (
 	StatusCompleted  = "completed"
 	StatusCancelled  = "cancelled"
 
-	SectionCurrent = "current"
-	SectionFuture  = "future"
-	SectionPast    = "past"
-
 	PriorityHigh   = "high"
 	PriorityMedium = "medium"
 	PriorityLow    = "low"
-)
-
-const (
-	EstimateMinutes = "minutes"
-	EstimateHours   = "hours"
-	EstimateDays    = "days"
 )
 
 var DefaultCategories = []string{"Feature", "Fix", "Ergonomy", "Documentation", "Research"}
@@ -50,19 +40,13 @@ type Category struct {
 }
 
 type Task struct {
-	ID                string `json:"id"`
-	Title             string `json:"title"`
-	Description       string `json:"description,omitempty"`
-	Status            string `json:"status"`
-	Section           string `json:"section"`
-	CreatedAt         string `json:"created_at"`
-	UpdatedAt         string `json:"updated_at"`
-	Deadline          string `json:"deadline,omitempty"`
-	TimeEstimateValue int    `json:"time_estimate_value,omitempty"`
-	TimeEstimateUnit  string `json:"time_estimate_unit,omitempty"`
-	Priority          string `json:"priority,omitempty"`
-	Notes             string `json:"notes,omitempty"`
-	CompletionDate    string `json:"completion_date,omitempty"`
+	ID             string `json:"id"`
+	Title          string `json:"title"`
+	Status         string `json:"status"`
+	CreatedAt      string `json:"created_at"`
+	UpdatedAt      string `json:"updated_at"`
+	Priority       string `json:"priority,omitempty"`
+	CompletionDate string `json:"completion_date,omitempty"`
 }
 
 func NowTimestamp() string {
@@ -129,7 +113,6 @@ func NewTask(title string) (Task, error) {
 		ID:        id,
 		Title:     title,
 		Status:    StatusTodo,
-		Section:   SectionCurrent,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
@@ -141,15 +124,6 @@ func ValidateStatus(status string) error {
 		return nil
 	default:
 		return errors.New("invalid status")
-	}
-}
-
-func ValidateSection(section string) error {
-	switch section {
-	case SectionCurrent, SectionFuture, SectionPast:
-		return nil
-	default:
-		return errors.New("invalid section")
 	}
 }
 
@@ -165,27 +139,9 @@ func ValidatePriority(priority string) error {
 func SortTasks(tasks []Task) {
 	sort.SliceStable(tasks, func(i, j int) bool {
 		a, b := tasks[i], tasks[j]
-		if dlA, okA := parseDeadline(a.Deadline); okA {
-			if dlB, okB := parseDeadline(b.Deadline); okB {
-				if !dlA.Equal(dlB) {
-					return dlA.Before(dlB)
-				}
-			} else {
-				return true
-			}
-		} else if _, okB := parseDeadline(b.Deadline); okB {
-			return false
-		}
-		if estA, okA := estimateMinutes(a.TimeEstimateValue, a.TimeEstimateUnit); okA {
-			if estB, okB := estimateMinutes(b.TimeEstimateValue, b.TimeEstimateUnit); okB {
-				if estA != estB {
-					return estA < estB
-				}
-			} else {
-				return true
-			}
-		} else if _, okB := estimateMinutes(b.TimeEstimateValue, b.TimeEstimateUnit); okB {
-			return false
+		rA, rB := rankPriority(a.Priority), rankPriority(b.Priority)
+		if rA != rB {
+			return rA < rB
 		}
 		return strings.ToLower(a.Title) < strings.ToLower(b.Title)
 	})
@@ -203,34 +159,5 @@ func rankPriority(priority string) int {
 		return 3
 	default:
 		return 4
-	}
-}
-
-func parseDeadline(deadline string) (time.Time, bool) {
-	if strings.TrimSpace(deadline) == "" {
-		return time.Time{}, false
-	}
-	if t, err := time.Parse("2006-01-02", deadline); err == nil {
-		return t, true
-	}
-	if t, err := time.Parse(time.RFC3339, deadline); err == nil {
-		return t, true
-	}
-	return time.Time{}, false
-}
-
-func estimateMinutes(value int, unit string) (int, bool) {
-	if value <= 0 {
-		return 0, false
-	}
-	switch unit {
-	case EstimateMinutes:
-		return value, true
-	case EstimateHours:
-		return value * 60, true
-	case EstimateDays:
-		return value * 60 * 24, true
-	default:
-		return 0, false
 	}
 }

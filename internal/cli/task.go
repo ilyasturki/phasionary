@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,7 +26,6 @@ func newTaskCmd() *cobra.Command {
 
 func newTaskListCmd() *cobra.Command {
 	var status string
-	var section string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -46,11 +44,6 @@ func newTaskListCmd() *cobra.Command {
 					return err
 				}
 			}
-			if section != "" {
-				if err := domain.ValidateSection(section); err != nil {
-					return err
-				}
-			}
 
 			found := false
 			for _, category := range project.Categories {
@@ -60,10 +53,7 @@ func newTaskListCmd() *cobra.Command {
 					if status != "" && task.Status != status {
 						continue
 					}
-					if section != "" && task.Section != section {
-						continue
-					}
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\t%s (%s)\n", category.Name, task.Status, task.Section, task.Title, task.ID)
+					fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s (%s)\n", category.Name, task.Status, task.Title, task.ID)
 					found = true
 				}
 			}
@@ -75,15 +65,12 @@ func newTaskListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&status, "status", "", "filter by status")
-	cmd.Flags().StringVar(&section, "section", "", "filter by section")
 	return cmd
 }
 
 func newTaskAddCmd() *cobra.Command {
 	var categoryName string
 	var priority string
-	var deadline string
-	var estimate string
 
 	cmd := &cobra.Command{
 		Use:   "add <title>",
@@ -114,22 +101,6 @@ func newTaskAddCmd() *cobra.Command {
 				task.Priority = priority
 			}
 
-			if deadline != "" {
-				if _, err := time.Parse("2006-01-02", deadline); err != nil {
-					return fmt.Errorf("invalid deadline format: %w", err)
-				}
-				task.Deadline = deadline
-			}
-
-			if estimate != "" {
-				value, unit, err := parseEstimate(estimate)
-				if err != nil {
-					return err
-				}
-				task.TimeEstimateValue = value
-				task.TimeEstimateUnit = unit
-			}
-
 			categoryIndex := -1
 			for i, category := range project.Categories {
 				if domain.NormalizeName(category.Name) == domain.NormalizeName(categoryName) {
@@ -153,8 +124,6 @@ func newTaskAddCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&categoryName, "category", "", "category name")
 	cmd.Flags().StringVar(&priority, "priority", "", "priority: high|medium|low")
-	cmd.Flags().StringVar(&deadline, "deadline", "", "deadline YYYY-MM-DD")
-	cmd.Flags().StringVar(&estimate, "estimate", "", "estimate: 30m, 2h, 1d")
 	return cmd
 }
 
@@ -191,15 +160,7 @@ func newTaskStatusCmd() *cobra.Command {
 					task.UpdatedAt = domain.NowTimestamp()
 					if status == domain.StatusCompleted {
 						task.CompletionDate = domain.NowTimestamp()
-						task.Section = domain.SectionPast
-					}
-					if status == domain.StatusCancelled {
-						task.Section = domain.SectionPast
-					}
-					if status == domain.StatusTodo || status == domain.StatusInProgress {
-						if task.Section == domain.SectionPast {
-							task.Section = domain.SectionCurrent
-						}
+					} else {
 						task.CompletionDate = ""
 					}
 					updated = true
@@ -223,43 +184,4 @@ func newTaskStatusCmd() *cobra.Command {
 		},
 	}
 	return cmd
-}
-
-func parseEstimate(raw string) (int, string, error) {
-	if len(raw) < 2 {
-		return 0, "", fmt.Errorf("invalid estimate %q", raw)
-	}
-	unitChar := raw[len(raw)-1:]
-	valuePart := raw[:len(raw)-1]
-	value, err := parsePositiveInt(valuePart)
-	if err != nil {
-		return 0, "", fmt.Errorf("invalid estimate %q", raw)
-	}
-	switch unitChar {
-	case "m":
-		return value, domain.EstimateMinutes, nil
-	case "h":
-		return value, domain.EstimateHours, nil
-	case "d":
-		return value, domain.EstimateDays, nil
-	default:
-		return 0, "", fmt.Errorf("invalid estimate unit %q", unitChar)
-	}
-}
-
-func parsePositiveInt(raw string) (int, error) {
-	if raw == "" {
-		return 0, errors.New("missing number")
-	}
-	var value int
-	for _, r := range raw {
-		if r < '0' || r > '9' {
-			return 0, fmt.Errorf("invalid number %q", raw)
-		}
-		value = value*10 + int(r-'0')
-	}
-	if value <= 0 {
-		return 0, errors.New("number must be positive")
-	}
-	return value, nil
 }

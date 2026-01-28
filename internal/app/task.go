@@ -113,15 +113,7 @@ func updateTaskStatus(task *domain.Task, status string) {
 	task.UpdatedAt = domain.NowTimestamp()
 	if status == domain.StatusCompleted {
 		task.CompletionDate = domain.NowTimestamp()
-		task.Section = domain.SectionPast
 		return
-	}
-	if status == domain.StatusCancelled {
-		task.Section = domain.SectionPast
-		return
-	}
-	if task.Section == domain.SectionPast {
-		task.Section = domain.SectionCurrent
 	}
 	task.CompletionDate = ""
 }

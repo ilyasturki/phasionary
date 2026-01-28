@@ -435,7 +435,7 @@ func (m model) statusLine() string {
 		return ui.StatusLineStyle.Render(summary)
 	}
 	task := category.Tasks[position.TaskIndex]
-	summary := fmt.Sprintf("Selected: %s / %s (%s - %s)", category.Name, task.Title, task.Status, task.Section)
+	summary := fmt.Sprintf("Selected: %s / %s (%s)", category.Name, task.Title, task.Status)
 	return ui.StatusLineStyle.Render(summary)
 }
 
