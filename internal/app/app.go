@@ -78,6 +78,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.startEditing()
 		case "a":
 			m.startAddingTask()
+		case "h":
+			m.decreasePriority()
+		case "l":
+			m.increasePriority()
 		}
 	}
 	return m, nil
@@ -300,7 +304,7 @@ func (m model) shortcutsLine() string {
 	if m.editing {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | a add task | enter edit title | space toggle status | ? help | q/ctrl+c quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | a add | enter edit | space status | h/l priority | ? help | q quit")
 }
 
 func (m model) helpView() string {
@@ -311,6 +315,7 @@ func (m model) helpView() string {
 		"  a add new task",
 		"  enter edit selected task",
 		"  space toggle task status",
+		"  h/l change priority",
 		"  q or ctrl+c quit",
 		"",
 		"Editing:",
@@ -641,6 +646,74 @@ func updateTaskStatus(task *domain.Task, status string) {
 		task.Section = domain.SectionCurrent
 	}
 	task.CompletionDate = ""
+}
+
+func (m *model) increasePriority() {
+	if m.editing {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		return
+	}
+	category := &m.categories[position.CategoryIndex]
+	task := &category.Tasks[position.TaskIndex]
+	newPriority := nextPriorityUp(task.Priority)
+	if newPriority == task.Priority {
+		return
+	}
+	task.Priority = newPriority
+	task.UpdatedAt = domain.NowTimestamp()
+	m.syncTaskToProject(position, *task)
+	m.storeTaskUpdate()
+	m.refreshTaskView(position)
+}
+
+func (m *model) decreasePriority() {
+	if m.editing {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		return
+	}
+	category := &m.categories[position.CategoryIndex]
+	task := &category.Tasks[position.TaskIndex]
+	newPriority := nextPriorityDown(task.Priority)
+	if newPriority == task.Priority {
+		return
+	}
+	task.Priority = newPriority
+	task.UpdatedAt = domain.NowTimestamp()
+	m.syncTaskToProject(position, *task)
+	m.storeTaskUpdate()
+	m.refreshTaskView(position)
+}
+
+func nextPriorityUp(current string) string {
+	switch current {
+	case domain.PriorityLow:
+		return domain.PriorityMedium
+	case domain.PriorityMedium:
+		return domain.PriorityHigh
+	case domain.PriorityHigh:
+		return domain.PriorityHigh
+	default:
+		return domain.PriorityMedium
+	}
+}
+
+func nextPriorityDown(current string) string {
+	switch current {
+	case domain.PriorityHigh:
+		return domain.PriorityMedium
+	case domain.PriorityMedium:
+		return domain.PriorityLow
+	case domain.PriorityLow:
+		return domain.PriorityLow
+	default:
+		return domain.PriorityMedium
+	}
 }
 
 func (m *model) syncTaskToProject(position focusPosition, task domain.Task) {
