@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
 )
@@ -184,6 +187,31 @@ func (m model) shortcutsLine() string {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
 	return ui.StatusLineStyle.Render("Shortcuts: j/k move | a add task | A add category | enter edit | space status | h/l priority | y copy | ? help | q quit")
+}
+
+func placeOverlay(bg, fg string, width, height int) string {
+	bgLines := strings.Split(bg, "\n")
+	fgLines := strings.Split(fg, "\n")
+
+	fgW := lipgloss.Width(fg)
+	fgH := len(fgLines)
+	startY := max(0, (height-fgH)/2)
+	startX := max(0, (width-fgW)/2)
+
+	for i, fgLine := range fgLines {
+		y := startY + i
+		if y >= len(bgLines) {
+			break
+		}
+		left := ansi.Truncate(bgLines[y], startX, "")
+		if w := ansi.StringWidth(left); w < startX {
+			left += strings.Repeat(" ", startX-w)
+		}
+		right := ansi.TruncateLeft(bgLines[y], startX+fgW, "")
+		bgLines[y] = left + fgLine + right
+	}
+
+	return strings.Join(bgLines, "\n")
 }
 
 func (m model) helpView() string {

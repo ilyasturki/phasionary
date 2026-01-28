@@ -171,7 +171,8 @@ func (m model) View() string {
 	if m.showHelp {
 		help := m.helpView()
 		if m.width > 0 && m.height > 0 {
-			return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, help)
+			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
+			return placeOverlay(bg, help, m.width, m.height)
 		}
 		return help
 	}
