@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
@@ -38,6 +39,7 @@ type model struct {
 	width      int
 	height     int
 	editing    bool
+	showHelp   bool
 	editValue  string
 	editCursor int
 	store      *data.Store
@@ -53,6 +55,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tea.KeyMsg:
+		if msg.String() == "?" {
+			m.showHelp = !m.showHelp
+			break
+		}
 		if m.editing {
 			m.handleEditKey(msg)
 			break
@@ -109,8 +115,15 @@ func (m model) View() string {
 	body := strings.TrimRight(bodyBuilder.String(), "\n")
 	statusLine := m.statusLine()
 	shortcuts := m.shortcutsLine()
-
-	return header + "  " + project + "\n\n" + body + "\n\n" + statusLine + "\n" + shortcuts + "\n"
+	content := header + "  " + project + "\n\n" + body + "\n\n" + statusLine + "\n" + shortcuts + "\n"
+	if m.showHelp {
+		help := m.helpView()
+		if m.width > 0 && m.height > 0 {
+			return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, help)
+		}
+		return help
+	}
+	return content
 }
 
 func Run(dataDir string, projectSelector string) error {
@@ -223,7 +236,7 @@ func renderTaskLine(task domain.Task, selected bool) string {
 	titleStyle := ui.PriorityStyle(task.Priority).Bold(true).Reverse(true)
 	icon := ""
 	if priorityIcon != "" {
-		icon = titleStyle.Render(priorityIcon) + " "
+		icon = titleStyle.Render(priorityIcon + " ")
 	}
 	title := titleStyle.Render(task.Title)
 	return ui.SelectedStyle.Render(prefix+"[") +
@@ -281,9 +294,28 @@ func (m model) statusLine() string {
 
 func (m model) shortcutsLine() string {
 	if m.editing {
-		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor")
+		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | enter edit title | space toggle status | q/ctrl+c quit")
+	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | enter edit title | space toggle status | ? help | q/ctrl+c quit")
+}
+
+func (m model) helpView() string {
+	lines := []string{
+		"Shortcuts:",
+		"  ? toggle help",
+		"  up/down or j/k move selection",
+		"  enter edit selected task",
+		"  space toggle task status",
+		"  q or ctrl+c quit",
+		"",
+		"Editing:",
+		"  enter save changes",
+		"  esc cancel editing",
+		"  left/right move cursor",
+		"  backspace/delete remove character",
+		"  type to insert text",
+	}
+	return ui.HelpDialogStyle.Render(ui.MutedStyle.Render(strings.Join(lines, "\n")))
 }
 
 func (m *model) startEditing() {

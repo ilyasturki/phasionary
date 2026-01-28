@@ -8,6 +8,7 @@ var (
 	CategoryStyle   = lipgloss.NewStyle().Bold(true)
 	SelectedStyle   = lipgloss.NewStyle().Bold(true).Reverse(true)
 	StatusLineStyle = lipgloss.NewStyle().Faint(true)
+	HelpDialogStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
 )
 
 func StatusStyle(status string) lipgloss.Style {
