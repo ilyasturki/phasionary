@@ -4,7 +4,8 @@
       "Bash(/home/yasso/.claude/plugins/cache/claude-plugins-official/ralph-loop/f70b65538da0/scripts/setup-ralph-loop.sh:*)",
       "Bash(go test:*)",
       "Bash(go build:*)",
-      "Bash(go mod tidy:*)"
+      "Bash(go mod tidy:*)",
+      "Bash(go vet:*)"
     ]
   },
   "enabledPlugins": {

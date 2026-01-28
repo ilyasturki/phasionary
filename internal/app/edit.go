@@ -193,7 +193,6 @@ func (m *model) finishEditing() {
 			m.syncTaskToProject(position, *task)
 			m.storeTaskUpdate()
 		}
-		m.refreshtaskview(position)
 	case focusCategory:
 		m.finishCategoryEditing(position, trimmed)
 	default:

@@ -136,7 +136,6 @@ func (m *model) increasePriority() {
 	task.UpdatedAt = domain.NowTimestamp()
 	m.syncTaskToProject(position, *task)
 	m.storeTaskUpdate()
-	m.refreshtaskview(position)
 }
 
 func (m *model) decreasePriority() {
@@ -157,7 +156,56 @@ func (m *model) decreasePriority() {
 	task.UpdatedAt = domain.NowTimestamp()
 	m.syncTaskToProject(position, *task)
 	m.storeTaskUpdate()
-	m.refreshtaskview(position)
+}
+
+func (m *model) moveTaskDown() {
+	if m.editing {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		return
+	}
+	catIndex := position.CategoryIndex
+	taskIndex := position.TaskIndex
+	tasks := m.categories[catIndex].Tasks
+	if taskIndex >= len(tasks)-1 {
+		return
+	}
+	// Swap in view
+	tasks[taskIndex], tasks[taskIndex+1] = tasks[taskIndex+1], tasks[taskIndex]
+	// Swap in project model
+	pt := m.project.Categories[catIndex].Tasks
+	pt[taskIndex], pt[taskIndex+1] = pt[taskIndex+1], pt[taskIndex]
+	// Rebuild positions and follow the moved task
+	m.positions = rebuildPositions(m.categories)
+	m.selected++
+	m.storeTaskUpdate()
+}
+
+func (m *model) moveTaskUp() {
+	if m.editing {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		return
+	}
+	catIndex := position.CategoryIndex
+	taskIndex := position.TaskIndex
+	if taskIndex <= 0 {
+		return
+	}
+	tasks := m.categories[catIndex].Tasks
+	// Swap in view
+	tasks[taskIndex], tasks[taskIndex-1] = tasks[taskIndex-1], tasks[taskIndex]
+	// Swap in project model
+	pt := m.project.Categories[catIndex].Tasks
+	pt[taskIndex], pt[taskIndex-1] = pt[taskIndex-1], pt[taskIndex]
+	// Rebuild positions and follow the moved task
+	m.positions = rebuildPositions(m.categories)
+	m.selected--
+	m.storeTaskUpdate()
 }
 
 func nextPriorityUp(current string) string {

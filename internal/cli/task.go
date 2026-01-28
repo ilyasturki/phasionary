@@ -47,9 +47,7 @@ func newTaskListCmd() *cobra.Command {
 
 			found := false
 			for _, category := range project.Categories {
-				tasks := append([]domain.Task(nil), category.Tasks...)
-				domain.SortTasks(tasks)
-				for _, task := range tasks {
+				for _, task := range category.Tasks {
 					if status != "" && task.Status != status {
 						continue
 					}

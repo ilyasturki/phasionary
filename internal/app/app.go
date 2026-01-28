@@ -119,6 +119,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.copySelected()
 		case "d":
 			m.deleteSelected()
+		case "J":
+			m.moveTaskDown()
+		case "K":
+			m.moveTaskUp()
 		}
 	}
 	return m, nil
@@ -264,7 +268,6 @@ func buildViews(project domain.Project) ([]categoryView, []focusPosition) {
 	categories := make([]categoryView, 0, len(project.Categories))
 	for _, category := range project.Categories {
 		tasks := append([]domain.Task(nil), category.Tasks...)
-		domain.SortTasks(tasks)
 		categories = append(categories, categoryView{
 			Name:  category.Name,
 			Tasks: tasks,

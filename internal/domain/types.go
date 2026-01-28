@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"sort"
 	"strings"
 	"time"
 )
@@ -136,28 +135,3 @@ func ValidatePriority(priority string) error {
 	}
 }
 
-func SortTasks(tasks []Task) {
-	sort.SliceStable(tasks, func(i, j int) bool {
-		a, b := tasks[i], tasks[j]
-		rA, rB := rankPriority(a.Priority), rankPriority(b.Priority)
-		if rA != rB {
-			return rA < rB
-		}
-		return strings.ToLower(a.Title) < strings.ToLower(b.Title)
-	})
-}
-
-func rankPriority(priority string) int {
-	switch priority {
-	case PriorityHigh:
-		return 0
-	case PriorityMedium:
-		return 1
-	case PriorityLow:
-		return 2
-	case "":
-		return 3
-	default:
-		return 4
-	}
-}
