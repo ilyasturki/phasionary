@@ -43,6 +43,8 @@ type model struct {
 	editValue  string
 	editCursor int
 	store      *data.Store
+	addingTask bool   // true when adding a new task (vs editing existing)
+	newTaskID  string // ID of task being added (for removal on cancel)
 }
 
 func (m model) Init() tea.Cmd {
@@ -74,6 +76,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggleSelectedTask()
 		case "enter":
 			m.startEditing()
+		case "a":
+			m.startAddingTask()
 		}
 	}
 	return m, nil
@@ -296,7 +300,7 @@ func (m model) shortcutsLine() string {
 	if m.editing {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | enter edit title | space toggle status | ? help | q/ctrl+c quit")
+	return ui.StatusLineStyle.Render("Shortcuts: up/down or j/k move | a add task | enter edit title | space toggle status | ? help | q/ctrl+c quit")
 }
 
 func (m model) helpView() string {
@@ -304,6 +308,7 @@ func (m model) helpView() string {
 		"Shortcuts:",
 		"  ? toggle help",
 		"  up/down or j/k move selection",
+		"  a add new task",
 		"  enter edit selected task",
 		"  space toggle task status",
 		"  q or ctrl+c quit",
@@ -328,6 +333,46 @@ func (m *model) startEditing() {
 	m.editing = true
 	m.editValue = task.Title
 	m.editCursor = len([]rune(m.editValue))
+}
+
+func (m *model) startAddingTask() {
+	position, ok := m.selectedPosition()
+	if !ok {
+		return
+	}
+	catIndex := position.CategoryIndex
+	if catIndex < 0 || catIndex >= len(m.categories) {
+		return
+	}
+
+	// Create new task with empty title (defaults to todo status)
+	newTask, err := domain.NewTask("")
+	if err != nil {
+		return
+	}
+
+	// Append task to both view and project
+	m.categories[catIndex].Tasks = append(m.categories[catIndex].Tasks, newTask)
+	m.project.Categories[catIndex].Tasks = append(m.project.Categories[catIndex].Tasks, newTask)
+
+	// Rebuild positions
+	m.positions = rebuildPositions(m.categories)
+
+	// Find and select the new task position
+	taskIndex := len(m.categories[catIndex].Tasks) - 1
+	for i, pos := range m.positions {
+		if pos.Kind == focusTask && pos.CategoryIndex == catIndex && pos.TaskIndex == taskIndex {
+			m.selected = i
+			break
+		}
+	}
+
+	// Enter edit mode for the new task
+	m.editing = true
+	m.addingTask = true
+	m.newTaskID = newTask.ID
+	m.editValue = ""
+	m.editCursor = 0
 }
 
 func (m *model) handleEditKey(msg tea.KeyMsg) {
@@ -369,7 +414,7 @@ func (m *model) finishEditing() {
 	}
 	category := &m.categories[position.CategoryIndex]
 	task := &category.Tasks[position.TaskIndex]
-	if task.Title != trimmed {
+	if task.Title != trimmed || m.addingTask {
 		task.Title = trimmed
 		task.UpdatedAt = domain.NowTimestamp()
 		m.syncTaskToProject(position, *task)
@@ -379,12 +424,56 @@ func (m *model) finishEditing() {
 	m.editing = false
 	m.editValue = ""
 	m.editCursor = 0
+	m.addingTask = false
+	m.newTaskID = ""
 }
 
 func (m *model) cancelEditing() {
+	if m.addingTask {
+		m.removeNewTask()
+	}
 	m.editing = false
 	m.editValue = ""
 	m.editCursor = 0
+	m.addingTask = false
+	m.newTaskID = ""
+}
+
+func (m *model) removeNewTask() {
+	if m.newTaskID == "" {
+		return
+	}
+
+	// Find and remove from view categories
+	for cIndex := range m.categories {
+		tasks := m.categories[cIndex].Tasks
+		for tIndex, task := range tasks {
+			if task.ID == m.newTaskID {
+				m.categories[cIndex].Tasks = append(tasks[:tIndex], tasks[tIndex+1:]...)
+				break
+			}
+		}
+	}
+
+	// Find and remove from project categories
+	for cIndex := range m.project.Categories {
+		tasks := m.project.Categories[cIndex].Tasks
+		for tIndex, task := range tasks {
+			if task.ID == m.newTaskID {
+				m.project.Categories[cIndex].Tasks = append(tasks[:tIndex], tasks[tIndex+1:]...)
+				break
+			}
+		}
+	}
+
+	// Rebuild positions and adjust selection
+	m.positions = rebuildPositions(m.categories)
+	if m.selected >= len(m.positions) {
+		m.selected = len(m.positions) - 1
+	}
+	if m.selected < 0 && len(m.positions) > 0 {
+		m.selected = 0
+	}
 }
 
 func (m *model) moveEditCursor(delta int) {
@@ -444,6 +533,20 @@ func (m *model) deleteEditRune(offset int) {
 func (m model) renderEditTaskLine(task domain.Task) string {
 	prefix := "> "
 	statusText := formatStatus(task.Status)
+
+	// Show placeholder text when adding a new task with empty value
+	if m.addingTask && m.editValue == "" {
+		placeholder := ui.MutedStyle.Render("Enter task title...")
+		cursorStyle := ui.SelectedStyle
+		return fmt.Sprintf(
+			"%s[%s] %s%s",
+			prefix,
+			statusText,
+			cursorStyle.Render(" "),
+			placeholder,
+		)
+	}
+
 	edited := m.editValue
 	if edited == "" {
 		edited = " "
