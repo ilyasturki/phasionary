@@ -6,7 +6,7 @@ var (
 	HeaderStyle     = lipgloss.NewStyle().Bold(true)
 	MutedStyle      = lipgloss.NewStyle().Faint(true)
 	CategoryStyle   = lipgloss.NewStyle().Bold(true)
-	SelectedStyle   = lipgloss.NewStyle().Bold(true).Reverse(true)
+	SelectedStyle = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("15")).Foreground(lipgloss.Color("0"))
 	StatusLineStyle = lipgloss.NewStyle().Faint(true)
 	HelpDialogStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
 )
@@ -43,5 +43,31 @@ func PriorityIcon(priority string) string {
 		return "▼"
 	default:
 		return ""
+	}
+}
+
+func SelectedPriorityStyle(priority string) lipgloss.Style {
+	base := lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("15"))
+	switch priority {
+	case "high":
+		return base.Foreground(lipgloss.Color("1")) // red text
+	case "low":
+		return base.Foreground(lipgloss.Color("6")) // cyan text
+	default:
+		return base.Foreground(lipgloss.Color("0")) // black text for contrast
+	}
+}
+
+func SelectedStatusStyle(status string) lipgloss.Style {
+	base := lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("15"))
+	switch status {
+	case "in_progress":
+		return base.Foreground(lipgloss.Color("4")) // blue text
+	case "completed":
+		return base.Foreground(lipgloss.Color("2")) // green text
+	case "cancelled":
+		return base.Foreground(lipgloss.Color("1")) // red text
+	default:
+		return base.Foreground(lipgloss.Color("0")) // black text for todo
 	}
 }

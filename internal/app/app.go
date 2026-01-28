@@ -232,13 +232,13 @@ func renderTaskLine(task domain.Task, selected bool) string {
 		return fmt.Sprintf("%s[%s] %s%s", prefix, status, icon, title)
 	}
 	statusText := statusLabel(task.Status)
-	statusStyle := ui.StatusStyle(task.Status).Bold(true).Reverse(true)
-	titleStyle := ui.PriorityStyle(task.Priority).Bold(true).Reverse(true)
+	priorityStyle := ui.SelectedPriorityStyle(task.Priority)
+	statusStyle := ui.SelectedStatusStyle(task.Status)
 	icon := ""
 	if priorityIcon != "" {
-		icon = titleStyle.Render(priorityIcon + " ")
+		icon = priorityStyle.Render(priorityIcon + " ")
 	}
-	title := titleStyle.Render(task.Title)
+	title := priorityStyle.Render(task.Title)
 	return ui.SelectedStyle.Render(prefix+"[") +
 		statusStyle.Render(statusText) +
 		ui.SelectedStyle.Render("] ") +
