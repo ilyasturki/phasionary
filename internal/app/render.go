@@ -181,7 +181,7 @@ func (m model) shortcutsLine() string {
 func (m model) helpView() string {
 	lines := []string{
 		"Shortcuts:",
-		"  ? toggle help",
+		"  ? toggle help  (q/esc to close)",
 		"  up/down or j/k move selection",
 		"  a add new task",
 		"  enter edit selected item",

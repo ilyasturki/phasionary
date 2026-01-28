@@ -72,6 +72,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showHelp = !m.showHelp
 			break
 		}
+		if m.showHelp {
+			switch msg.String() {
+			case "q", "esc":
+				m.showHelp = false
+			}
+			break
+		}
 		if m.editing {
 			m.handleEditKey(msg)
 			break
