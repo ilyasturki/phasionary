@@ -124,3 +124,57 @@ func (m model) spacingBefore(posIndex int) int {
 	}
 	return 0
 }
+
+// centerOnSelected adjusts scrollOffset to center the selected item on screen.
+func (m *model) centerOnSelected() {
+	if len(m.positions) == 0 || m.selected < 0 {
+		return
+	}
+
+	availHeight := m.availableHeight()
+	// Reserve space for scroll indicators
+	availHeight -= 2 // "more above" and "more below"
+	if availHeight < 1 {
+		availHeight = 1
+	}
+
+	// Calculate the visual height of the selected element
+	selectedHeight := m.elementHeight(m.selected)
+
+	// Target: place selected item in the middle of available height
+	// We want (space above selected) ≈ (availHeight - selectedHeight) / 2
+	targetSpaceAbove := (availHeight - selectedHeight) / 2
+	if targetSpaceAbove < 0 {
+		targetSpaceAbove = 0
+	}
+
+	// Find scrollOffset such that elements from scrollOffset to selected-1
+	// (plus spacing) sum to approximately targetSpaceAbove
+	m.scrollOffset = 0
+	usedHeight := 0
+
+	for i := 0; i < m.selected; i++ {
+		h := m.elementHeight(i)
+		if i > 0 {
+			h += m.spacingBefore(i)
+		}
+
+		// If adding this element would exceed target space above,
+		// scroll past it
+		if usedHeight+h > targetSpaceAbove && i > 0 {
+			// Set scrollOffset so items before this are hidden
+			m.scrollOffset = i
+			usedHeight = 0
+		} else {
+			usedHeight += h
+		}
+	}
+
+	// Clamp scrollOffset to valid range
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+	if m.scrollOffset > m.selected {
+		m.scrollOffset = m.selected
+	}
+}

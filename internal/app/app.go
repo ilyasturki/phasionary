@@ -54,6 +54,7 @@ type model struct {
 	statusMsg     string // temporary status message (e.g., "Copied!")
 	confirmDelete bool   // true when delete confirmation dialog is shown
 	scrollOffset  int    // position index at top of visible area
+	pendingKey    rune   // for multi-key sequences like gg and zz
 }
 
 func (m model) Init() tea.Cmd {
@@ -124,28 +125,71 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "up", "k":
 			m.moveSelection(-1)
+			m.pendingKey = 0
 		case "down", "j":
 			m.moveSelection(1)
+			m.pendingKey = 0
 		case " ":
 			m.toggleSelectedTask()
+			m.pendingKey = 0
 		case "enter":
 			m.startEditing()
+			m.pendingKey = 0
 		case "a":
 			m.startAddingTask()
+			m.pendingKey = 0
 		case "A":
 			m.startAddingCategory()
+			m.pendingKey = 0
 		case "h":
 			m.decreasePriority()
+			m.pendingKey = 0
 		case "l":
 			m.increasePriority()
+			m.pendingKey = 0
 		case "y":
+			m.pendingKey = 0
 			return m, m.copySelected()
 		case "d":
 			m.deleteSelected()
+			m.pendingKey = 0
 		case "J":
 			m.moveTaskDown()
+			m.pendingKey = 0
 		case "K":
 			m.moveTaskUp()
+			m.pendingKey = 0
+		case "ctrl+d":
+			m.moveSelectionByPage(0.5)
+			m.pendingKey = 0
+		case "ctrl+u":
+			m.moveSelectionByPage(-0.5)
+			m.pendingKey = 0
+		case "ctrl+f":
+			m.moveSelectionByPage(1.0)
+			m.pendingKey = 0
+		case "ctrl+b":
+			m.moveSelectionByPage(-1.0)
+			m.pendingKey = 0
+		case "g":
+			if m.pendingKey == 'g' {
+				m.jumpToFirst()
+				m.pendingKey = 0
+			} else {
+				m.pendingKey = 'g'
+			}
+		case "G":
+			m.jumpToLast()
+			m.pendingKey = 0
+		case "z":
+			if m.pendingKey == 'z' {
+				m.centerOnSelected()
+				m.pendingKey = 0
+			} else {
+				m.pendingKey = 'z'
+			}
+		default:
+			m.pendingKey = 0
 		}
 	}
 	return m, nil
