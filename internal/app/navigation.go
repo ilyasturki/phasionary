@@ -12,6 +12,7 @@ func (m *model) moveSelection(delta int) {
 		next = len(m.positions) - 1
 	}
 	m.selected = next
+	m.ensureVisible()
 }
 
 func (m model) selectedPosition() (focusPosition, bool) {

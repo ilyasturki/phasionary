@@ -53,6 +53,7 @@ type model struct {
 	newCategoryID  string // ID of category being added (for removal on cancel)
 	statusMsg     string // temporary status message (e.g., "Copied!")
 	confirmDelete bool   // true when delete confirmation dialog is shown
+	scrollOffset  int    // position index at top of visible area
 }
 
 func (m model) Init() tea.Cmd {
@@ -64,6 +65,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.ensureVisible()
 	case clipboardResultMsg:
 		if msg.err != nil {
 			m.statusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
@@ -88,6 +90,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			pos := rowMap[msg.Y]
 			if pos >= 0 && pos < len(m.positions) {
 				m.selected = pos
+				m.ensureVisible()
 			}
 		}
 	case tea.KeyMsg:
@@ -169,50 +172,132 @@ func (m model) copySelected() tea.Cmd {
 
 func (m model) View() string {
 	var bodyBuilder strings.Builder
+	availHeight := m.availableHeight()
+	usedHeight := 0
 	cursor := 0
+	hasMoreAbove := m.scrollOffset > 0
+	hasMoreBelow := false
+
+	// Reserve space for scroll indicators when needed
+	if hasMoreAbove {
+		availHeight-- // Space for "more above"
+	}
+	// Reserve space for potential "more below" indicator
+	availHeight--
+	if availHeight < 1 {
+		availHeight = 1
+	}
+
+	// Helper to render an element if visible.
+	// Each element occupies elementHeight visual rows. A separator \n is added
+	// between elements but NOT counted toward usedHeight.
+	renderIfVisible := func(renderFn func() string, elementHeight int) bool {
+		if cursor < m.scrollOffset {
+			cursor++
+			return true // Skip, continue
+		}
+		if usedHeight+elementHeight > availHeight {
+			hasMoreBelow = true
+			return false // Stop rendering
+		}
+		if usedHeight > 0 {
+			bodyBuilder.WriteString("\n") // Separator (not counted)
+		}
+		bodyBuilder.WriteString(renderFn())
+		usedHeight += elementHeight
+		cursor++
+		return true
+	}
+
+	// Helper to add blank visual lines between elements.
+	// Each blank line is a real visual row counted toward usedHeight.
+	addBlankLines := func(count int) {
+		if cursor <= m.scrollOffset || usedHeight == 0 {
+			return // Don't add blank lines before we start rendering
+		}
+		for i := 0; i < count; i++ {
+			if usedHeight+1 > availHeight {
+				return
+			}
+			bodyBuilder.WriteString("\n") // Each \n = 1 blank visual line
+			usedHeight++
+		}
+	}
 
 	// Project line (first focusable item)
 	isProjectSelected := cursor == m.selected
-	if m.editing && isProjectSelected {
-		bodyBuilder.WriteString(m.renderEditProjectLine())
-	} else {
-		bodyBuilder.WriteString(renderProjectLine(m.project.Name, isProjectSelected))
+	projectHeight := m.countProjectLines()
+	if !renderIfVisible(func() string {
+		if m.editing && isProjectSelected {
+			return m.renderEditProjectLine()
+		}
+		return renderProjectLine(m.project.Name, isProjectSelected)
+	}, projectHeight) {
+		goto footer
 	}
-	cursor++
-	bodyBuilder.WriteString("\n\n")
+	addBlankLines(2) // 2 blank lines after project
 
 	for i, category := range m.categories {
 		if i > 0 {
-			bodyBuilder.WriteString("\n")
+			addBlankLines(1) // 1 blank line between categories
 		}
+
+		// Category header
 		isSelected := cursor == m.selected
-		if m.editing && isSelected {
-			bodyBuilder.WriteString(m.renderEditCategoryLine())
-		} else {
-			bodyBuilder.WriteString(renderCategoryLine(category.Name, isSelected, m.width))
+		catHeight := m.countCategoryLines(category.Name)
+		if !renderIfVisible(func() string {
+			if m.editing && isSelected {
+				return m.renderEditCategoryLine()
+			}
+			return renderCategoryLine(category.Name, isSelected, m.width)
+		}, catHeight) {
+			goto footer
 		}
-		cursor++
+
 		if len(category.Tasks) == 0 {
-			bodyBuilder.WriteString("\n")
-			bodyBuilder.WriteString(ui.MutedStyle.Render("  (no tasks)"))
-			bodyBuilder.WriteString("\n")
+			// "(no tasks)" placeholder - not a position, just visual
+			if cursor > m.scrollOffset && usedHeight+1 <= availHeight {
+				bodyBuilder.WriteString("\n")
+				bodyBuilder.WriteString(ui.MutedStyle.Render("  (no tasks)"))
+				usedHeight++
+			}
 			continue
 		}
-		bodyBuilder.WriteString("\n")
-		for _, task := range category.Tasks {
-			isSelected = cursor == m.selected
-			if m.editing && isSelected {
-				bodyBuilder.WriteString(m.renderEditTaskLine(task))
-			} else {
-				bodyBuilder.WriteString(renderTaskLine(task, isSelected, m.width))
-			}
-			bodyBuilder.WriteString("\n")
-			cursor++
-		}
 
+		addBlankLines(1) // 1 blank line after category header
+
+		// Tasks (consecutive tasks have no blank lines between them)
+		for _, task := range category.Tasks {
+			isTaskSelected := cursor == m.selected
+			taskHeight := m.countTaskLines(task)
+			taskCopy := task // capture for closure
+			if !renderIfVisible(func() string {
+				if m.editing && isTaskSelected {
+					return m.renderEditTaskLine(taskCopy)
+				}
+				return renderTaskLine(taskCopy, isTaskSelected, m.width)
+			}, taskHeight) {
+				goto footer
+			}
+		}
 	}
 
+	// Check if there's more content below
+	if cursor < len(m.positions) {
+		hasMoreBelow = true
+	}
+
+footer:
 	body := strings.TrimRight(bodyBuilder.String(), "\n")
+
+	// Add scroll indicators
+	if hasMoreAbove {
+		body = ui.MutedStyle.Render("  ↑ more above") + "\n" + body
+	}
+	if hasMoreBelow {
+		body = body + "\n" + ui.MutedStyle.Render("  ↓ more below")
+	}
+
 	statusLine := m.statusLine()
 	shortcuts := m.shortcutsLine()
 	content := body + "\n\n" + statusLine + "\n" + shortcuts + "\n"

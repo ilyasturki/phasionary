@@ -72,6 +72,7 @@ func (m *model) rebuildAndClamp() {
 	if m.selected < 0 && len(m.positions) > 0 {
 		m.selected = 0
 	}
+	m.ensureVisible()
 }
 
 func (m *model) toggleSelectedTask() {
@@ -180,6 +181,7 @@ func (m *model) moveTaskDown() {
 	// Rebuild positions and follow the moved task
 	m.positions = rebuildPositions(m.categories)
 	m.selected++
+	m.ensureVisible()
 	m.storeTaskUpdate()
 }
 
@@ -205,6 +207,7 @@ func (m *model) moveTaskUp() {
 	// Rebuild positions and follow the moved task
 	m.positions = rebuildPositions(m.categories)
 	m.selected--
+	m.ensureVisible()
 	m.storeTaskUpdate()
 }
 

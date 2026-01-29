@@ -69,6 +69,7 @@ func (m *model) startAddingTask() {
 	m.newTaskID = newTask.ID
 	m.editValue = ""
 	m.editCursor = 0
+	m.ensureVisible()
 }
 
 func (m *model) startAddingCategory() {
@@ -107,6 +108,7 @@ func (m *model) startAddingCategory() {
 	m.newCategoryID = newCat.ID
 	m.editValue = ""
 	m.editCursor = 0
+	m.ensureVisible()
 }
 
 func (m *model) removeNewCategory() {
@@ -140,6 +142,7 @@ func (m *model) removeNewCategory() {
 	if m.selected < 0 && len(m.positions) > 0 {
 		m.selected = 0
 	}
+	m.ensureVisible()
 }
 
 func (m *model) handleEditKey(msg tea.KeyMsg) {
@@ -276,6 +279,7 @@ func (m *model) removeNewTask() {
 	if m.selected < 0 && len(m.positions) > 0 {
 		m.selected = 0
 	}
+	m.ensureVisible()
 }
 
 func (m *model) moveEditCursor(delta int) {
