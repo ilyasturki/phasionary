@@ -70,6 +70,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.statusMsg = "Copied!"
 		}
+	case tea.MouseMsg:
+		// Ignore mouse events when in overlays or editing mode
+		if m.editing || m.showHelp || m.confirmDelete {
+			break
+		}
+		// Only handle left mouse button press
+		if msg.Button != tea.MouseButtonLeft {
+			break
+		}
+		// Ignore wheel events
+		if msg.Action != tea.MouseActionPress {
+			break
+		}
+		rowMap := m.computeRowMap()
+		if msg.Y >= 0 && msg.Y < len(rowMap) {
+			pos := rowMap[msg.Y]
+			if pos >= 0 && pos < len(m.positions) {
+				m.selected = pos
+			}
+		}
 	case tea.KeyMsg:
 		m.statusMsg = ""
 		if msg.String() == "?" {
@@ -259,7 +279,7 @@ func Run(dataDir string, projectSelector string) error {
 		positions:  positions,
 		selected:   selected,
 		store:      store,
-	}, tea.WithAltScreen())
+	}, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = program.Run()
 	return err
 }
