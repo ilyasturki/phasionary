@@ -20,6 +20,15 @@ func newRootCmd() *cobra.Command {
 		Use:   "phasionary",
 		Short: "Terminal-first project planning tool",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := config.ResolveConfigPath(viper.GetString("config"))
+			if err != nil {
+				return err
+			}
+			cfgManager := config.NewManager(configPath)
+			if err := cfgManager.Load(); err != nil {
+				return err
+			}
+
 			dataDir, err := config.ResolveDataDir(viper.GetString("data"))
 			if err != nil {
 				return err
@@ -31,11 +40,18 @@ func newRootCmd() *cobra.Command {
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 
+	cmd.PersistentFlags().String("config", "", "override config directory path")
 	cmd.PersistentFlags().String("data", "", "override data directory path")
 	cmd.PersistentFlags().String("project", "", "target project for commands")
 
 	viper.AutomaticEnv()
+	if err := viper.BindEnv("config", config.EnvConfigPath); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 	if err := viper.BindEnv("data", config.EnvDataPath); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	if err := viper.BindPFlag("config", cmd.PersistentFlags().Lookup("config")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	if err := viper.BindPFlag("data", cmd.PersistentFlags().Lookup("data")); err != nil {
