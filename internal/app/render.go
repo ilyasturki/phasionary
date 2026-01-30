@@ -136,13 +136,13 @@ func renderSelectedTask(task domain.Task, prefix, priorityIcon string, width int
 func statusLabel(status string) string {
 	switch status {
 	case domain.StatusInProgress:
-		return "in progress"
+		return " progress"
 	case domain.StatusCompleted:
 		return "completed"
 	case domain.StatusCancelled:
 		return "cancelled"
 	default:
-		return "todo"
+		return "  todo   "
 	}
 }
 
