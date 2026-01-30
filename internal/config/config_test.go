@@ -64,10 +64,10 @@ func TestManager(t *testing.T) {
 		_, err = os.Stat(configPath)
 		require.NoError(t, err)
 
-		// Should contain empty JSON object
+		// Should contain default config with status_display
 		data, err := os.ReadFile(configPath)
 		require.NoError(t, err)
-		assert.Equal(t, "{}", string(data))
+		assert.JSONEq(t, `{"status_display":"text"}`, string(data))
 	})
 
 	t.Run("loads existing config", func(t *testing.T) {
@@ -129,5 +129,5 @@ func TestManager(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	assert.Equal(t, Config{}, cfg)
+	assert.Equal(t, Config{StatusDisplay: StatusDisplayText}, cfg)
 }

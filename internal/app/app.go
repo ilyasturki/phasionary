@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"phasionary/internal/config"
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
@@ -40,6 +41,7 @@ type model struct {
 	mode         UIMode
 	edit         EditState
 	store        data.ProjectRepository
+	cfg          config.Config
 	statusMsg    string
 	scrollOffset int
 	pendingKey   rune
@@ -285,7 +287,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		if m.mode == ModeEdit && isSelected {
 			return m.renderEditTaskLine(task)
 		}
-		return renderTaskLine(task, isSelected, m.width)
+		return m.renderTaskLine(task, isSelected, m.width)
 
 	case LayoutEmptyCategory:
 		return ui.MutedStyle.Render("  (no tasks)")
@@ -297,7 +299,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 	return ""
 }
 
-func Run(dataDir string, projectSelector string) error {
+func Run(dataDir string, projectSelector string, cfg config.Config) error {
 	store := data.NewStore(dataDir)
 	if err := store.Ensure(); err != nil {
 		return err
@@ -340,6 +342,7 @@ func Run(dataDir string, projectSelector string) error {
 		positions: positions,
 		selected:  selected,
 		store:     store,
+		cfg:       cfg,
 	}, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = program.Run()
 	return err

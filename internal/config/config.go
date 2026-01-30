@@ -8,14 +8,19 @@ import (
 const (
 	EnvDataPath   = "PHASIONARY_DATA_PATH"
 	EnvConfigPath = "PHASIONARY_CONFIG_PATH"
+
+	StatusDisplayText  = "text"
+	StatusDisplayIcons = "icons"
 )
 
-// Config holds user preferences. Fields will be added as needed.
-type Config struct{}
+// Config holds user preferences.
+type Config struct {
+	StatusDisplay string `json:"status_display,omitempty"`
+}
 
 // DefaultConfig returns a Config with default values.
 func DefaultConfig() Config {
-	return Config{}
+	return Config{StatusDisplay: StatusDisplayText}
 }
 
 func ResolveDataDir(input string) (string, error) {

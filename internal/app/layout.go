@@ -47,14 +47,16 @@ func DefaultLayoutConfig() LayoutConfig {
 }
 
 type LayoutBuilder struct {
-	config LayoutConfig
-	width  int
+	config        LayoutConfig
+	width         int
+	statusDisplay string
 }
 
-func NewLayoutBuilder(config LayoutConfig, width int) *LayoutBuilder {
+func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string) *LayoutBuilder {
 	return &LayoutBuilder{
-		config: config,
-		width:  width,
+		config:        config,
+		width:         width,
+		statusDisplay: statusDisplay,
 	}
 }
 
@@ -164,7 +166,7 @@ func (b *LayoutBuilder) countTaskLines(task domain.Task) int {
 	}
 	prefix := "  "
 	priorityIcon := ui.PriorityIcon(task.Priority)
-	statusText := statusLabel(task.Status)
+	statusText := statusLabel(task.Status, b.statusDisplay)
 	iconText := ""
 	if priorityIcon != "" {
 		iconText = priorityIcon + " "
@@ -174,7 +176,7 @@ func (b *LayoutBuilder) countTaskLines(task domain.Task) int {
 }
 
 func (m *model) buildLayout() *Layout {
-	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.width)
+	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.width, m.cfg.StatusDisplay)
 	layout := builder.Build(m.project, m.positions)
 	return &layout
 }

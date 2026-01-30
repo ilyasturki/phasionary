@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
+	"phasionary/internal/config"
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
 )
@@ -54,20 +55,20 @@ func renderCategoryLine(name string, selected bool, width int) string {
 	return style.Render(strings.Join(wrapped.lines, "\n"))
 }
 
-func renderTaskLine(task domain.Task, selected bool, width int) string {
+func (m model) renderTaskLine(task domain.Task, selected bool, width int) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
 	priorityIcon := ui.PriorityIcon(task.Priority)
 	if !selected {
-		return renderUnselectedTask(task, prefix, priorityIcon, width)
+		return m.renderUnselectedTask(task, prefix, priorityIcon, width)
 	}
-	return renderSelectedTask(task, prefix, priorityIcon, width)
+	return m.renderSelectedTask(task, prefix, priorityIcon, width)
 }
 
-func renderUnselectedTask(task domain.Task, prefix, priorityIcon string, width int) string {
-	status := formatStatus(task.Status)
+func (m model) renderUnselectedTask(task domain.Task, prefix, priorityIcon string, width int) string {
+	status := formatStatus(task.Status, m.cfg.StatusDisplay)
 	icon := ""
 	if priorityIcon != "" {
 		icon = ui.PriorityStyle(task.Priority).Render(priorityIcon) + " "
@@ -94,8 +95,8 @@ func renderUnselectedTask(task domain.Task, prefix, priorityIcon string, width i
 	return strings.Join(result, "\n")
 }
 
-func renderSelectedTask(task domain.Task, prefix, priorityIcon string, width int) string {
-	statusText := statusLabel(task.Status)
+func (m model) renderSelectedTask(task domain.Task, prefix, priorityIcon string, width int) string {
+	statusText := statusLabel(task.Status, m.cfg.StatusDisplay)
 	priorityStyle := ui.SelectedPriorityStyle(task.Priority)
 	statusStyle := ui.SelectedStatusStyle(task.Status)
 	icon := ""
@@ -133,7 +134,10 @@ func renderSelectedTask(task domain.Task, prefix, priorityIcon string, width int
 	return strings.Join(result, "\n")
 }
 
-func statusLabel(status string) string {
+func statusLabel(status, displayMode string) string {
+	if displayMode == config.StatusDisplayIcons {
+		return statusIcon(status)
+	}
 	switch status {
 	case domain.StatusInProgress:
 		return " progress"
@@ -146,8 +150,21 @@ func statusLabel(status string) string {
 	}
 }
 
-func formatStatus(status string) string {
-	return ui.StatusStyle(status).Render(statusLabel(status))
+func statusIcon(status string) string {
+	switch status {
+	case domain.StatusInProgress:
+		return "/"
+	case domain.StatusCompleted:
+		return "x"
+	case domain.StatusCancelled:
+		return "-"
+	default:
+		return " "
+	}
+}
+
+func formatStatus(status, displayMode string) string {
+	return ui.StatusStyle(status).Render(statusLabel(status, displayMode))
 }
 
 func (m model) renderEditCategoryLine() string {
@@ -167,7 +184,7 @@ func (m model) renderEditCategoryLine() string {
 
 func (m model) renderEditTaskLine(task domain.Task) string {
 	prefix := "> "
-	statusText := formatStatus(task.Status)
+	statusText := formatStatus(task.Status, m.cfg.StatusDisplay)
 	titleStyle := ui.PriorityStyle(task.Priority)
 	icon := ui.PriorityIcon(task.Priority)
 	iconPrefix := ""
@@ -177,7 +194,7 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		iconPlain = icon + " "
 	}
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, statusText, iconPrefix)
-	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status) + "] " + iconPlain)
+	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, m.cfg.StatusDisplay) + "] " + iconPlain)
 	if m.edit.isAdding && m.edit.input.Value() == "" {
 		cursorStyle := ui.SelectedStyle
 		placeholder := ui.MutedStyle.Render("Enter task title...")
