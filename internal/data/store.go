@@ -15,10 +15,19 @@ import (
 
 var ErrProjectNotFound = errors.New("project not found")
 
+type ProjectRepository interface {
+	ListProjects() ([]domain.Project, error)
+	LoadProject(selector string) (domain.Project, error)
+	SaveProject(project domain.Project) error
+	CreateProject(name, description string) (domain.Project, error)
+}
+
 // Store manages JSON persistence in a directory.
 type Store struct {
 	Dir string
 }
+
+var _ ProjectRepository = (*Store)(nil)
 
 func NewStore(dir string) *Store {
 	return &Store{Dir: dir}

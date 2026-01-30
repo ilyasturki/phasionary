@@ -3,18 +3,18 @@ package app
 import "phasionary/internal/domain"
 
 func (m *model) deleteSelected() {
-	if m.editing {
+	if m.mode == ModeEdit {
 		return
 	}
 	pos, ok := m.selectedPosition()
 	if !ok || pos.Kind == focusProject {
 		return
 	}
-	m.confirmDelete = true
+	m.mode = ModeConfirmDelete
 }
 
 func (m *model) confirmDeleteAction() {
-	m.confirmDelete = false
+	m.mode = ModeNormal
 	position, ok := m.selectedPosition()
 	if !ok {
 		return
@@ -30,42 +30,21 @@ func (m *model) confirmDeleteAction() {
 func (m *model) deleteTask(position focusPosition) {
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
-	taskID := m.categories[catIndex].Tasks[taskIndex].ID
-
-	// Remove from view categories
-	m.categories[catIndex].Tasks = append(
-		m.categories[catIndex].Tasks[:taskIndex],
-		m.categories[catIndex].Tasks[taskIndex+1:]...,
-	)
-
-	// Remove from project categories (match by ID)
-	projTasks := m.project.Categories[catIndex].Tasks
-	for i, t := range projTasks {
-		if t.ID == taskID {
-			m.project.Categories[catIndex].Tasks = append(projTasks[:i], projTasks[i+1:]...)
-			break
-		}
-	}
-
+	tasks := m.project.Categories[catIndex].Tasks
+	m.project.Categories[catIndex].Tasks = append(tasks[:taskIndex], tasks[taskIndex+1:]...)
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
 }
 
 func (m *model) deleteCategory(position focusPosition) {
 	catIndex := position.CategoryIndex
-
-	// Remove from view categories
-	m.categories = append(m.categories[:catIndex], m.categories[catIndex+1:]...)
-
-	// Remove from project categories
 	m.project.Categories = append(m.project.Categories[:catIndex], m.project.Categories[catIndex+1:]...)
-
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
 }
 
 func (m *model) rebuildAndClamp() {
-	m.positions = rebuildPositions(m.categories)
+	m.rebuildPositions()
 	if m.selected >= len(m.positions) {
 		m.selected = len(m.positions) - 1
 	}
@@ -76,21 +55,19 @@ func (m *model) rebuildAndClamp() {
 }
 
 func (m *model) toggleSelectedTask() {
-	if m.editing {
+	if m.mode == ModeEdit {
 		return
 	}
 	position, ok := m.selectedPosition()
 	if !ok || position.Kind != focusTask {
 		return
 	}
-	category := &m.categories[position.CategoryIndex]
-	task := &category.Tasks[position.TaskIndex]
+	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 	nextStatus := nextTaskStatus(task.Status)
 	if nextStatus == task.Status {
 		return
 	}
 	updateTaskStatus(task, nextStatus)
-	m.syncTaskToProject(position, *task)
 	m.storeTaskUpdate()
 }
 
@@ -110,57 +87,47 @@ func nextTaskStatus(current string) string {
 }
 
 func updateTaskStatus(task *domain.Task, status string) {
-	task.Status = status
-	task.UpdatedAt = domain.NowTimestamp()
-	if status == domain.StatusCompleted {
-		task.CompletionDate = domain.NowTimestamp()
-		return
-	}
-	task.CompletionDate = ""
+	_ = task.SetStatus(status)
 }
 
 func (m *model) increasePriority() {
-	if m.editing {
+	if m.mode == ModeEdit {
 		return
 	}
 	position, ok := m.selectedPosition()
 	if !ok || position.Kind != focusTask {
 		return
 	}
-	category := &m.categories[position.CategoryIndex]
-	task := &category.Tasks[position.TaskIndex]
+	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 	newPriority := nextPriorityUp(task.Priority)
 	if newPriority == task.Priority {
 		return
 	}
 	task.Priority = newPriority
 	task.UpdatedAt = domain.NowTimestamp()
-	m.syncTaskToProject(position, *task)
 	m.storeTaskUpdate()
 }
 
 func (m *model) decreasePriority() {
-	if m.editing {
+	if m.mode == ModeEdit {
 		return
 	}
 	position, ok := m.selectedPosition()
 	if !ok || position.Kind != focusTask {
 		return
 	}
-	category := &m.categories[position.CategoryIndex]
-	task := &category.Tasks[position.TaskIndex]
+	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 	newPriority := nextPriorityDown(task.Priority)
 	if newPriority == task.Priority {
 		return
 	}
 	task.Priority = newPriority
 	task.UpdatedAt = domain.NowTimestamp()
-	m.syncTaskToProject(position, *task)
 	m.storeTaskUpdate()
 }
 
 func (m *model) moveTaskDown() {
-	if m.editing {
+	if m.mode == ModeEdit {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -169,24 +136,19 @@ func (m *model) moveTaskDown() {
 	}
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
-	tasks := m.categories[catIndex].Tasks
+	tasks := m.project.Categories[catIndex].Tasks
 	if taskIndex >= len(tasks)-1 {
 		return
 	}
-	// Swap in view
 	tasks[taskIndex], tasks[taskIndex+1] = tasks[taskIndex+1], tasks[taskIndex]
-	// Swap in project model
-	pt := m.project.Categories[catIndex].Tasks
-	pt[taskIndex], pt[taskIndex+1] = pt[taskIndex+1], pt[taskIndex]
-	// Rebuild positions and follow the moved task
-	m.positions = rebuildPositions(m.categories)
+	m.rebuildPositions()
 	m.selected++
 	m.ensureVisible()
 	m.storeTaskUpdate()
 }
 
 func (m *model) moveTaskUp() {
-	if m.editing {
+	if m.mode == ModeEdit {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -198,14 +160,9 @@ func (m *model) moveTaskUp() {
 	if taskIndex <= 0 {
 		return
 	}
-	tasks := m.categories[catIndex].Tasks
-	// Swap in view
+	tasks := m.project.Categories[catIndex].Tasks
 	tasks[taskIndex], tasks[taskIndex-1] = tasks[taskIndex-1], tasks[taskIndex]
-	// Swap in project model
-	pt := m.project.Categories[catIndex].Tasks
-	pt[taskIndex], pt[taskIndex-1] = pt[taskIndex-1], pt[taskIndex]
-	// Rebuild positions and follow the moved task
-	m.positions = rebuildPositions(m.categories)
+	m.rebuildPositions()
 	m.selected--
 	m.ensureVisible()
 	m.storeTaskUpdate()

@@ -135,3 +135,26 @@ func ValidatePriority(priority string) error {
 	}
 }
 
+func (t *Task) SetStatus(status string) error {
+	if err := ValidateStatus(status); err != nil {
+		return err
+	}
+	t.Status = status
+	t.UpdatedAt = NowTimestamp()
+	if status == StatusCompleted {
+		t.CompletionDate = NowTimestamp()
+	} else {
+		t.CompletionDate = ""
+	}
+	return nil
+}
+
+func (t *Task) SetPriority(priority string) error {
+	if err := ValidatePriority(priority); err != nil {
+		return err
+	}
+	t.Priority = priority
+	t.UpdatedAt = NowTimestamp()
+	return nil
+}
+

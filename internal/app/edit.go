@@ -15,19 +15,16 @@ func (m *model) startEditing() {
 	}
 	switch position.Kind {
 	case focusProject:
-		m.editing = true
-		m.editValue = m.project.Name
-		m.editCursor = len([]rune(m.editValue))
+		m.mode = ModeEdit
+		m.edit = newEditState(m.project.Name, false, "", focusProject)
 	case focusTask:
-		task := m.categories[position.CategoryIndex].Tasks[position.TaskIndex]
-		m.editing = true
-		m.editValue = task.Title
-		m.editCursor = len([]rune(m.editValue))
+		task := m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+		m.mode = ModeEdit
+		m.edit = newEditState(task.Title, false, "", focusTask)
 	case focusCategory:
-		category := m.categories[position.CategoryIndex]
-		m.editing = true
-		m.editValue = category.Name
-		m.editCursor = len([]rune(m.editValue))
+		category := m.project.Categories[position.CategoryIndex]
+		m.mode = ModeEdit
+		m.edit = newEditState(category.Name, false, "", focusCategory)
 	}
 }
 
@@ -37,38 +34,25 @@ func (m *model) startAddingTask() {
 		return
 	}
 	catIndex := position.CategoryIndex
-	if catIndex < 0 || catIndex >= len(m.categories) {
+	if catIndex < 0 || catIndex >= len(m.project.Categories) {
 		return
 	}
-
-	// Create new task with empty title (defaults to todo status)
 	newTask, err := domain.NewTask("")
 	if err != nil {
 		return
 	}
-
-	// Append task to both view and project
-	m.categories[catIndex].Tasks = append(m.categories[catIndex].Tasks, newTask)
 	m.project.Categories[catIndex].Tasks = append(m.project.Categories[catIndex].Tasks, newTask)
-
-	// Rebuild positions
-	m.positions = rebuildPositions(m.categories)
-
-	// Find and select the new task position
-	taskIndex := len(m.categories[catIndex].Tasks) - 1
+	m.rebuildPositions()
+	taskIndex := len(m.project.Categories[catIndex].Tasks) - 1
 	for i, pos := range m.positions {
 		if pos.Kind == focusTask && pos.CategoryIndex == catIndex && pos.TaskIndex == taskIndex {
 			m.selected = i
 			break
 		}
 	}
-
-	// Enter edit mode for the new task
-	m.editing = true
-	m.addingTask = true
-	m.newTaskID = newTask.ID
-	m.editValue = ""
-	m.editCursor = 0
+	m.mode = ModeEdit
+	m.edit = newEditState("", true, newTask.ID, focusTask)
+	m.edit.cursor = 0
 	m.ensureVisible()
 }
 
@@ -78,48 +62,33 @@ func (m *model) startAddingCategory() {
 		return
 	}
 	insertIndex := position.CategoryIndex + 1
-
 	newCat, err := domain.NewCategory("")
 	if err != nil {
 		return
 	}
-
-	// Insert into view categories
-	m.categories = append(m.categories, categoryView{})
-	copy(m.categories[insertIndex+1:], m.categories[insertIndex:])
-	m.categories[insertIndex] = categoryView{Name: "", Tasks: nil}
-
-	// Insert into project categories
 	m.project.Categories = append(m.project.Categories, domain.Category{})
 	copy(m.project.Categories[insertIndex+1:], m.project.Categories[insertIndex:])
 	m.project.Categories[insertIndex] = newCat
-
-	// Rebuild positions and select the new category
-	m.positions = rebuildPositions(m.categories)
+	m.rebuildPositions()
 	for i, pos := range m.positions {
 		if pos.Kind == focusCategory && pos.CategoryIndex == insertIndex {
 			m.selected = i
 			break
 		}
 	}
-
-	m.editing = true
-	m.addingCategory = true
-	m.newCategoryID = newCat.ID
-	m.editValue = ""
-	m.editCursor = 0
+	m.mode = ModeEdit
+	m.edit = newEditState("", true, newCat.ID, focusCategory)
+	m.edit.cursor = 0
 	m.ensureVisible()
 }
 
 func (m *model) removeNewCategory() {
-	if m.newCategoryID == "" {
+	if m.edit.newItemID == "" {
 		return
 	}
-
-	// Find the category index by ID
 	catIndex := -1
 	for i, cat := range m.project.Categories {
-		if cat.ID == m.newCategoryID {
+		if cat.ID == m.edit.newItemID {
 			catIndex = i
 			break
 		}
@@ -127,15 +96,8 @@ func (m *model) removeNewCategory() {
 	if catIndex < 0 {
 		return
 	}
-
-	// Remove from view categories
-	m.categories = append(m.categories[:catIndex], m.categories[catIndex+1:]...)
-
-	// Remove from project categories
 	m.project.Categories = append(m.project.Categories[:catIndex], m.project.Categories[catIndex+1:]...)
-
-	// Rebuild positions and clamp selection
-	m.positions = rebuildPositions(m.categories)
+	m.rebuildPositions()
 	if m.selected >= len(m.positions) {
 		m.selected = len(m.positions) - 1
 	}
@@ -169,7 +131,7 @@ func (m *model) handleEditKey(msg tea.KeyMsg) {
 }
 
 func (m *model) finishEditing() {
-	if !m.editing {
+	if m.mode != ModeEdit {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -177,7 +139,7 @@ func (m *model) finishEditing() {
 		m.cancelEditing()
 		return
 	}
-	trimmed := strings.TrimSpace(m.editValue)
+	trimmed := strings.TrimSpace(m.edit.value)
 	if trimmed == "" {
 		m.cancelEditing()
 		return
@@ -188,12 +150,10 @@ func (m *model) finishEditing() {
 		m.project.UpdatedAt = domain.NowTimestamp()
 		m.storeTaskUpdate()
 	case focusTask:
-		category := &m.categories[position.CategoryIndex]
-		task := &category.Tasks[position.TaskIndex]
-		if task.Title != trimmed || m.addingTask {
+		task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+		if task.Title != trimmed || m.edit.isAdding {
 			task.Title = trimmed
 			task.UpdatedAt = domain.NowTimestamp()
-			m.syncTaskToProject(position, *task)
 			m.storeTaskUpdate()
 		}
 	case focusCategory:
@@ -202,77 +162,51 @@ func (m *model) finishEditing() {
 		m.cancelEditing()
 		return
 	}
-	m.editing = false
-	m.editValue = ""
-	m.editCursor = 0
-	m.addingTask = false
-	m.newTaskID = ""
-	m.addingCategory = false
-	m.newCategoryID = ""
+	m.mode = ModeNormal
+	m.edit.reset()
 }
 
 func (m *model) finishCategoryEditing(position focusPosition, name string) {
-	// Check for duplicate name (case-insensitive) among other categories
-	for i, cat := range m.categories {
+	for i, cat := range m.project.Categories {
 		if i != position.CategoryIndex && strings.EqualFold(cat.Name, name) {
-			// Duplicate found — remove phantom category if adding
-			if m.addingCategory {
+			if m.edit.isAdding {
 				m.removeNewCategory()
 			}
 			return
 		}
 	}
-	m.categories[position.CategoryIndex].Name = name
 	m.project.Categories[position.CategoryIndex].Name = name
 	m.project.UpdatedAt = domain.NowTimestamp()
 	m.storeTaskUpdate()
 }
 
 func (m *model) cancelEditing() {
-	if m.addingTask {
-		m.removeNewTask()
+	if m.edit.isAdding {
+		switch m.edit.itemType {
+		case focusTask:
+			m.removeNewTask()
+		case focusCategory:
+			m.removeNewCategory()
+		}
 	}
-	if m.addingCategory {
-		m.removeNewCategory()
-	}
-	m.editing = false
-	m.editValue = ""
-	m.editCursor = 0
-	m.addingTask = false
-	m.newTaskID = ""
-	m.addingCategory = false
-	m.newCategoryID = ""
+	m.mode = ModeNormal
+	m.edit.reset()
 }
 
 func (m *model) removeNewTask() {
-	if m.newTaskID == "" {
+	if m.edit.newItemID == "" {
 		return
 	}
-
-	// Find and remove from view categories
-	for cIndex := range m.categories {
-		tasks := m.categories[cIndex].Tasks
-		for tIndex, task := range tasks {
-			if task.ID == m.newTaskID {
-				m.categories[cIndex].Tasks = append(tasks[:tIndex], tasks[tIndex+1:]...)
-				break
-			}
-		}
-	}
-
-	// Find and remove from project categories
 	for cIndex := range m.project.Categories {
 		tasks := m.project.Categories[cIndex].Tasks
 		for tIndex, task := range tasks {
-			if task.ID == m.newTaskID {
+			if task.ID == m.edit.newItemID {
 				m.project.Categories[cIndex].Tasks = append(tasks[:tIndex], tasks[tIndex+1:]...)
 				break
 			}
 		}
 	}
-
-	// Rebuild positions and adjust selection
-	m.positions = rebuildPositions(m.categories)
+	m.rebuildPositions()
 	if m.selected >= len(m.positions) {
 		m.selected = len(m.positions) - 1
 	}
@@ -283,23 +217,23 @@ func (m *model) removeNewTask() {
 }
 
 func (m *model) moveEditCursor(delta int) {
-	runes := []rune(m.editValue)
-	next := m.editCursor + delta
+	runes := []rune(m.edit.value)
+	next := m.edit.cursor + delta
 	if next < 0 {
 		next = 0
 	}
 	if next > len(runes) {
 		next = len(runes)
 	}
-	m.editCursor = next
+	m.edit.cursor = next
 }
 
 func (m *model) insertEditRunes(runesToInsert []rune) {
 	if len(runesToInsert) == 0 {
 		return
 	}
-	runes := []rune(m.editValue)
-	cursor := m.editCursor
+	runes := []rune(m.edit.value)
+	cursor := m.edit.cursor
 	if cursor < 0 {
 		cursor = 0
 	}
@@ -310,28 +244,28 @@ func (m *model) insertEditRunes(runesToInsert []rune) {
 	updated = append(updated, runes[:cursor]...)
 	updated = append(updated, runesToInsert...)
 	updated = append(updated, runes[cursor:]...)
-	m.editValue = string(updated)
-	m.editCursor = cursor + len(runesToInsert)
+	m.edit.value = string(updated)
+	m.edit.cursor = cursor + len(runesToInsert)
 }
 
 func (m *model) deleteEditRune(offset int) {
-	runes := []rune(m.editValue)
+	runes := []rune(m.edit.value)
 	if len(runes) == 0 {
 		return
 	}
-	index := m.editCursor + offset
+	index := m.edit.cursor + offset
 	if offset < 0 {
-		index = m.editCursor - 1
+		index = m.edit.cursor - 1
 	}
 	if index < 0 || index >= len(runes) {
 		return
 	}
 	updated := append([]rune{}, runes[:index]...)
 	updated = append(updated, runes[index+1:]...)
-	m.editValue = string(updated)
+	m.edit.value = string(updated)
 	if offset < 0 {
-		m.editCursor = index
-	} else if m.editCursor > len(updated) {
-		m.editCursor = len(updated)
+		m.edit.cursor = index
+	} else if m.edit.cursor > len(updated) {
+		m.edit.cursor = len(updated)
 	}
 }

@@ -16,10 +16,6 @@ import (
 
 type clipboardResultMsg struct{ err error }
 
-type categoryView struct {
-	Name  string
-	Tasks []domain.Task
-}
 
 type focusKind int
 
@@ -36,25 +32,17 @@ type focusPosition struct {
 }
 
 type model struct {
-	project        domain.Project
-	categories     []categoryView
-	positions      []focusPosition
-	selected       int
-	width          int
-	height         int
-	editing        bool
-	showHelp       bool
-	editValue      string
-	editCursor     int
-	store          *data.Store
-	addingTask     bool   // true when adding a new task (vs editing existing)
-	newTaskID      string // ID of task being added (for removal on cancel)
-	addingCategory bool   // true when adding a new category
-	newCategoryID  string // ID of category being added (for removal on cancel)
-	statusMsg      string // temporary status message (e.g., "Copied!")
-	confirmDelete  bool   // true when delete confirmation dialog is shown
-	scrollOffset   int    // position index at top of visible area
-	pendingKey     rune   // for multi-key sequences like gg and zz
+	project      domain.Project
+	positions    []focusPosition
+	selected     int
+	width        int
+	height       int
+	mode         UIMode
+	edit         EditState
+	store        data.ProjectRepository
+	statusMsg    string
+	scrollOffset int
+	pendingKey   rune
 }
 
 func (m model) Init() tea.Cmd {
@@ -74,16 +62,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Copied!"
 		}
 	case tea.MouseMsg:
-		// Ignore mouse events when in overlays or editing mode
-		if m.editing || m.showHelp || m.confirmDelete {
+		if m.mode != ModeNormal {
 			break
 		}
-		// Only handle left mouse button press
-		if msg.Button != tea.MouseButtonLeft {
-			break
-		}
-		// Ignore wheel events
-		if msg.Action != tea.MouseActionPress {
+		if msg.Button != tea.MouseButtonLeft || msg.Action != tea.MouseActionPress {
 			break
 		}
 		rowMap := m.computeRowMap()
@@ -96,101 +78,122 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyMsg:
 		m.statusMsg = ""
-		if msg.String() == "?" {
-			m.showHelp = !m.showHelp
-			break
+		return m.handleKeyMsg(msg)
+	}
+	return m, nil
+}
+
+func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "?" {
+		if m.mode == ModeHelp {
+			m.mode = ModeNormal
+		} else if m.mode == ModeNormal {
+			m.mode = ModeHelp
 		}
-		if m.showHelp {
-			switch msg.String() {
-			case "q", "esc":
-				m.showHelp = false
-			}
-			break
+		return m, nil
+	}
+	switch m.mode {
+	case ModeHelp:
+		return m.handleHelpKey(msg), nil
+	case ModeConfirmDelete:
+		return m.handleConfirmDeleteKey(msg), nil
+	case ModeEdit:
+		m.handleEditKey(msg)
+		return m, nil
+	default:
+		return m.handleNormalKey(msg)
+	}
+}
+
+func (m model) handleHelpKey(msg tea.KeyMsg) model {
+	switch msg.String() {
+	case "q", "esc":
+		m.mode = ModeNormal
+	}
+	return m
+}
+
+func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
+	switch msg.String() {
+	case "y", "enter":
+		m.confirmDeleteAction()
+	case "n", "esc":
+		m.mode = ModeNormal
+	}
+	return m
+}
+
+func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "up", "k":
+		m.moveSelection(-1)
+		m.pendingKey = 0
+	case "down", "j":
+		m.moveSelection(1)
+		m.pendingKey = 0
+	case " ":
+		m.toggleSelectedTask()
+		m.pendingKey = 0
+	case "enter":
+		m.startEditing()
+		m.pendingKey = 0
+	case "a":
+		m.startAddingTask()
+		m.pendingKey = 0
+	case "A":
+		m.startAddingCategory()
+		m.pendingKey = 0
+	case "h":
+		m.decreasePriority()
+		m.pendingKey = 0
+	case "l":
+		m.increasePriority()
+		m.pendingKey = 0
+	case "y":
+		m.pendingKey = 0
+		return m, m.copySelected()
+	case "d":
+		m.deleteSelected()
+		m.pendingKey = 0
+	case "J":
+		m.moveTaskDown()
+		m.pendingKey = 0
+	case "K":
+		m.moveTaskUp()
+		m.pendingKey = 0
+	case "ctrl+d":
+		m.moveSelectionByPage(0.5)
+		m.pendingKey = 0
+	case "ctrl+u":
+		m.moveSelectionByPage(-0.5)
+		m.pendingKey = 0
+	case "ctrl+f":
+		m.moveSelectionByPage(1.0)
+		m.pendingKey = 0
+	case "ctrl+b":
+		m.moveSelectionByPage(-1.0)
+		m.pendingKey = 0
+	case "g":
+		if m.pendingKey == 'g' {
+			m.jumpToFirst()
+			m.pendingKey = 0
+		} else {
+			m.pendingKey = 'g'
 		}
-		if m.confirmDelete {
-			switch msg.String() {
-			case "y", "enter":
-				m.confirmDeleteAction()
-			case "n", "esc":
-				m.confirmDelete = false
-			}
-			break
+	case "G":
+		m.jumpToLast()
+		m.pendingKey = 0
+	case "z":
+		if m.pendingKey == 'z' {
+			m.centerOnSelected()
+			m.pendingKey = 0
+		} else {
+			m.pendingKey = 'z'
 		}
-		if m.editing {
-			m.handleEditKey(msg)
-			break
-		}
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "up", "k":
-			m.moveSelection(-1)
-			m.pendingKey = 0
-		case "down", "j":
-			m.moveSelection(1)
-			m.pendingKey = 0
-		case " ":
-			m.toggleSelectedTask()
-			m.pendingKey = 0
-		case "enter":
-			m.startEditing()
-			m.pendingKey = 0
-		case "a":
-			m.startAddingTask()
-			m.pendingKey = 0
-		case "A":
-			m.startAddingCategory()
-			m.pendingKey = 0
-		case "h":
-			m.decreasePriority()
-			m.pendingKey = 0
-		case "l":
-			m.increasePriority()
-			m.pendingKey = 0
-		case "y":
-			m.pendingKey = 0
-			return m, m.copySelected()
-		case "d":
-			m.deleteSelected()
-			m.pendingKey = 0
-		case "J":
-			m.moveTaskDown()
-			m.pendingKey = 0
-		case "K":
-			m.moveTaskUp()
-			m.pendingKey = 0
-		case "ctrl+d":
-			m.moveSelectionByPage(0.5)
-			m.pendingKey = 0
-		case "ctrl+u":
-			m.moveSelectionByPage(-0.5)
-			m.pendingKey = 0
-		case "ctrl+f":
-			m.moveSelectionByPage(1.0)
-			m.pendingKey = 0
-		case "ctrl+b":
-			m.moveSelectionByPage(-1.0)
-			m.pendingKey = 0
-		case "g":
-			if m.pendingKey == 'g' {
-				m.jumpToFirst()
-				m.pendingKey = 0
-			} else {
-				m.pendingKey = 'g'
-			}
-		case "G":
-			m.jumpToLast()
-			m.pendingKey = 0
-		case "z":
-			if m.pendingKey == 'z' {
-				m.centerOnSelected()
-				m.pendingKey = 0
-			} else {
-				m.pendingKey = 'z'
-			}
-		default:
-			m.pendingKey = 0
-		}
+	default:
+		m.pendingKey = 0
 	}
 	return m, nil
 }
@@ -205,9 +208,9 @@ func (m model) copySelected() tea.Cmd {
 	case focusProject:
 		text = m.project.Name
 	case focusCategory:
-		text = m.categories[pos.CategoryIndex].Name
+		text = m.project.Categories[pos.CategoryIndex].Name
 	default:
-		text = m.categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
+		text = m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
 	}
 	return func() tea.Msg {
 		return clipboardResultMsg{err: clipboard.WriteAll(text)}
@@ -272,7 +275,7 @@ func (m model) View() string {
 	isProjectSelected := cursor == m.selected
 	projectHeight := m.countProjectLines()
 	if !renderIfVisible(func() string {
-		if m.editing && isProjectSelected {
+		if m.mode == ModeEdit && isProjectSelected {
 			return m.renderEditProjectLine()
 		}
 		return renderProjectLine(m.project.Name, isProjectSelected)
@@ -281,7 +284,7 @@ func (m model) View() string {
 	}
 	addBlankLines(2) // 2 blank lines after project
 
-	for i, category := range m.categories {
+	for i, category := range m.project.Categories {
 		if i > 0 {
 			addBlankLines(1) // 1 blank line between categories
 		}
@@ -290,7 +293,7 @@ func (m model) View() string {
 		isSelected := cursor == m.selected
 		catHeight := m.countCategoryLines(category.Name)
 		if !renderIfVisible(func() string {
-			if m.editing && isSelected {
+			if m.mode == ModeEdit && isSelected {
 				return m.renderEditCategoryLine()
 			}
 			return renderCategoryLine(category.Name, isSelected, m.width)
@@ -316,7 +319,7 @@ func (m model) View() string {
 			taskHeight := m.countTaskLines(task)
 			taskCopy := task // capture for closure
 			if !renderIfVisible(func() string {
-				if m.editing && isTaskSelected {
+				if m.mode == ModeEdit && isTaskSelected {
 					return m.renderEditTaskLine(taskCopy)
 				}
 				return renderTaskLine(taskCopy, isTaskSelected, m.width)
@@ -345,15 +348,15 @@ footer:
 	statusLine := m.statusLine()
 	shortcuts := m.shortcutsLine()
 	content := body + "\n\n" + statusLine + "\n" + shortcuts + "\n"
-	if m.showHelp {
+	switch m.mode {
+	case ModeHelp:
 		help := m.helpView()
 		if m.width > 0 && m.height > 0 {
 			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
 			return placeOverlay(bg, help, m.width, m.height)
 		}
 		return help
-	}
-	if m.confirmDelete {
+	case ModeConfirmDelete:
 		dialog := m.confirmDeleteView()
 		if m.width > 0 && m.height > 0 {
 			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
@@ -390,7 +393,7 @@ func Run(dataDir string, projectSelector string) error {
 		return err
 	}
 
-	categories, positions := buildViews(project)
+	positions := rebuildPositions(project.Categories)
 	selected := -1
 	if len(positions) > 0 {
 		selected = 0
@@ -403,25 +406,11 @@ func Run(dataDir string, projectSelector string) error {
 	}
 
 	program := tea.NewProgram(model{
-		project:    project,
-		categories: categories,
-		positions:  positions,
-		selected:   selected,
-		store:      store,
+		project:   project,
+		positions: positions,
+		selected:  selected,
+		store:     store,
 	}, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = program.Run()
 	return err
-}
-
-func buildViews(project domain.Project) ([]categoryView, []focusPosition) {
-	categories := make([]categoryView, 0, len(project.Categories))
-	for _, category := range project.Categories {
-		tasks := append([]domain.Task(nil), category.Tasks...)
-		categories = append(categories, categoryView{
-			Name:  category.Name,
-			Tasks: tasks,
-		})
-	}
-	positions := rebuildPositions(categories)
-	return categories, positions
 }

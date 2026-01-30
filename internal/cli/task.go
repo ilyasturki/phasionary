@@ -154,13 +154,7 @@ func newTaskStatusCmd() *cobra.Command {
 					if task.ID != id {
 						continue
 					}
-					task.Status = status
-					task.UpdatedAt = domain.NowTimestamp()
-					if status == domain.StatusCompleted {
-						task.CompletionDate = domain.NowTimestamp()
-					} else {
-						task.CompletionDate = ""
-					}
+					_ = task.SetStatus(status)
 					updated = true
 					break
 				}

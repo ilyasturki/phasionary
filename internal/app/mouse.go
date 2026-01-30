@@ -1,8 +1,6 @@
 package app
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/x/ansi"
 
 	"phasionary/internal/domain"
@@ -88,7 +86,7 @@ func (m model) computeRowMap() []int {
 	addBlankLines(2) // 2 blank lines after project
 
 	// Categories and tasks
-	for catIdx, category := range m.categories {
+	for catIdx, category := range m.project.Categories {
 		if catIdx > 0 {
 			addBlankLines(1) // 1 blank line between categories
 		}
@@ -130,18 +128,7 @@ func (m model) countProjectLines() int {
 
 // countCategoryLines returns how many screen rows a category line takes.
 func (m model) countCategoryLines(name string) int {
-	if m.width <= 0 {
-		return 1
-	}
-
-	const prefixWidth = 2
-	availableWidth := m.width - prefixWidth
-	if availableWidth < 1 {
-		availableWidth = 1
-	}
-
-	wrapped := ansi.Wrap(name, availableWidth, "")
-	return strings.Count(wrapped, "\n") + 1
+	return countWrappedLines(name, m.width, prefixWidth)
 }
 
 // countTaskLines returns how many screen rows a task line takes.
@@ -149,21 +136,13 @@ func (m model) countTaskLines(task domain.Task) int {
 	if m.width <= 0 {
 		return 1
 	}
-
 	prefix := "  "
 	priorityIcon := ui.PriorityIcon(task.Priority)
 	statusText := statusLabel(task.Status)
-
 	iconText := ""
 	if priorityIcon != "" {
 		iconText = priorityIcon + " "
 	}
 	overhead := ansi.StringWidth(prefix + "[" + statusText + "] " + iconText)
-	availableWidth := m.width - overhead
-	if availableWidth < 1 {
-		availableWidth = 1
-	}
-
-	wrapped := ansi.Wrap(task.Title, availableWidth, "")
-	return strings.Count(wrapped, "\n") + 1
+	return countWrappedLines(task.Title, m.width, overhead)
 }

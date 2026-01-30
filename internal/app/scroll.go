@@ -1,9 +1,5 @@
 package app
 
-// footerHeight is the number of lines used by footer:
-// 1 blank line (\n\n, where first \n ends body) + status line + shortcuts line = 3
-const footerHeight = 3
-
 // availableHeight returns the number of lines available for content rendering
 func (m model) availableHeight() int {
 	if m.height <= footerHeight {
@@ -22,9 +18,9 @@ func (m model) elementHeight(posIndex int) int {
 	case focusProject:
 		return m.countProjectLines()
 	case focusCategory:
-		return m.countCategoryLines(m.categories[pos.CategoryIndex].Name)
+		return m.countCategoryLines(m.project.Categories[pos.CategoryIndex].Name)
 	case focusTask:
-		return m.countTaskLines(m.categories[pos.CategoryIndex].Tasks[pos.TaskIndex])
+		return m.countTaskLines(m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex])
 	default:
 		return 1
 	}

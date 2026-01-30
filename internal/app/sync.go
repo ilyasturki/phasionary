@@ -2,28 +2,16 @@ package app
 
 import "phasionary/internal/domain"
 
-func (m *model) syncTaskToProject(position focusPosition, task domain.Task) {
-	if position.CategoryIndex < 0 || position.CategoryIndex >= len(m.project.Categories) {
-		return
-	}
-	projectCategory := &m.project.Categories[position.CategoryIndex]
-	for index := range projectCategory.Tasks {
-		if projectCategory.Tasks[index].ID == task.ID {
-			projectCategory.Tasks[index] = task
-			return
-		}
-	}
-	projectCategory.Tasks = append(projectCategory.Tasks, task)
-}
-
 func (m *model) storeTaskUpdate() {
 	if m.store == nil {
 		return
 	}
-	_ = m.store.SaveProject(m.project)
+	if err := m.store.SaveProject(m.project); err != nil {
+		m.statusMsg = "Save failed: " + err.Error()
+	}
 }
 
-func rebuildPositions(categories []categoryView) []focusPosition {
+func rebuildPositions(categories []domain.Category) []focusPosition {
 	positions := make([]focusPosition, 0)
 	positions = append(positions, focusPosition{
 		Kind:          focusProject,
@@ -47,3 +35,6 @@ func rebuildPositions(categories []categoryView) []focusPosition {
 	return positions
 }
 
+func (m *model) rebuildPositions() {
+	m.positions = rebuildPositions(m.project.Categories)
+}
