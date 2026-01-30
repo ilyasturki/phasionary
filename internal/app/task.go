@@ -1,6 +1,10 @@
 package app
 
-import "phasionary/internal/domain"
+import (
+	"sort"
+
+	"phasionary/internal/domain"
+)
 
 func (m *model) deleteSelected() {
 	if m.mode == ModeEdit {
@@ -242,4 +246,107 @@ func nextPriorityDown(current string) string {
 	default:
 		return domain.PriorityMedium
 	}
+}
+
+func statusOrder(status string) int {
+	switch status {
+	case domain.StatusTodo:
+		return 0
+	case domain.StatusInProgress:
+		return 1
+	case domain.StatusCompleted:
+		return 2
+	case domain.StatusCancelled:
+		return 3
+	default:
+		return 0
+	}
+}
+
+func priorityOrder(priority string) int {
+	switch priority {
+	case domain.PriorityHigh:
+		return 0
+	case domain.PriorityMedium:
+		return 1
+	case domain.PriorityLow:
+		return 2
+	default:
+		return 3
+	}
+}
+
+func getTaskSortDate(task domain.Task) string {
+	if task.UpdatedAt != "" {
+		return task.UpdatedAt
+	}
+	return task.CreatedAt
+}
+
+func sortCategoryTasks(tasks []domain.Task, ascending bool) {
+	sort.SliceStable(tasks, func(i, j int) bool {
+		orderI := statusOrder(tasks[i].Status)
+		orderJ := statusOrder(tasks[j].Status)
+		if orderI != orderJ {
+			if ascending {
+				return orderI < orderJ
+			}
+			return orderI > orderJ
+		}
+		prioI := priorityOrder(tasks[i].Priority)
+		prioJ := priorityOrder(tasks[j].Priority)
+		if prioI != prioJ {
+			if ascending {
+				return prioI < prioJ
+			}
+			return prioI > prioJ
+		}
+		dateI := getTaskSortDate(tasks[i])
+		dateJ := getTaskSortDate(tasks[j])
+		if ascending {
+			return dateI < dateJ
+		}
+		return dateI > dateJ
+	})
+}
+
+func (m *model) sortTasksByStatus() {
+	m.sortTasksByStatusOrder(true)
+}
+
+func (m *model) sortTasksByStatusReverse() {
+	m.sortTasksByStatusOrder(false)
+}
+
+func (m *model) sortTasksByStatusOrder(ascending bool) {
+	if m.mode == ModeEdit {
+		return
+	}
+
+	var selectedTaskID string
+	position, hasSelection := m.selectedPosition()
+	if hasSelection && position.Kind == focusTask {
+		selectedTaskID = m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex].ID
+	}
+
+	for i := range m.project.Categories {
+		sortCategoryTasks(m.project.Categories[i].Tasks, ascending)
+	}
+
+	m.rebuildPositions()
+
+	if selectedTaskID != "" {
+		for i, pos := range m.positions {
+			if pos.Kind == focusTask {
+				task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
+				if task.ID == selectedTaskID {
+					m.selected = i
+					break
+				}
+			}
+		}
+	}
+
+	m.ensureVisible()
+	m.storeTaskUpdate()
 }

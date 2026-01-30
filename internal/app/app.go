@@ -242,6 +242,12 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.pendingKey = 'z'
 		}
+	case "s":
+		m.sortTasksByStatus()
+		m.pendingKey = 0
+	case "S":
+		m.sortTasksByStatusReverse()
+		m.pendingKey = 0
 	default:
 		m.pendingKey = 0
 	}
@@ -280,9 +286,7 @@ func (m model) View() string {
 
 	for i := viewport.VisibleStart; i < viewport.VisibleEnd; i++ {
 		rendered := m.renderLayoutItem(layout.Items[i])
-		if rendered != "" {
-			lines = append(lines, rendered)
-		}
+		lines = append(lines, rendered)
 	}
 
 	if viewport.HasMoreBelow {
