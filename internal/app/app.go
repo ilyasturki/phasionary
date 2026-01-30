@@ -40,6 +40,7 @@ type model struct {
 	height       int
 	mode         UIMode
 	edit         EditState
+	picker       ProjectPickerState
 	store        data.ProjectRepository
 	cfgManager   *config.Manager
 	options      OptionsState
@@ -102,6 +103,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfirmDeleteKey(msg), nil
 	case ModeOptions:
 		return m.handleOptionsKey(msg), nil
+	case ModeProjectPicker:
+		return m.handleProjectPickerKey(msg), nil
 	case ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
@@ -229,6 +232,9 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeOptions
 		m.options = OptionsState{selectedOption: 0}
 		m.pendingKey = 0
+	case "p":
+		m.openProjectPicker()
+		m.pendingKey = 0
 	case "z":
 		if m.pendingKey == 'z' {
 			m.centerOnSelected()
@@ -305,6 +311,13 @@ func (m model) View() string {
 		return dialog
 	case ModeOptions:
 		dialog := m.optionsView()
+		if m.width > 0 && m.height > 0 {
+			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
+			return placeOverlay(bg, dialog, m.width, m.height)
+		}
+		return dialog
+	case ModeProjectPicker:
+		dialog := m.projectPickerView()
 		if m.width > 0 && m.height > 0 {
 			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
 			return placeOverlay(bg, dialog, m.width, m.height)

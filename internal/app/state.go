@@ -1,6 +1,10 @@
 package app
 
-import "github.com/charmbracelet/bubbles/textinput"
+import (
+	"github.com/charmbracelet/bubbles/textinput"
+
+	"phasionary/internal/domain"
+)
 
 type UIMode int
 
@@ -10,10 +14,23 @@ const (
 	ModeHelp
 	ModeConfirmDelete
 	ModeOptions
+	ModeProjectPicker
 )
 
 type OptionsState struct {
 	selectedOption int
+}
+
+type ProjectPickerState struct {
+	projects     []domain.Project
+	selected     int
+	scrollOffset int
+}
+
+func (p *ProjectPickerState) reset() {
+	p.projects = nil
+	p.selected = 0
+	p.scrollOffset = 0
 }
 
 type EditState struct {

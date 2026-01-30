@@ -284,7 +284,7 @@ func (m model) shortcutsLine() string {
 	if m.mode == ModeEdit {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | a add task | A add category | enter edit | space status | h/l priority | y copy | d delete | o options | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | a add task | A add category | enter edit | space status | h/l priority | y copy | d delete | p projects | o options | ? help | q quit")
 }
 
 func placeOverlay(bg, fg string, width, height int) string {
@@ -347,6 +347,7 @@ func (m model) helpView() string {
 		"  gg            jump to first item",
 		"  G             jump to last item",
 		"  zz            center selection on screen",
+		"  p             switch project",
 		"",
 		"Actions:",
 		"  a             add new task",
@@ -385,5 +386,45 @@ func (m model) optionsView() string {
 		"",
 		"space/tab toggle | q/esc/enter close",
 	}
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (m model) projectPickerView() string {
+	lines := []string{"Select Project:", ""}
+
+	visibleEnd := m.picker.scrollOffset + pickerVisibleItems
+	if visibleEnd > len(m.picker.projects) {
+		visibleEnd = len(m.picker.projects)
+	}
+
+	if m.picker.scrollOffset > 0 {
+		lines = append(lines, ui.MutedStyle.Render("  ↑ more above"))
+	}
+
+	for i := m.picker.scrollOffset; i < visibleEnd; i++ {
+		p := m.picker.projects[i]
+		prefix := "  "
+		if i == m.picker.selected {
+			prefix = "> "
+		}
+		name := p.Name
+		if p.ID == m.project.ID {
+			name += " (current)"
+		}
+		line := prefix + name
+		if i == m.picker.selected {
+			line = ui.SelectedStyle.Render(line)
+		} else if p.ID == m.project.ID {
+			line = prefix + p.Name + ui.MutedStyle.Render(" (current)")
+		}
+		lines = append(lines, line)
+	}
+
+	if visibleEnd < len(m.picker.projects) {
+		lines = append(lines, ui.MutedStyle.Render("  ↓ more below"))
+	}
+
+	lines = append(lines, "", "j/k navigate | enter select | esc cancel")
+
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
