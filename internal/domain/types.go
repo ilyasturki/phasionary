@@ -23,12 +23,11 @@ var DefaultCategories = []string{"Feature", "Fix", "Ergonomy", "Documentation", 
 
 // Project is stored as a single JSON file.
 type Project struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description,omitempty"`
-	CreatedAt   string     `json:"created_at"`
-	UpdatedAt   string     `json:"updated_at"`
-	Categories  []Category `json:"categories"`
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	CreatedAt  string     `json:"created_at"`
+	UpdatedAt  string     `json:"updated_at"`
+	Categories []Category `json:"categories"`
 }
 
 type Category struct {
@@ -72,19 +71,18 @@ func NewID() (string, error) {
 	return strings.Join(parts, "-"), nil
 }
 
-func NewProject(name string, description string) (Project, error) {
+func NewProject(name string) (Project, error) {
 	id, err := NewID()
 	if err != nil {
 		return Project{}, err
 	}
 	now := NowTimestamp()
 	project := Project{
-		ID:          id,
-		Name:        name,
-		Description: description,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-		Categories:  []Category{},
+		ID:         id,
+		Name:       name,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+		Categories: []Category{},
 	}
 	return project, nil
 }

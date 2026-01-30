@@ -49,8 +49,6 @@ func newProjectListCmd() *cobra.Command {
 }
 
 func newProjectAddCmd() *cobra.Command {
-	var description string
-
 	cmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a project",
@@ -60,7 +58,7 @@ func newProjectAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			project, err := store.CreateProject(args[0], description)
+			project, err := store.CreateProject(args[0])
 			if err != nil {
 				return err
 			}
@@ -68,7 +66,6 @@ func newProjectAddCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&description, "description", "", "project description")
 	return cmd
 }
 

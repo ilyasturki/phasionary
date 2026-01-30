@@ -47,11 +47,6 @@ func ExportMarkdown(project domain.Project, w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "# %s\n", project.Name); err != nil {
 		return err
 	}
-	if project.Description != "" {
-		if _, err := fmt.Fprintf(w, "\n%s\n", project.Description); err != nil {
-			return err
-		}
-	}
 	for _, cat := range project.Categories {
 		if _, err := fmt.Fprintf(w, "\n## %s\n\n", cat.Name); err != nil {
 			return err
@@ -74,17 +69,14 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 	scanner := bufio.NewScanner(r)
 
 	var parsedName string
-	var descLines []string
 	var categories []categoryData
 	var currentCategory *categoryData
-	inDescription := false
 
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		if m := projectHeaderRe.FindStringSubmatch(line); m != nil {
 			parsedName = strings.TrimSpace(m[1])
-			inDescription = true
 			continue
 		}
 
@@ -93,7 +85,6 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 				categories = append(categories, *currentCategory)
 			}
 			currentCategory = &categoryData{name: strings.TrimSpace(m[1])}
-			inDescription = false
 			continue
 		}
 
@@ -112,13 +103,6 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 			})
 			continue
 		}
-
-		if inDescription && currentCategory == nil {
-			trimmed := strings.TrimSpace(line)
-			if trimmed != "" {
-				descLines = append(descLines, trimmed)
-			}
-		}
 	}
 	if err := scanner.Err(); err != nil {
 		return domain.Project{}, err
@@ -135,7 +119,7 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 		name = "Imported Project"
 	}
 
-	project, err := domain.NewProject(name, strings.Join(descLines, " "))
+	project, err := domain.NewProject(name)
 	if err != nil {
 		return domain.Project{}, err
 	}

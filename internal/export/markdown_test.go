@@ -14,8 +14,7 @@ import (
 func TestExportMarkdown(t *testing.T) {
 	t.Run("exports project with all status types", func(t *testing.T) {
 		project := domain.Project{
-			Name:        "Test Project",
-			Description: "A test description",
+			Name: "Test Project",
 			Categories: []domain.Category{
 				{
 					Name: "Features",
@@ -35,7 +34,6 @@ func TestExportMarkdown(t *testing.T) {
 
 		output := buf.String()
 		assert.Contains(t, output, "# Test Project")
-		assert.Contains(t, output, "A test description")
 		assert.Contains(t, output, "## Features")
 		assert.Contains(t, output, "- [ ] Todo task")
 		assert.Contains(t, output, "- [x] Done task")
@@ -111,8 +109,6 @@ func TestImportMarkdown(t *testing.T) {
 	t.Run("imports basic markdown", func(t *testing.T) {
 		md := `# My Project
 
-This is a description.
-
 ## Features
 
 - [ ] Task one
@@ -124,7 +120,6 @@ This is a description.
 		require.NoError(t, err)
 
 		assert.Equal(t, "My Project", project.Name)
-		assert.Equal(t, "This is a description.", project.Description)
 		require.Len(t, project.Categories, 1)
 		assert.Equal(t, "Features", project.Categories[0].Name)
 		require.Len(t, project.Categories[0].Tasks, 4)
@@ -258,11 +253,10 @@ This is a description.
 		assert.Empty(t, project.Categories[0].Tasks[1].CompletionDate)
 	})
 
-	t.Run("handles multiline description", func(t *testing.T) {
+	t.Run("ignores content between project header and first category", func(t *testing.T) {
 		md := `# Test
 
-First line.
-Second line.
+Some notes here.
 
 ## Tasks
 
@@ -271,7 +265,9 @@ Second line.
 		project, err := ImportMarkdown(strings.NewReader(md), "")
 		require.NoError(t, err)
 
-		assert.Equal(t, "First line. Second line.", project.Description)
+		assert.Equal(t, "Test", project.Name)
+		require.Len(t, project.Categories, 1)
+		assert.Equal(t, "Tasks", project.Categories[0].Name)
 	})
 
 	t.Run("ignores tasks outside categories", func(t *testing.T) {
@@ -295,8 +291,7 @@ Second line.
 func TestRoundTrip(t *testing.T) {
 	t.Run("export then import preserves data", func(t *testing.T) {
 		original := domain.Project{
-			Name:        "Round Trip",
-			Description: "Testing round trip conversion",
+			Name: "Round Trip",
 			Categories: []domain.Category{
 				{
 					Name: "Feature",
@@ -323,7 +318,6 @@ func TestRoundTrip(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, original.Name, imported.Name)
-		assert.Equal(t, original.Description, imported.Description)
 		require.Len(t, imported.Categories, len(original.Categories))
 
 		for i, origCat := range original.Categories {

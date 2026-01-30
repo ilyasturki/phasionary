@@ -19,7 +19,7 @@ type ProjectRepository interface {
 	ListProjects() ([]domain.Project, error)
 	LoadProject(selector string) (domain.Project, error)
 	SaveProject(project domain.Project) error
-	CreateProject(name, description string) (domain.Project, error)
+	CreateProject(name string) (domain.Project, error)
 }
 
 // Store manages JSON persistence in a directory.
@@ -99,7 +99,7 @@ func (s *Store) SaveProject(project domain.Project) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func (s *Store) CreateProject(name, description string) (domain.Project, error) {
+func (s *Store) CreateProject(name string) (domain.Project, error) {
 	projects, err := s.ListProjects()
 	if err != nil {
 		return domain.Project{}, err
@@ -110,7 +110,7 @@ func (s *Store) CreateProject(name, description string) (domain.Project, error) 
 			return domain.Project{}, fmt.Errorf("project %q already exists", name)
 		}
 	}
-	project, err := domain.NewProject(name, description)
+	project, err := domain.NewProject(name)
 	if err != nil {
 		return domain.Project{}, err
 	}
@@ -135,7 +135,7 @@ func (s *Store) InitDefault() (domain.Project, error) {
 	if len(projects) > 0 {
 		return projects[0], nil
 	}
-	return s.CreateProject("Default", "")
+	return s.CreateProject("Default")
 }
 
 func (s *Store) defaultCategories() ([]domain.Category, error) {
