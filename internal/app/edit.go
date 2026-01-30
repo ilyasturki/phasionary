@@ -52,7 +52,6 @@ func (m *model) startAddingTask() {
 	}
 	m.mode = ModeEdit
 	m.edit = newEditState("", true, newTask.ID, focusTask)
-	m.edit.cursor = 0
 	m.ensureVisible()
 }
 
@@ -78,7 +77,6 @@ func (m *model) startAddingCategory() {
 	}
 	m.mode = ModeEdit
 	m.edit = newEditState("", true, newCat.ID, focusCategory)
-	m.edit.cursor = 0
 	m.ensureVisible()
 }
 
@@ -107,27 +105,18 @@ func (m *model) removeNewCategory() {
 	m.ensureVisible()
 }
 
-func (m *model) handleEditKey(msg tea.KeyMsg) {
+func (m *model) handleEditKey(msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
 	case "enter":
 		m.finishEditing()
+		return nil
 	case "esc":
 		m.cancelEditing()
-	case "left":
-		m.moveEditCursor(-1)
-	case "right":
-		m.moveEditCursor(1)
-	case "backspace":
-		m.deleteEditRune(-1)
-	case "delete":
-		m.deleteEditRune(0)
-	case " ", "space":
-		m.insertEditRunes([]rune(" "))
-	default:
-		if msg.Type == tea.KeyRunes {
-			m.insertEditRunes(msg.Runes)
-		}
+		return nil
 	}
+	var cmd tea.Cmd
+	m.edit.input, cmd = m.edit.input.Update(msg)
+	return cmd
 }
 
 func (m *model) finishEditing() {
@@ -139,7 +128,7 @@ func (m *model) finishEditing() {
 		m.cancelEditing()
 		return
 	}
-	trimmed := strings.TrimSpace(m.edit.value)
+	trimmed := strings.TrimSpace(m.edit.input.Value())
 	if trimmed == "" {
 		m.cancelEditing()
 		return
@@ -216,56 +205,3 @@ func (m *model) removeNewTask() {
 	m.ensureVisible()
 }
 
-func (m *model) moveEditCursor(delta int) {
-	runes := []rune(m.edit.value)
-	next := m.edit.cursor + delta
-	if next < 0 {
-		next = 0
-	}
-	if next > len(runes) {
-		next = len(runes)
-	}
-	m.edit.cursor = next
-}
-
-func (m *model) insertEditRunes(runesToInsert []rune) {
-	if len(runesToInsert) == 0 {
-		return
-	}
-	runes := []rune(m.edit.value)
-	cursor := m.edit.cursor
-	if cursor < 0 {
-		cursor = 0
-	}
-	if cursor > len(runes) {
-		cursor = len(runes)
-	}
-	updated := make([]rune, 0, len(runes)+len(runesToInsert))
-	updated = append(updated, runes[:cursor]...)
-	updated = append(updated, runesToInsert...)
-	updated = append(updated, runes[cursor:]...)
-	m.edit.value = string(updated)
-	m.edit.cursor = cursor + len(runesToInsert)
-}
-
-func (m *model) deleteEditRune(offset int) {
-	runes := []rune(m.edit.value)
-	if len(runes) == 0 {
-		return
-	}
-	index := m.edit.cursor + offset
-	if offset < 0 {
-		index = m.edit.cursor - 1
-	}
-	if index < 0 || index >= len(runes) {
-		return
-	}
-	updated := append([]rune{}, runes[:index]...)
-	updated = append(updated, runes[index+1:]...)
-	m.edit.value = string(updated)
-	if offset < 0 {
-		m.edit.cursor = index
-	} else if m.edit.cursor > len(updated) {
-		m.edit.cursor = len(updated)
-	}
-}

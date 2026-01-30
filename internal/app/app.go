@@ -98,8 +98,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ModeConfirmDelete:
 		return m.handleConfirmDeleteKey(msg), nil
 	case ModeEdit:
-		m.handleEditKey(msg)
-		return m, nil
+		cmd := m.handleEditKey(msg)
+		return m, cmd
 	default:
 		return m.handleNormalKey(msg)
 	}

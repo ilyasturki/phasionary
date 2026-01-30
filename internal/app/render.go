@@ -26,7 +26,7 @@ func renderProjectLine(name string, selected bool) string {
 func (m model) renderEditProjectLine() string {
 	prefix := "> "
 	icon := "■ "
-	split := splitAtCursor(m.edit.value, m.edit.cursor)
+	split := splitAtCursor(m.edit.input.Value(), m.edit.input.Position())
 	cursorStyle := ui.SelectedStyle
 	return fmt.Sprintf(
 		"%s%s%s%s%s",
@@ -152,7 +152,7 @@ func formatStatus(status string) string {
 
 func (m model) renderEditCategoryLine() string {
 	prefix := "> "
-	if m.edit.isAdding && m.edit.value == "" {
+	if m.edit.isAdding && m.edit.input.Value() == "" {
 		cursorStyle := ui.SelectedStyle
 		placeholder := ui.MutedStyle.Render("Enter category name...")
 		styledText := cursorStyle.Render(" ") + placeholder
@@ -162,7 +162,7 @@ func (m model) renderEditCategoryLine() string {
 		}
 		return prefix + styledText
 	}
-	return renderCursorLine(m.edit.value, m.edit.cursor, m.width, prefixWidth, prefix, ui.CategoryStyle, ui.SelectedStyle)
+	return renderCursorLine(m.edit.input.Value(), m.edit.input.Position(), m.width, prefixWidth, prefix, ui.CategoryStyle, ui.SelectedStyle)
 }
 
 func (m model) renderEditTaskLine(task domain.Task) string {
@@ -178,7 +178,7 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	}
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, statusText, iconPrefix)
 	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status) + "] " + iconPlain)
-	if m.edit.isAdding && m.edit.value == "" {
+	if m.edit.isAdding && m.edit.input.Value() == "" {
 		cursorStyle := ui.SelectedStyle
 		placeholder := ui.MutedStyle.Render("Enter task title...")
 		styledText := cursorStyle.Render(" ") + placeholder
@@ -198,12 +198,12 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		}
 		return prefixPart + styledText
 	}
-	edited := m.edit.value
+	edited := m.edit.input.Value()
 	if edited == "" {
 		edited = " "
 	}
 	if m.width <= 0 {
-		split := splitAtCursor(edited, m.edit.cursor)
+		split := splitAtCursor(edited, m.edit.input.Position())
 		return prefixPart +
 			titleStyle.Render(split.left) +
 			ui.SelectedStyle.Render(split.cursorCh) +
@@ -215,17 +215,18 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	indent := strings.Repeat(" ", overhead)
 	pos := 0
 	var result []string
+	cursor := m.edit.input.Position()
 	for i, line := range wrapLines {
 		lineRunes := []rune(line)
 		lineLen := len(lineRunes)
 		var styledLine string
-		if m.edit.cursor >= pos && m.edit.cursor < pos+lineLen {
-			offset := m.edit.cursor - pos
+		if cursor >= pos && cursor < pos+lineLen {
+			offset := cursor - pos
 			l := string(lineRunes[:offset])
 			c := string(lineRunes[offset])
 			r := string(lineRunes[offset+1:])
 			styledLine = titleStyle.Render(l) + ui.SelectedStyle.Render(c) + titleStyle.Render(r)
-		} else if m.edit.cursor == pos+lineLen {
+		} else if cursor == pos+lineLen {
 			styledLine = titleStyle.Render(line) + ui.SelectedStyle.Render(" ")
 		} else {
 			styledLine = titleStyle.Render(line)
@@ -346,7 +347,10 @@ func (m model) helpView() string {
 		"  enter         save changes",
 		"  esc           cancel editing",
 		"  ←/→           move cursor",
-		"  backspace     delete character",
+		"  ctrl+a/e      start/end of line",
+		"  ctrl+w        delete word backward",
+		"  ctrl+k/u      delete to end/start",
+		"  ctrl+←/→      word navigation",
 	}
 	return ui.HelpDialogStyle.Render(ui.MutedStyle.Render(strings.Join(lines, "\n")))
 }
