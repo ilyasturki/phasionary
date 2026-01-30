@@ -10,7 +10,8 @@
       "Bash(./phasionary:*)",
       "Bash(head:*)",
       "Bash(wc:*)",
-      "Bash(go list:*)"
+      "Bash(go list:*)",
+      "Bash(go get:*)"
     ]
   },
   "enabledPlugins": {
