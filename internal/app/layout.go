@@ -176,7 +176,7 @@ func (b *LayoutBuilder) countTaskLines(task domain.Task) int {
 }
 
 func (m *model) buildLayout() *Layout {
-	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.width, m.cfg.StatusDisplay)
+	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.width, m.cfgManager.Get().StatusDisplay)
 	layout := builder.Build(m.project, m.positions)
 	return &layout
 }

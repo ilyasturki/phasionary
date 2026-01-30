@@ -68,7 +68,7 @@ func (m model) renderTaskLine(task domain.Task, selected bool, width int) string
 }
 
 func (m model) renderUnselectedTask(task domain.Task, prefix, priorityIcon string, width int) string {
-	status := formatStatus(task.Status, m.cfg.StatusDisplay)
+	status := formatStatus(task.Status, m.cfgManager.Get().StatusDisplay)
 	icon := ""
 	if priorityIcon != "" {
 		icon = ui.PriorityStyle(task.Priority).Render(priorityIcon) + " "
@@ -96,7 +96,7 @@ func (m model) renderUnselectedTask(task domain.Task, prefix, priorityIcon strin
 }
 
 func (m model) renderSelectedTask(task domain.Task, prefix, priorityIcon string, width int) string {
-	statusText := statusLabel(task.Status, m.cfg.StatusDisplay)
+	statusText := statusLabel(task.Status, m.cfgManager.Get().StatusDisplay)
 	priorityStyle := ui.SelectedPriorityStyle(task.Priority)
 	statusStyle := ui.SelectedStatusStyle(task.Status)
 	icon := ""
@@ -184,7 +184,7 @@ func (m model) renderEditCategoryLine() string {
 
 func (m model) renderEditTaskLine(task domain.Task) string {
 	prefix := "> "
-	statusText := formatStatus(task.Status, m.cfg.StatusDisplay)
+	statusText := formatStatus(task.Status, m.cfgManager.Get().StatusDisplay)
 	titleStyle := ui.PriorityStyle(task.Priority)
 	icon := ui.PriorityIcon(task.Priority)
 	iconPrefix := ""
@@ -194,7 +194,7 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		iconPlain = icon + " "
 	}
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, statusText, iconPrefix)
-	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, m.cfg.StatusDisplay) + "] " + iconPlain)
+	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, m.cfgManager.Get().StatusDisplay) + "] " + iconPlain)
 	if m.edit.isAdding && m.edit.input.Value() == "" {
 		cursorStyle := ui.SelectedStyle
 		placeholder := ui.MutedStyle.Render("Enter task title...")
@@ -284,7 +284,7 @@ func (m model) shortcutsLine() string {
 	if m.mode == ModeEdit {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | a add task | A add category | enter edit | space status | h/l priority | y copy | d delete | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | a add task | A add category | enter edit | space status | h/l priority | y copy | d delete | o options | ? help | q quit")
 }
 
 func placeOverlay(bg, fg string, width, height int) string {
@@ -357,6 +357,7 @@ func (m model) helpView() string {
 		"  h/l           change priority",
 		"  y             copy selected text",
 		"  d             delete selected item",
+		"  o             options",
 		"  ?             toggle help",
 		"  q or ctrl+c   quit",
 		"",
@@ -370,4 +371,19 @@ func (m model) helpView() string {
 		"  ctrl+←/→      word navigation",
 	}
 	return ui.HelpDialogStyle.Render(ui.MutedStyle.Render(strings.Join(lines, "\n")))
+}
+
+func (m model) optionsView() string {
+	statusValue := "Text Labels"
+	if m.cfgManager.Get().StatusDisplay == config.StatusDisplayIcons {
+		statusValue = "Icons"
+	}
+	lines := []string{
+		"Options",
+		"",
+		fmt.Sprintf("> Status Display: [%s]", statusValue),
+		"",
+		"space/tab toggle | q/esc/enter close",
+	}
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }

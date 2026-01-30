@@ -33,7 +33,7 @@ func newRootCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return app.Run(dataDir, viper.GetString("project"), cfgManager.Get())
+			return app.Run(dataDir, viper.GetString("project"), cfgManager)
 		},
 	}
 

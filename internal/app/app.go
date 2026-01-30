@@ -41,7 +41,8 @@ type model struct {
 	mode         UIMode
 	edit         EditState
 	store        data.ProjectRepository
-	cfg          config.Config
+	cfgManager   *config.Manager
+	options      OptionsState
 	statusMsg    string
 	scrollOffset int
 	pendingKey   rune
@@ -99,6 +100,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleHelpKey(msg), nil
 	case ModeConfirmDelete:
 		return m.handleConfirmDeleteKey(msg), nil
+	case ModeOptions:
+		return m.handleOptionsKey(msg), nil
 	case ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
@@ -123,6 +126,33 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
 		m.mode = ModeNormal
 	}
 	return m
+}
+
+func (m model) handleOptionsKey(msg tea.KeyMsg) model {
+	switch msg.String() {
+	case "q", "esc", "enter":
+		m.mode = ModeNormal
+	case "j", "down":
+		// Ready for more options
+	case "k", "up":
+		// Ready for more options
+	case " ", "tab", "h", "l":
+		m.toggleSelectedOption()
+	}
+	return m
+}
+
+func (m *model) toggleSelectedOption() {
+	switch m.options.selectedOption {
+	case 0: // StatusDisplay
+		newValue := config.StatusDisplayIcons
+		if m.cfgManager.Get().StatusDisplay == config.StatusDisplayIcons {
+			newValue = config.StatusDisplayText
+		}
+		_ = m.cfgManager.Update(func(cfg *config.Config) {
+			cfg.StatusDisplay = newValue
+		})
+	}
 }
 
 func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -194,6 +224,10 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "G":
 		m.jumpToLast()
+		m.pendingKey = 0
+	case "o":
+		m.mode = ModeOptions
+		m.options = OptionsState{selectedOption: 0}
 		m.pendingKey = 0
 	case "z":
 		if m.pendingKey == 'z' {
@@ -269,6 +303,13 @@ func (m model) View() string {
 			return placeOverlay(bg, dialog, m.width, m.height)
 		}
 		return dialog
+	case ModeOptions:
+		dialog := m.optionsView()
+		if m.width > 0 && m.height > 0 {
+			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
+			return placeOverlay(bg, dialog, m.width, m.height)
+		}
+		return dialog
 	}
 	return content
 }
@@ -307,7 +348,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 	return ""
 }
 
-func Run(dataDir string, projectSelector string, cfg config.Config) error {
+func Run(dataDir string, projectSelector string, cfgManager *config.Manager) error {
 	store := data.NewStore(dataDir)
 	if err := store.Ensure(); err != nil {
 		return err
@@ -346,11 +387,11 @@ func Run(dataDir string, projectSelector string, cfg config.Config) error {
 	}
 
 	program := tea.NewProgram(model{
-		project:   project,
-		positions: positions,
-		selected:  selected,
-		store:     store,
-		cfg:       cfg,
+		project:    project,
+		positions:  positions,
+		selected:   selected,
+		store:      store,
+		cfgManager: cfgManager,
 	}, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = program.Run()
 	return err

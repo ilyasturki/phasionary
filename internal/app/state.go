@@ -9,7 +9,12 @@ const (
 	ModeEdit
 	ModeHelp
 	ModeConfirmDelete
+	ModeOptions
 )
+
+type OptionsState struct {
+	selectedOption int
+}
 
 type EditState struct {
 	input     textinput.Model
