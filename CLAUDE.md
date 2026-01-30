@@ -27,13 +27,16 @@ go test -v ./internal/domain/...  # Run tests for specific package
 ```
 cmd/phasionary/main.go    # Entry point
 internal/
-  app/      # App state + Bubble Tea update loop
-  ui/       # Views, components, lipgloss styles
-  cli/      # Cobra commands
-  domain/   # Entities (Project, Category, Task) + sorting rules
-  data/     # JSON storage access
-  config/   # Config loading
-  export/   # Import/export helpers (JSON, CSV)
+  app/                    # App state + Bubble Tea update loop
+    components/           # Reusable UI components (Modal, TaskLineRenderer)
+    modes/                # UI mode state machine
+    selection/            # Navigation/selection manager
+  ui/                     # Lipgloss styles
+  cli/                    # Cobra commands
+  domain/                 # Entities (Project, Category, Task) + sorting rules
+  data/                   # JSON storage access
+  config/                 # Config loading
+  export/                 # Import/export helpers (JSON, CSV)
 ```
 
 ## Domain Model
@@ -48,7 +51,10 @@ Task sort order within categories: Priority > Deadline > Time estimate > Title (
 
 - **Normal**: Navigation and actions
 - **Edit**: Form fields and text entry
-- **Command**: `:` prefix for palette commands
+- **Help**: Help dialog overlay
+- **ConfirmDelete**: Deletion confirmation
+- **Options**: Settings dialog
+- **ProjectPicker**: Project switching
 
 ## Key Constraints
 
