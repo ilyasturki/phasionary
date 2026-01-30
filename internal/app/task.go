@@ -168,6 +168,56 @@ func (m *model) moveTaskUp() {
 	m.storeTaskUpdate()
 }
 
+func (m *model) moveCategoryDown() {
+	if m.mode == ModeEdit {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusCategory {
+		return
+	}
+	catIndex := position.CategoryIndex
+	if catIndex >= len(m.project.Categories)-1 {
+		return
+	}
+	m.project.Categories[catIndex], m.project.Categories[catIndex+1] =
+		m.project.Categories[catIndex+1], m.project.Categories[catIndex]
+	m.rebuildPositions()
+	for i, pos := range m.positions {
+		if pos.Kind == focusCategory && pos.CategoryIndex == catIndex+1 {
+			m.selected = i
+			break
+		}
+	}
+	m.ensureVisible()
+	m.storeTaskUpdate()
+}
+
+func (m *model) moveCategoryUp() {
+	if m.mode == ModeEdit {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusCategory {
+		return
+	}
+	catIndex := position.CategoryIndex
+	if catIndex <= 0 {
+		return
+	}
+	m.project.Categories[catIndex], m.project.Categories[catIndex-1] =
+		m.project.Categories[catIndex-1], m.project.Categories[catIndex]
+	m.rebuildPositions()
+	for i, pos := range m.positions {
+		if pos.Kind == focusCategory && pos.CategoryIndex == catIndex-1 {
+			m.selected = i
+			break
+		}
+	}
+	m.ensureVisible()
+	m.storeTaskUpdate()
+}
+
 func nextPriorityUp(current string) string {
 	switch current {
 	case domain.PriorityLow:

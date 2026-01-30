@@ -353,7 +353,7 @@ func (m model) helpView() string {
 		"  A             add new category",
 		"  enter         edit selected item",
 		"  space         toggle task status",
-		"  J/K           reorder task up/down",
+		"  J/K           reorder task/category up/down",
 		"  h/l           change priority",
 		"  y             copy selected text",
 		"  d             delete selected item",

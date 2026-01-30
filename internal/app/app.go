@@ -160,10 +160,18 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.deleteSelected()
 		m.pendingKey = 0
 	case "J":
-		m.moveTaskDown()
+		if pos, ok := m.selectedPosition(); ok && pos.Kind == focusCategory {
+			m.moveCategoryDown()
+		} else {
+			m.moveTaskDown()
+		}
 		m.pendingKey = 0
 	case "K":
-		m.moveTaskUp()
+		if pos, ok := m.selectedPosition(); ok && pos.Kind == focusCategory {
+			m.moveCategoryUp()
+		} else {
+			m.moveTaskUp()
+		}
 		m.pendingKey = 0
 	case "ctrl+d":
 		m.moveSelectionByPage(0.5)
