@@ -7,7 +7,10 @@
       "Bash(go mod tidy:*)",
       "Bash(go vet:*)",
       "Bash(go doc:*)",
-      "Bash(./phasionary:*)"
+      "Bash(./phasionary:*)",
+      "Bash(head:*)",
+      "Bash(wc:*)",
+      "Bash(go list:*)"
     ]
   },
   "enabledPlugins": {

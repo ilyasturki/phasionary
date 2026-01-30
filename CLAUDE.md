@@ -57,3 +57,7 @@ Task sort order within categories: Priority > Deadline > Time estimate > Title (
 - Must work over SSH and low-bandwidth terminals
 - All timestamps in UTC ISO 8601
 - Project/category names are case-insensitive unique
+
+## Code Style Requirements
+
+- Write comments only when necessary, prefer self-documenting code with clear naming

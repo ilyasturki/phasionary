@@ -36,25 +36,25 @@ type focusPosition struct {
 }
 
 type model struct {
-	project    domain.Project
-	categories []categoryView
-	positions  []focusPosition
-	selected   int
-	width      int
-	height     int
-	editing    bool
-	showHelp   bool
-	editValue  string
-	editCursor int
-	store      *data.Store
+	project        domain.Project
+	categories     []categoryView
+	positions      []focusPosition
+	selected       int
+	width          int
+	height         int
+	editing        bool
+	showHelp       bool
+	editValue      string
+	editCursor     int
+	store          *data.Store
 	addingTask     bool   // true when adding a new task (vs editing existing)
 	newTaskID      string // ID of task being added (for removal on cancel)
 	addingCategory bool   // true when adding a new category
 	newCategoryID  string // ID of category being added (for removal on cancel)
-	statusMsg     string // temporary status message (e.g., "Copied!")
-	confirmDelete bool   // true when delete confirmation dialog is shown
-	scrollOffset  int    // position index at top of visible area
-	pendingKey    rune   // for multi-key sequences like gg and zz
+	statusMsg      string // temporary status message (e.g., "Copied!")
+	confirmDelete  bool   // true when delete confirmation dialog is shown
+	scrollOffset   int    // position index at top of visible area
+	pendingKey     rune   // for multi-key sequences like gg and zz
 }
 
 func (m model) Init() tea.Cmd {
@@ -259,7 +259,7 @@ func (m model) View() string {
 		if cursor <= m.scrollOffset || usedHeight == 0 {
 			return // Don't add blank lines before we start rendering
 		}
-		for i := 0; i < count; i++ {
+		for range count {
 			if usedHeight+1 > availHeight {
 				return
 			}
