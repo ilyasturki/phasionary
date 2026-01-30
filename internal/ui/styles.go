@@ -16,11 +16,11 @@ func StatusStyle(status string) lipgloss.Style {
 	case "in_progress":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 	case "completed":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+		return lipgloss.NewStyle().Faint(true)
 	case "cancelled":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 	default:
-		return lipgloss.NewStyle()
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	}
 }
 
@@ -64,10 +64,10 @@ func SelectedStatusStyle(status string) lipgloss.Style {
 	case "in_progress":
 		return base.Foreground(lipgloss.Color("4")) // blue text
 	case "completed":
-		return base.Foreground(lipgloss.Color("2")) // green text
+		return base.Foreground(lipgloss.Color("8")) // gray text
 	case "cancelled":
 		return base.Foreground(lipgloss.Color("1")) // red text
 	default:
-		return base.Foreground(lipgloss.Color("0")) // black text for todo
+		return base.Foreground(lipgloss.Color("3")) // yellow text for todo
 	}
 }
