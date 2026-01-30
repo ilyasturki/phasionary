@@ -9,13 +9,13 @@ import (
 const pickerVisibleItems = 10
 
 func (m *model) openProjectPicker() {
-	projects, err := m.store.ListProjects()
+	projects, err := m.deps.Store.ListProjects()
 	if err != nil {
-		m.statusMsg = fmt.Sprintf("Error loading projects: %v", err)
+		m.ui.StatusMsg = fmt.Sprintf("Error loading projects: %v", err)
 		return
 	}
 	if len(projects) == 0 {
-		m.statusMsg = "No projects available"
+		m.ui.StatusMsg = "No projects available"
 		return
 	}
 
@@ -27,72 +27,63 @@ func (m *model) openProjectPicker() {
 		}
 	}
 
-	m.picker = ProjectPickerState{
+	m.ui.Picker = ProjectPickerState{
 		projects:     projects,
 		selected:     currentIdx,
 		scrollOffset: 0,
 	}
-	m.picker.ensureVisible()
-	m.mode = ModeProjectPicker
+	m.ui.Picker.ensureVisible()
+	m.ui.Modes.ToProjectPicker()
 }
 
 func (m model) handleProjectPickerKey(msg tea.KeyMsg) model {
 	switch msg.String() {
 	case "j", "down":
-		m.picker.moveSelection(1)
+		m.ui.Picker.moveSelection(1)
 	case "k", "up":
-		m.picker.moveSelection(-1)
+		m.ui.Picker.moveSelection(-1)
 	case "enter":
 		m.selectProject()
 	case "esc", "q":
-		m.picker.reset()
-		m.mode = ModeNormal
+		m.ui.Picker.reset()
+		m.ui.Modes.ToNormal()
 	}
 	return m
 }
 
 func (m *model) selectProject() {
-	if m.picker.selected < 0 || m.picker.selected >= len(m.picker.projects) {
-		m.picker.reset()
-		m.mode = ModeNormal
+	if m.ui.Picker.selected < 0 || m.ui.Picker.selected >= len(m.ui.Picker.projects) {
+		m.ui.Picker.reset()
+		m.ui.Modes.ToNormal()
 		return
 	}
 
-	selectedProject := m.picker.projects[m.picker.selected]
+	selectedProject := m.ui.Picker.projects[m.ui.Picker.selected]
 	if selectedProject.ID == m.project.ID {
-		m.picker.reset()
-		m.mode = ModeNormal
+		m.ui.Picker.reset()
+		m.ui.Modes.ToNormal()
 		return
 	}
 
-	project, err := m.store.LoadProject(selectedProject.ID)
+	project, err := m.deps.Store.LoadProject(selectedProject.ID)
 	if err != nil {
-		m.statusMsg = fmt.Sprintf("Error loading project: %v", err)
-		m.picker.reset()
-		m.mode = ModeNormal
+		m.ui.StatusMsg = fmt.Sprintf("Error loading project: %v", err)
+		m.ui.Picker.reset()
+		m.ui.Modes.ToNormal()
 		return
 	}
 
 	m.project = project
-	m.positions = rebuildPositions(project.Categories)
-	m.scrollOffset = 0
-
-	if len(m.positions) > 0 {
-		m.selected = 0
-		for i, pos := range m.positions {
-			if pos.Kind == focusTask {
-				m.selected = i
-				break
-			}
-		}
-	} else {
-		m.selected = -1
-	}
+	positions := rebuildPositions(project.Categories)
+	initialSelection := findFirstTaskIndex(positions)
+	m.ui.Selection.SetPositions(toSelectionPositions(positions))
+	m.ui.Selection.SetSelected(initialSelection)
+	m.ui.ScrollOffset = 0
 
 	m.ensureVisible()
-	m.statusMsg = fmt.Sprintf("Switched to: %s", project.Name)
-	m.picker.reset()
-	m.mode = ModeNormal
+	m.ui.StatusMsg = fmt.Sprintf("Switched to: %s", project.Name)
+	m.ui.Picker.reset()
+	m.ui.Modes.ToNormal()
 }
 
 func (p *ProjectPickerState) moveSelection(delta int) {

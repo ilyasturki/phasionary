@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
+	"phasionary/internal/app/components"
 	"phasionary/internal/config"
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
@@ -27,7 +27,7 @@ func renderProjectLine(name string, selected bool) string {
 func (m model) renderEditProjectLine() string {
 	prefix := "> "
 	icon := "■ "
-	split := splitAtCursor(m.edit.input.Value(), m.edit.input.Position())
+	split := splitAtCursor(m.ui.Edit.input.Value(), m.ui.Edit.input.Position())
 	cursorStyle := ui.SelectedStyle
 	return fmt.Sprintf(
 		"%s%s%s%s%s",
@@ -56,82 +56,8 @@ func renderCategoryLine(name string, selected bool, width int) string {
 }
 
 func (m model) renderTaskLine(task domain.Task, selected bool, width int) string {
-	prefix := "  "
-	if selected {
-		prefix = "> "
-	}
-	priorityIcon := ui.PriorityIcon(task.Priority)
-	if !selected {
-		return m.renderUnselectedTask(task, prefix, priorityIcon, width)
-	}
-	return m.renderSelectedTask(task, prefix, priorityIcon, width)
-}
-
-func (m model) renderUnselectedTask(task domain.Task, prefix, priorityIcon string, width int) string {
-	status := formatStatus(task.Status, m.cfgManager.Get().StatusDisplay)
-	icon := ""
-	if priorityIcon != "" {
-		icon = ui.PriorityStyle(task.Priority).Render(priorityIcon) + " "
-	}
-	titleStyle := ui.PriorityStyle(task.Priority)
-	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, status, icon)
-	if width <= 0 {
-		return prefixPart + titleStyle.Render(task.Title)
-	}
-	overhead := ansi.StringWidth(prefixPart)
-	available := safeWidth(width, overhead)
-	wrapped := ansi.Wrap(task.Title, available, "")
-	wrapLines := strings.Split(wrapped, "\n")
-	indent := strings.Repeat(" ", overhead)
-	var result []string
-	for i, line := range wrapLines {
-		styledLine := titleStyle.Render(line)
-		if i == 0 {
-			result = append(result, prefixPart+styledLine)
-		} else {
-			result = append(result, indent+styledLine)
-		}
-	}
-	return strings.Join(result, "\n")
-}
-
-func (m model) renderSelectedTask(task domain.Task, prefix, priorityIcon string, width int) string {
-	statusText := statusLabel(task.Status, m.cfgManager.Get().StatusDisplay)
-	priorityStyle := ui.SelectedPriorityStyle(task.Priority)
-	statusStyle := ui.SelectedStatusStyle(task.Status)
-	icon := ""
-	iconText := ""
-	if priorityIcon != "" {
-		icon = priorityStyle.Render(priorityIcon + " ")
-		iconText = priorityIcon + " "
-	}
-	if width <= 0 {
-		title := priorityStyle.Render(task.Title)
-		return ui.SelectedStyle.Render(prefix+"[") +
-			statusStyle.Render(statusText) +
-			ui.SelectedStyle.Render("] ") +
-			icon + title
-	}
-	overhead := ansi.StringWidth(prefix + "[" + statusText + "] " + iconText)
-	available := safeWidth(width, overhead)
-	wrapped := ansi.Wrap(task.Title, available, "")
-	wrapLines := strings.Split(wrapped, "\n")
-	indent := strings.Repeat(" ", overhead)
-	var result []string
-	for i, line := range wrapLines {
-		styledTitle := priorityStyle.Render(line)
-		if i == 0 {
-			firstLine := ui.SelectedStyle.Render(prefix+"[") +
-				statusStyle.Render(statusText) +
-				ui.SelectedStyle.Render("] ") +
-				icon + styledTitle
-			result = append(result, firstLine)
-		} else {
-			styledIndent := ui.SelectedStyle.Render(indent)
-			result = append(result, styledIndent+styledTitle)
-		}
-	}
-	return strings.Join(result, "\n")
+	renderer := components.NewTaskLineRenderer(width, m.deps.CfgManager.Get().StatusDisplay)
+	return renderer.Render(task, selected)
 }
 
 func statusLabel(status, displayMode string) string {
@@ -169,22 +95,22 @@ func formatStatus(status, displayMode string) string {
 
 func (m model) renderEditCategoryLine() string {
 	prefix := "> "
-	if m.edit.isAdding && m.edit.input.Value() == "" {
+	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
 		cursorStyle := ui.SelectedStyle
 		placeholder := ui.MutedStyle.Render("Enter category name...")
 		styledText := cursorStyle.Render(" ") + placeholder
-		if m.width > 0 {
-			wrapped := wrapWithPrefix(styledText, m.width, prefixWidth, prefix)
+		if m.ui.Width > 0 {
+			wrapped := wrapWithPrefix(styledText, m.ui.Width, prefixWidth, prefix)
 			return strings.Join(wrapped.lines, "\n")
 		}
 		return prefix + styledText
 	}
-	return renderCursorLine(m.edit.input.Value(), m.edit.input.Position(), m.width, prefixWidth, prefix, ui.CategoryStyle, ui.SelectedStyle)
+	return renderCursorLine(m.ui.Edit.input.Value(), m.ui.Edit.input.Position(), m.ui.Width, prefixWidth, prefix, ui.CategoryStyle, ui.SelectedStyle)
 }
 
 func (m model) renderEditTaskLine(task domain.Task) string {
 	prefix := "> "
-	statusText := formatStatus(task.Status, m.cfgManager.Get().StatusDisplay)
+	statusText := formatStatus(task.Status, m.deps.CfgManager.Get().StatusDisplay)
 	titleStyle := ui.PriorityStyle(task.Priority)
 	icon := ui.PriorityIcon(task.Priority)
 	iconPrefix := ""
@@ -194,13 +120,13 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		iconPlain = icon + " "
 	}
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, statusText, iconPrefix)
-	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, m.cfgManager.Get().StatusDisplay) + "] " + iconPlain)
-	if m.edit.isAdding && m.edit.input.Value() == "" {
+	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, m.deps.CfgManager.Get().StatusDisplay) + "] " + iconPlain)
+	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
 		cursorStyle := ui.SelectedStyle
 		placeholder := ui.MutedStyle.Render("Enter task title...")
 		styledText := cursorStyle.Render(" ") + placeholder
-		if m.width > 0 {
-			available := safeWidth(m.width, overhead)
+		if m.ui.Width > 0 {
+			available := safeWidth(m.ui.Width, overhead)
 			wrapped := ansi.Wrap(styledText, available, "")
 			lines := strings.Split(wrapped, "\n")
 			indent := strings.Repeat(" ", overhead)
@@ -215,24 +141,24 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		}
 		return prefixPart + styledText
 	}
-	edited := m.edit.input.Value()
+	edited := m.ui.Edit.input.Value()
 	if edited == "" {
 		edited = " "
 	}
-	if m.width <= 0 {
-		split := splitAtCursor(edited, m.edit.input.Position())
+	if m.ui.Width <= 0 {
+		split := splitAtCursor(edited, m.ui.Edit.input.Position())
 		return prefixPart +
 			titleStyle.Render(split.left) +
 			ui.SelectedStyle.Render(split.cursorCh) +
 			titleStyle.Render(split.right)
 	}
-	available := safeWidth(m.width, overhead)
+	available := safeWidth(m.ui.Width, overhead)
 	wrapped := ansi.Wrap(edited, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
 	pos := 0
 	var result []string
-	cursor := m.edit.input.Position()
+	cursor := m.ui.Edit.input.Position()
 	for i, line := range wrapLines {
 		lineRunes := []rune(line)
 		lineLen := len(lineRunes)
@@ -259,8 +185,8 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 }
 
 func (m model) statusLine() string {
-	if m.statusMsg != "" {
-		return ui.StatusLineStyle.Render(m.statusMsg)
+	if m.ui.StatusMsg != "" {
+		return ui.StatusLineStyle.Render(m.ui.StatusMsg)
 	}
 	position, ok := m.selectedPosition()
 	if !ok {
@@ -281,32 +207,10 @@ func (m model) statusLine() string {
 }
 
 func (m model) shortcutsLine() string {
-	if m.mode == ModeEdit {
+	if m.ui.Modes.IsEdit() {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
 	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | a add task | A add category | enter edit | space status | h/l priority | y copy | d delete | p projects | o options | ? help | q quit")
-}
-
-func placeOverlay(bg, fg string, width, height int) string {
-	bgLines := strings.Split(bg, "\n")
-	fgLines := strings.Split(fg, "\n")
-	fgW := lipgloss.Width(fg)
-	fgH := len(fgLines)
-	startY := max(0, (height-fgH)/2)
-	startX := max(0, (width-fgW)/2)
-	for i, fgLine := range fgLines {
-		y := startY + i
-		if y >= len(bgLines) {
-			break
-		}
-		left := ansi.Truncate(bgLines[y], startX, "")
-		if w := ansi.StringWidth(left); w < startX {
-			left += strings.Repeat(" ", startX-w)
-		}
-		right := ansi.TruncateLeft(bgLines[y], startX+fgW, "")
-		bgLines[y] = left + fgLine + right
-	}
-	return strings.Join(bgLines, "\n")
 }
 
 func truncateText(s string, max int) string {
@@ -377,7 +281,7 @@ func (m model) helpView() string {
 
 func (m model) optionsView() string {
 	statusValue := "Text Labels"
-	if m.cfgManager.Get().StatusDisplay == config.StatusDisplayIcons {
+	if m.deps.CfgManager.Get().StatusDisplay == config.StatusDisplayIcons {
 		statusValue = "Icons"
 	}
 	lines := []string{
@@ -393,19 +297,19 @@ func (m model) optionsView() string {
 func (m model) projectPickerView() string {
 	lines := []string{"Select Project:", ""}
 
-	visibleEnd := m.picker.scrollOffset + pickerVisibleItems
-	if visibleEnd > len(m.picker.projects) {
-		visibleEnd = len(m.picker.projects)
+	visibleEnd := m.ui.Picker.scrollOffset + pickerVisibleItems
+	if visibleEnd > len(m.ui.Picker.projects) {
+		visibleEnd = len(m.ui.Picker.projects)
 	}
 
-	if m.picker.scrollOffset > 0 {
+	if m.ui.Picker.scrollOffset > 0 {
 		lines = append(lines, ui.MutedStyle.Render("  ↑ more above"))
 	}
 
-	for i := m.picker.scrollOffset; i < visibleEnd; i++ {
-		p := m.picker.projects[i]
+	for i := m.ui.Picker.scrollOffset; i < visibleEnd; i++ {
+		p := m.ui.Picker.projects[i]
 		prefix := "  "
-		if i == m.picker.selected {
+		if i == m.ui.Picker.selected {
 			prefix = "> "
 		}
 		name := p.Name
@@ -413,7 +317,7 @@ func (m model) projectPickerView() string {
 			name += " (current)"
 		}
 		line := prefix + name
-		if i == m.picker.selected {
+		if i == m.ui.Picker.selected {
 			line = ui.SelectedStyle.Render(line)
 		} else if p.ID == m.project.ID {
 			line = prefix + p.Name + ui.MutedStyle.Render(" (current)")
@@ -421,7 +325,7 @@ func (m model) projectPickerView() string {
 		lines = append(lines, line)
 	}
 
-	if visibleEnd < len(m.picker.projects) {
+	if visibleEnd < len(m.ui.Picker.projects) {
 		lines = append(lines, ui.MutedStyle.Render("  ↓ more below"))
 	}
 

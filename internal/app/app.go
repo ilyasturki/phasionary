@@ -7,8 +7,10 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
+	"phasionary/internal/app/components"
+	"phasionary/internal/app/modes"
+	"phasionary/internal/app/selection"
 	"phasionary/internal/config"
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
@@ -33,20 +35,9 @@ type focusPosition struct {
 }
 
 type model struct {
-	project      domain.Project
-	positions    []focusPosition
-	selected     int
-	width        int
-	height       int
-	mode         UIMode
-	edit         EditState
-	picker       ProjectPickerState
-	store        data.ProjectRepository
-	cfgManager   *config.Manager
-	options      OptionsState
-	statusMsg    string
-	scrollOffset int
-	pendingKey   rune
+	project domain.Project
+	ui      *UIState
+	deps    *Dependencies
 }
 
 func (m model) Init() tea.Cmd {
@@ -56,17 +47,17 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		m.ui.Width = msg.Width
+		m.ui.Height = msg.Height
 		m.ensureVisible()
 	case clipboardResultMsg:
 		if msg.err != nil {
-			m.statusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
+			m.ui.StatusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
 		} else {
-			m.statusMsg = "Copied!"
+			m.ui.StatusMsg = "Copied!"
 		}
 	case tea.MouseMsg:
-		if m.mode != ModeNormal {
+		if !m.ui.Modes.IsNormal() {
 			break
 		}
 		if msg.Button != tea.MouseButtonLeft || msg.Action != tea.MouseActionPress {
@@ -75,13 +66,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		rowMap := m.computeRowMap()
 		if msg.Y >= 0 && msg.Y < len(rowMap) {
 			pos := rowMap[msg.Y]
-			if pos >= 0 && pos < len(m.positions) {
-				m.selected = pos
+			if pos >= 0 && pos < m.ui.Selection.Count() {
+				m.ui.Selection.SetSelected(pos)
 				m.ensureVisible()
 			}
 		}
 	case tea.KeyMsg:
-		m.statusMsg = ""
+		m.ui.StatusMsg = ""
 		return m.handleKeyMsg(msg)
 	}
 	return m, nil
@@ -89,23 +80,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "?" {
-		if m.mode == ModeHelp {
-			m.mode = ModeNormal
-		} else if m.mode == ModeNormal {
-			m.mode = ModeHelp
-		}
+		m.ui.Modes.ToggleHelp()
 		return m, nil
 	}
-	switch m.mode {
-	case ModeHelp:
+	switch m.ui.Modes.Current() {
+	case modes.ModeHelp:
 		return m.handleHelpKey(msg), nil
-	case ModeConfirmDelete:
+	case modes.ModeConfirmDelete:
 		return m.handleConfirmDeleteKey(msg), nil
-	case ModeOptions:
+	case modes.ModeOptions:
 		return m.handleOptionsKey(msg), nil
-	case ModeProjectPicker:
+	case modes.ModeProjectPicker:
 		return m.handleProjectPickerKey(msg), nil
-	case ModeEdit:
+	case modes.ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
 	default:
@@ -116,7 +103,7 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) handleHelpKey(msg tea.KeyMsg) model {
 	switch msg.String() {
 	case "q", "esc":
-		m.mode = ModeNormal
+		m.ui.Modes.ToNormal()
 	}
 	return m
 }
@@ -126,7 +113,7 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
 	case "y", "enter":
 		m.confirmDeleteAction()
 	case "n", "esc":
-		m.mode = ModeNormal
+		m.ui.Modes.ToNormal()
 	}
 	return m
 }
@@ -134,7 +121,7 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
 func (m model) handleOptionsKey(msg tea.KeyMsg) model {
 	switch msg.String() {
 	case "q", "esc", "enter":
-		m.mode = ModeNormal
+		m.ui.Modes.ToNormal()
 	case "j", "down":
 		// Ready for more options
 	case "k", "up":
@@ -146,13 +133,13 @@ func (m model) handleOptionsKey(msg tea.KeyMsg) model {
 }
 
 func (m *model) toggleSelectedOption() {
-	switch m.options.selectedOption {
+	switch m.ui.Options.selectedOption {
 	case 0: // StatusDisplay
 		newValue := config.StatusDisplayIcons
-		if m.cfgManager.Get().StatusDisplay == config.StatusDisplayIcons {
+		if m.deps.CfgManager.Get().StatusDisplay == config.StatusDisplayIcons {
 			newValue = config.StatusDisplayText
 		}
-		_ = m.cfgManager.Update(func(cfg *config.Config) {
+		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
 			cfg.StatusDisplay = newValue
 		})
 	}
@@ -164,92 +151,92 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "up", "k":
 		m.moveSelection(-1)
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "down", "j":
 		m.moveSelection(1)
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case " ":
 		m.toggleSelectedTask()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "enter":
 		m.startEditing()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "a":
 		m.startAddingTask()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "A":
 		m.startAddingCategory()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "h":
 		m.decreasePriority()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "l":
 		m.increasePriority()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "y":
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 		return m, m.copySelected()
 	case "d":
 		m.deleteSelected()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "J":
 		if pos, ok := m.selectedPosition(); ok && pos.Kind == focusCategory {
 			m.moveCategoryDown()
 		} else {
 			m.moveTaskDown()
 		}
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "K":
 		if pos, ok := m.selectedPosition(); ok && pos.Kind == focusCategory {
 			m.moveCategoryUp()
 		} else {
 			m.moveTaskUp()
 		}
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "ctrl+d":
 		m.moveSelectionByPage(0.5)
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "ctrl+u":
 		m.moveSelectionByPage(-0.5)
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "ctrl+f":
 		m.moveSelectionByPage(1.0)
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "ctrl+b":
 		m.moveSelectionByPage(-1.0)
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "g":
-		if m.pendingKey == 'g' {
+		if m.ui.PendingKey == 'g' {
 			m.jumpToFirst()
-			m.pendingKey = 0
+			m.ui.PendingKey = 0
 		} else {
-			m.pendingKey = 'g'
+			m.ui.PendingKey = 'g'
 		}
 	case "G":
 		m.jumpToLast()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "o":
-		m.mode = ModeOptions
-		m.options = OptionsState{selectedOption: 0}
-		m.pendingKey = 0
+		m.ui.Modes.ToOptions()
+		m.ui.Options = OptionsState{selectedOption: 0}
+		m.ui.PendingKey = 0
 	case "p":
 		m.openProjectPicker()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "z":
-		if m.pendingKey == 'z' {
+		if m.ui.PendingKey == 'z' {
 			m.centerOnSelected()
-			m.pendingKey = 0
+			m.ui.PendingKey = 0
 		} else {
-			m.pendingKey = 'z'
+			m.ui.PendingKey = 'z'
 		}
 	case "s":
 		m.sortTasksByStatus()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	case "S":
 		m.sortTasksByStatusReverse()
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	default:
-		m.pendingKey = 0
+		m.ui.PendingKey = 0
 	}
 	return m, nil
 }
@@ -275,8 +262,8 @@ func (m model) copySelected() tea.Cmd {
 
 func (m model) View() string {
 	layout := m.buildLayout()
-	viewport := NewViewport(layout, m.height, DefaultLayoutConfig())
-	viewport.ComputeVisibility(m.scrollOffset)
+	viewport := NewViewport(layout, m.ui.Height, DefaultLayoutConfig())
+	viewport.ComputeVisibility(m.ui.ScrollOffset)
 
 	var lines []string
 
@@ -298,62 +285,43 @@ func (m model) View() string {
 	statusLine := m.statusLine()
 	shortcuts := m.shortcutsLine()
 	content := body + "\n\n" + statusLine + "\n" + shortcuts + "\n"
-	switch m.mode {
-	case ModeHelp:
-		help := m.helpView()
-		if m.width > 0 && m.height > 0 {
-			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
-			return placeOverlay(bg, help, m.width, m.height)
-		}
-		return help
-	case ModeConfirmDelete:
-		dialog := m.confirmDeleteView()
-		if m.width > 0 && m.height > 0 {
-			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
-			return placeOverlay(bg, dialog, m.width, m.height)
-		}
-		return dialog
-	case ModeOptions:
-		dialog := m.optionsView()
-		if m.width > 0 && m.height > 0 {
-			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
-			return placeOverlay(bg, dialog, m.width, m.height)
-		}
-		return dialog
-	case ModeProjectPicker:
-		dialog := m.projectPickerView()
-		if m.width > 0 && m.height > 0 {
-			bg := lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, content)
-			return placeOverlay(bg, dialog, m.width, m.height)
-		}
-		return dialog
+	modal := components.NewModal(m.ui.Width, m.ui.Height)
+	switch m.ui.Modes.Current() {
+	case modes.ModeHelp:
+		return modal.Render(content, m.helpView())
+	case modes.ModeConfirmDelete:
+		return modal.Render(content, m.confirmDeleteView())
+	case modes.ModeOptions:
+		return modal.Render(content, m.optionsView())
+	case modes.ModeProjectPicker:
+		return modal.Render(content, m.projectPickerView())
 	}
 	return content
 }
 
 func (m model) renderLayoutItem(item LayoutItem) string {
-	isSelected := item.PositionIndex >= 0 && item.PositionIndex == m.selected
+	isSelected := item.PositionIndex >= 0 && item.PositionIndex == m.selected()
 
 	switch item.Kind {
 	case LayoutProject:
-		if m.mode == ModeEdit && isSelected {
+		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditProjectLine()
 		}
 		return renderProjectLine(m.project.Name, isSelected)
 
 	case LayoutCategory:
 		category := m.project.Categories[item.CategoryIndex]
-		if m.mode == ModeEdit && isSelected {
+		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditCategoryLine()
 		}
-		return renderCategoryLine(category.Name, isSelected, m.width)
+		return renderCategoryLine(category.Name, isSelected, m.ui.Width)
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
-		if m.mode == ModeEdit && isSelected {
+		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditTaskLine(task)
 		}
-		return m.renderTaskLine(task, isSelected, m.width)
+		return m.renderTaskLine(task, isSelected, m.ui.Width)
 
 	case LayoutEmptyCategory:
 		return ui.MutedStyle.Render("  (no tasks)")
@@ -392,24 +360,27 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager) err
 	}
 
 	positions := rebuildPositions(project.Categories)
-	selected := -1
-	if len(positions) > 0 {
-		selected = 0
-		for i, position := range positions {
-			if position.Kind == focusTask {
-				selected = i
-				break
-			}
-		}
-	}
+	initialSelection := findFirstTaskIndex(positions)
+	selMgr := selection.NewManager(toSelectionPositions(positions), initialSelection)
+	modeMachine := modes.NewMachine(modes.ModeNormal)
 
 	program := tea.NewProgram(model{
-		project:    project,
-		positions:  positions,
-		selected:   selected,
-		store:      store,
-		cfgManager: cfgManager,
+		project: project,
+		ui:      NewUIState(selMgr, modeMachine),
+		deps:    NewDependencies(store, cfgManager),
 	}, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = program.Run()
 	return err
+}
+
+func findFirstTaskIndex(positions []focusPosition) int {
+	for i, pos := range positions {
+		if pos.Kind == focusTask {
+			return i
+		}
+	}
+	if len(positions) > 0 {
+		return 0
+	}
+	return -1
 }

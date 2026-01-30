@@ -6,17 +6,6 @@ import (
 	"phasionary/internal/domain"
 )
 
-type UIMode int
-
-const (
-	ModeNormal UIMode = iota
-	ModeEdit
-	ModeHelp
-	ModeConfirmDelete
-	ModeOptions
-	ModeProjectPicker
-)
-
 type OptionsState struct {
 	selectedOption int
 }

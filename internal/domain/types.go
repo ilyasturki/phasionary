@@ -156,3 +156,94 @@ func (t *Task) SetPriority(priority string) error {
 	return nil
 }
 
+func (t *Task) IncreasePriority() bool {
+	var newPriority string
+	switch t.Priority {
+	case PriorityLow:
+		newPriority = PriorityMedium
+	case PriorityMedium:
+		newPriority = PriorityHigh
+	case PriorityHigh:
+		return false
+	default:
+		newPriority = PriorityMedium
+	}
+	t.Priority = newPriority
+	t.UpdatedAt = NowTimestamp()
+	return true
+}
+
+func (t *Task) DecreasePriority() bool {
+	var newPriority string
+	switch t.Priority {
+	case PriorityHigh:
+		newPriority = PriorityMedium
+	case PriorityMedium:
+		newPriority = PriorityLow
+	case PriorityLow:
+		return false
+	default:
+		newPriority = PriorityMedium
+	}
+	t.Priority = newPriority
+	t.UpdatedAt = NowTimestamp()
+	return true
+}
+
+func (t *Task) CycleStatus() bool {
+	var nextStatus string
+	switch t.Status {
+	case StatusTodo:
+		nextStatus = StatusInProgress
+	case StatusInProgress:
+		nextStatus = StatusCompleted
+	case StatusCompleted:
+		nextStatus = StatusTodo
+	case StatusCancelled:
+		nextStatus = StatusTodo
+	default:
+		nextStatus = StatusTodo
+	}
+	if nextStatus == t.Status {
+		return false
+	}
+	_ = t.SetStatus(nextStatus)
+	return true
+}
+
+func (c *Category) AddTask(task Task) {
+	c.Tasks = append(c.Tasks, task)
+}
+
+func (c *Category) RemoveTask(index int) error {
+	if index < 0 || index >= len(c.Tasks) {
+		return errors.New("task index out of range")
+	}
+	c.Tasks = append(c.Tasks[:index], c.Tasks[index+1:]...)
+	return nil
+}
+
+func (p *Project) AddCategory(cat Category) {
+	p.Categories = append(p.Categories, cat)
+	p.UpdatedAt = NowTimestamp()
+}
+
+func (p *Project) InsertCategory(index int, cat Category) {
+	if index < 0 || index > len(p.Categories) {
+		index = len(p.Categories)
+	}
+	p.Categories = append(p.Categories, Category{})
+	copy(p.Categories[index+1:], p.Categories[index:])
+	p.Categories[index] = cat
+	p.UpdatedAt = NowTimestamp()
+}
+
+func (p *Project) RemoveCategory(index int) error {
+	if index < 0 || index >= len(p.Categories) {
+		return errors.New("category index out of range")
+	}
+	p.Categories = append(p.Categories[:index], p.Categories[index+1:]...)
+	p.UpdatedAt = NowTimestamp()
+	return nil
+}
+

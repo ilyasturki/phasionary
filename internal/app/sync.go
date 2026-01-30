@@ -3,11 +3,11 @@ package app
 import "phasionary/internal/domain"
 
 func (m *model) storeTaskUpdate() {
-	if m.store == nil {
+	if m.deps.Store == nil {
 		return
 	}
-	if err := m.store.SaveProject(m.project); err != nil {
-		m.statusMsg = "Save failed: " + err.Error()
+	if err := m.deps.Store.SaveProject(m.project); err != nil {
+		m.ui.StatusMsg = "Save failed: " + err.Error()
 	}
 }
 
@@ -36,5 +36,6 @@ func rebuildPositions(categories []domain.Category) []focusPosition {
 }
 
 func (m *model) rebuildPositions() {
-	m.positions = rebuildPositions(m.project.Categories)
+	positions := rebuildPositions(m.project.Categories)
+	m.ui.Selection.SetPositions(toSelectionPositions(positions))
 }

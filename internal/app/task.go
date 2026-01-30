@@ -3,22 +3,24 @@ package app
 import (
 	"sort"
 
+	"phasionary/internal/app/modes"
+	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
 )
 
 func (m *model) deleteSelected() {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionDeleteItem) {
 		return
 	}
 	pos, ok := m.selectedPosition()
 	if !ok || pos.Kind == focusProject {
 		return
 	}
-	m.mode = ModeConfirmDelete
+	m.ui.Modes.ToConfirmDelete()
 }
 
 func (m *model) confirmDeleteAction() {
-	m.mode = ModeNormal
+	m.ui.Modes.ToNormal()
 	position, ok := m.selectedPosition()
 	if !ok {
 		return
@@ -34,32 +36,25 @@ func (m *model) confirmDeleteAction() {
 func (m *model) deleteTask(position focusPosition) {
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
-	tasks := m.project.Categories[catIndex].Tasks
-	m.project.Categories[catIndex].Tasks = append(tasks[:taskIndex], tasks[taskIndex+1:]...)
+	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
 }
 
 func (m *model) deleteCategory(position focusPosition) {
 	catIndex := position.CategoryIndex
-	m.project.Categories = append(m.project.Categories[:catIndex], m.project.Categories[catIndex+1:]...)
+	_ = m.project.RemoveCategory(catIndex)
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
 }
 
 func (m *model) rebuildAndClamp() {
 	m.rebuildPositions()
-	if m.selected >= len(m.positions) {
-		m.selected = len(m.positions) - 1
-	}
-	if m.selected < 0 && len(m.positions) > 0 {
-		m.selected = 0
-	}
 	m.ensureVisible()
 }
 
 func (m *model) toggleSelectedTask() {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionToggleTask) {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -67,35 +62,13 @@ func (m *model) toggleSelectedTask() {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
-	nextStatus := nextTaskStatus(task.Status)
-	if nextStatus == task.Status {
-		return
+	if task.CycleStatus() {
+		m.storeTaskUpdate()
 	}
-	updateTaskStatus(task, nextStatus)
-	m.storeTaskUpdate()
-}
-
-func nextTaskStatus(current string) string {
-	switch current {
-	case domain.StatusTodo:
-		return domain.StatusInProgress
-	case domain.StatusInProgress:
-		return domain.StatusCompleted
-	case domain.StatusCompleted:
-		return domain.StatusTodo
-	case domain.StatusCancelled:
-		return domain.StatusTodo
-	default:
-		return domain.StatusTodo
-	}
-}
-
-func updateTaskStatus(task *domain.Task, status string) {
-	_ = task.SetStatus(status)
 }
 
 func (m *model) increasePriority() {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionChangePriority) {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -103,17 +76,13 @@ func (m *model) increasePriority() {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
-	newPriority := nextPriorityUp(task.Priority)
-	if newPriority == task.Priority {
-		return
+	if task.IncreasePriority() {
+		m.storeTaskUpdate()
 	}
-	task.Priority = newPriority
-	task.UpdatedAt = domain.NowTimestamp()
-	m.storeTaskUpdate()
 }
 
 func (m *model) decreasePriority() {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionChangePriority) {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -121,17 +90,13 @@ func (m *model) decreasePriority() {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
-	newPriority := nextPriorityDown(task.Priority)
-	if newPriority == task.Priority {
-		return
+	if task.DecreasePriority() {
+		m.storeTaskUpdate()
 	}
-	task.Priority = newPriority
-	task.UpdatedAt = domain.NowTimestamp()
-	m.storeTaskUpdate()
 }
 
 func (m *model) moveTaskDown() {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -146,13 +111,13 @@ func (m *model) moveTaskDown() {
 	}
 	tasks[taskIndex], tasks[taskIndex+1] = tasks[taskIndex+1], tasks[taskIndex]
 	m.rebuildPositions()
-	m.selected++
+	m.ui.Selection.MoveBy(1)
 	m.ensureVisible()
 	m.storeTaskUpdate()
 }
 
 func (m *model) moveTaskUp() {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -167,13 +132,13 @@ func (m *model) moveTaskUp() {
 	tasks := m.project.Categories[catIndex].Tasks
 	tasks[taskIndex], tasks[taskIndex-1] = tasks[taskIndex-1], tasks[taskIndex]
 	m.rebuildPositions()
-	m.selected--
+	m.ui.Selection.MoveBy(-1)
 	m.ensureVisible()
 	m.storeTaskUpdate()
 }
 
 func (m *model) moveCategoryDown() {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -187,18 +152,15 @@ func (m *model) moveCategoryDown() {
 	m.project.Categories[catIndex], m.project.Categories[catIndex+1] =
 		m.project.Categories[catIndex+1], m.project.Categories[catIndex]
 	m.rebuildPositions()
-	for i, pos := range m.positions {
-		if pos.Kind == focusCategory && pos.CategoryIndex == catIndex+1 {
-			m.selected = i
-			break
-		}
-	}
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusCategory && p.CategoryIndex == catIndex+1
+	})
 	m.ensureVisible()
 	m.storeTaskUpdate()
 }
 
 func (m *model) moveCategoryUp() {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
 		return
 	}
 	position, ok := m.selectedPosition()
@@ -212,40 +174,11 @@ func (m *model) moveCategoryUp() {
 	m.project.Categories[catIndex], m.project.Categories[catIndex-1] =
 		m.project.Categories[catIndex-1], m.project.Categories[catIndex]
 	m.rebuildPositions()
-	for i, pos := range m.positions {
-		if pos.Kind == focusCategory && pos.CategoryIndex == catIndex-1 {
-			m.selected = i
-			break
-		}
-	}
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusCategory && p.CategoryIndex == catIndex-1
+	})
 	m.ensureVisible()
 	m.storeTaskUpdate()
-}
-
-func nextPriorityUp(current string) string {
-	switch current {
-	case domain.PriorityLow:
-		return domain.PriorityMedium
-	case domain.PriorityMedium:
-		return domain.PriorityHigh
-	case domain.PriorityHigh:
-		return domain.PriorityHigh
-	default:
-		return domain.PriorityMedium
-	}
-}
-
-func nextPriorityDown(current string) string {
-	switch current {
-	case domain.PriorityHigh:
-		return domain.PriorityMedium
-	case domain.PriorityMedium:
-		return domain.PriorityLow
-	case domain.PriorityLow:
-		return domain.PriorityLow
-	default:
-		return domain.PriorityMedium
-	}
 }
 
 func statusOrder(status string) int {
@@ -319,7 +252,7 @@ func (m *model) sortTasksByStatusReverse() {
 }
 
 func (m *model) sortTasksByStatusOrder(ascending bool) {
-	if m.mode == ModeEdit {
+	if !m.ui.Modes.CanPerformAction(modes.ActionSort) {
 		return
 	}
 
@@ -336,15 +269,13 @@ func (m *model) sortTasksByStatusOrder(ascending bool) {
 	m.rebuildPositions()
 
 	if selectedTaskID != "" {
-		for i, pos := range m.positions {
-			if pos.Kind == focusTask {
-				task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
-				if task.ID == selectedTaskID {
-					m.selected = i
-					break
-				}
+		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			if p.Kind != selection.FocusTask {
+				return false
 			}
-		}
+			task := m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex]
+			return task.ID == selectedTaskID
+		})
 	}
 
 	m.ensureVisible()
