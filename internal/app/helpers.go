@@ -10,7 +10,7 @@ import (
 const (
 	prefixWidth     = 2
 	footerHeight    = 3
-	blankAfterProj  = 2
+	blankAfterProj  = 1
 	blankBetweenCat = 1
 	blankAfterCat   = 1
 )
