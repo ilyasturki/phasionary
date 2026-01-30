@@ -11,7 +11,8 @@
       "Bash(head:*)",
       "Bash(wc:*)",
       "Bash(go list:*)",
-      "Bash(go get:*)"
+      "Bash(go get:*)",
+      "Bash(git grep:*)"
     ]
   },
   "enabledPlugins": {
