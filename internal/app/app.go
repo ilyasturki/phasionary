@@ -218,132 +218,28 @@ func (m model) copySelected() tea.Cmd {
 }
 
 func (m model) View() string {
-	var bodyBuilder strings.Builder
-	availHeight := m.availableHeight()
-	usedHeight := 0
-	cursor := 0
-	hasMoreAbove := m.scrollOffset > 0
-	hasMoreBelow := false
+	layout := m.buildLayout()
+	viewport := NewViewport(layout, m.height, DefaultLayoutConfig())
+	viewport.ComputeVisibility(m.scrollOffset)
 
-	// Reserve space for scroll indicators when needed
-	if hasMoreAbove {
-		availHeight-- // Space for "more above"
-	}
-	// Reserve space for potential "more below" indicator
-	availHeight--
-	if availHeight < 1 {
-		availHeight = 1
+	var lines []string
+
+	if viewport.HasMoreAbove {
+		lines = append(lines, ui.MutedStyle.Render("  ↑ more above"))
 	}
 
-	// Helper to render an element if visible.
-	// Each element occupies elementHeight visual rows. A separator \n is added
-	// between elements but NOT counted toward usedHeight.
-	renderIfVisible := func(renderFn func() string, elementHeight int) bool {
-		if cursor < m.scrollOffset {
-			cursor++
-			return true // Skip, continue
-		}
-		if usedHeight+elementHeight > availHeight {
-			hasMoreBelow = true
-			return false // Stop rendering
-		}
-		if usedHeight > 0 {
-			bodyBuilder.WriteString("\n") // Separator (not counted)
-		}
-		bodyBuilder.WriteString(renderFn())
-		usedHeight += elementHeight
-		cursor++
-		return true
-	}
-
-	// Helper to add blank visual lines between elements.
-	// Each blank line is a real visual row counted toward usedHeight.
-	addBlankLines := func(count int) {
-		if cursor <= m.scrollOffset || usedHeight == 0 {
-			return // Don't add blank lines before we start rendering
-		}
-		for range count {
-			if usedHeight+1 > availHeight {
-				return
-			}
-			bodyBuilder.WriteString("\n") // Each \n = 1 blank visual line
-			usedHeight++
+	for i := viewport.VisibleStart; i < viewport.VisibleEnd; i++ {
+		rendered := m.renderLayoutItem(layout.Items[i])
+		if rendered != "" {
+			lines = append(lines, rendered)
 		}
 	}
 
-	// Project line (first focusable item)
-	isProjectSelected := cursor == m.selected
-	projectHeight := m.countProjectLines()
-	if !renderIfVisible(func() string {
-		if m.mode == ModeEdit && isProjectSelected {
-			return m.renderEditProjectLine()
-		}
-		return renderProjectLine(m.project.Name, isProjectSelected)
-	}, projectHeight) {
-		goto footer
-	}
-	addBlankLines(2) // 2 blank lines after project
-
-	for i, category := range m.project.Categories {
-		if i > 0 {
-			addBlankLines(1) // 1 blank line between categories
-		}
-
-		// Category header
-		isSelected := cursor == m.selected
-		catHeight := m.countCategoryLines(category.Name)
-		if !renderIfVisible(func() string {
-			if m.mode == ModeEdit && isSelected {
-				return m.renderEditCategoryLine()
-			}
-			return renderCategoryLine(category.Name, isSelected, m.width)
-		}, catHeight) {
-			goto footer
-		}
-
-		if len(category.Tasks) == 0 {
-			// "(no tasks)" placeholder - not a position, just visual
-			if cursor > m.scrollOffset && usedHeight+1 <= availHeight {
-				bodyBuilder.WriteString("\n")
-				bodyBuilder.WriteString(ui.MutedStyle.Render("  (no tasks)"))
-				usedHeight++
-			}
-			continue
-		}
-
-		addBlankLines(1) // 1 blank line after category header
-
-		// Tasks (consecutive tasks have no blank lines between them)
-		for _, task := range category.Tasks {
-			isTaskSelected := cursor == m.selected
-			taskHeight := m.countTaskLines(task)
-			taskCopy := task // capture for closure
-			if !renderIfVisible(func() string {
-				if m.mode == ModeEdit && isTaskSelected {
-					return m.renderEditTaskLine(taskCopy)
-				}
-				return renderTaskLine(taskCopy, isTaskSelected, m.width)
-			}, taskHeight) {
-				goto footer
-			}
-		}
+	if viewport.HasMoreBelow {
+		lines = append(lines, ui.MutedStyle.Render("  ↓ more below"))
 	}
 
-	// Check if there's more content below
-	if cursor < len(m.positions) {
-		hasMoreBelow = true
-	}
-
-footer:
-	body := strings.TrimRight(bodyBuilder.String(), "\n")
-
-	// Add scroll indicators
-	if hasMoreAbove {
-		body = ui.MutedStyle.Render("  ↑ more above") + "\n" + body
-	}
-	if hasMoreBelow {
-		body = body + "\n" + ui.MutedStyle.Render("  ↓ more below")
-	}
+	body := strings.Join(lines, "\n")
 
 	statusLine := m.statusLine()
 	shortcuts := m.shortcutsLine()
@@ -365,6 +261,40 @@ footer:
 		return dialog
 	}
 	return content
+}
+
+func (m model) renderLayoutItem(item LayoutItem) string {
+	isSelected := item.PositionIndex >= 0 && item.PositionIndex == m.selected
+
+	switch item.Kind {
+	case LayoutProject:
+		if m.mode == ModeEdit && isSelected {
+			return m.renderEditProjectLine()
+		}
+		return renderProjectLine(m.project.Name, isSelected)
+
+	case LayoutCategory:
+		category := m.project.Categories[item.CategoryIndex]
+		if m.mode == ModeEdit && isSelected {
+			return m.renderEditCategoryLine()
+		}
+		return renderCategoryLine(category.Name, isSelected, m.width)
+
+	case LayoutTask:
+		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
+		if m.mode == ModeEdit && isSelected {
+			return m.renderEditTaskLine(task)
+		}
+		return renderTaskLine(task, isSelected, m.width)
+
+	case LayoutEmptyCategory:
+		return ui.MutedStyle.Render("  (no tasks)")
+
+	case LayoutSpacing:
+		return strings.Repeat("\n", item.Height-1)
+	}
+
+	return ""
 }
 
 func Run(dataDir string, projectSelector string) error {
