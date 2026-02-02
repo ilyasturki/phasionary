@@ -42,14 +42,15 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 	if priorityIcon != "" {
 		icon = ui.PriorityStyle(task.Priority).Render(priorityIcon) + " "
 	}
+	estimate := r.formatEstimateBadge(task.EstimateMinutes, false)
 	titleStyle := ui.PriorityStyle(task.Priority)
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, status, icon)
 
 	if r.width <= 0 {
-		return prefixPart + titleStyle.Render(task.Title)
+		return prefixPart + titleStyle.Render(task.Title) + estimate
 	}
 
-	return r.wrapTaskContent(task.Title, prefixPart, titleStyle, nil)
+	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, titleStyle, estimate, r.estimateBadgeText(task.EstimateMinutes))
 }
 
 func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon string) string {
@@ -64,21 +65,25 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 		iconText = priorityIcon + " "
 	}
 
+	estimate := r.formatEstimateBadge(task.EstimateMinutes, true)
+	estimateText := r.estimateBadgeText(task.EstimateMinutes)
+
 	prefixPart := ui.SelectedStyle.Render(prefix+"[") +
 		statusStyle.Render(statusText) +
 		ui.SelectedStyle.Render("] ") + icon
 
 	if r.width <= 0 {
-		return prefixPart + priorityStyle.Render(task.Title)
+		return prefixPart + priorityStyle.Render(task.Title) + estimate
 	}
 
 	overhead := ansi.StringWidth(prefix + "[" + statusText + "] " + iconText)
-	return r.wrapSelectedContent(task.Title, prefixPart, overhead, priorityStyle)
+	return r.wrapSelectedContentWithSuffix(task.Title, prefixPart, overhead, priorityStyle, estimate, estimateText)
 }
 
-func (r *TaskLineRenderer) wrapTaskContent(title, prefixPart string, titleStyle lipgloss.Style, _ interface{}) string {
+func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart string, titleStyle lipgloss.Style, suffix, suffixText string) string {
 	overhead := ansi.StringWidth(prefixPart)
-	available := safeWidth(r.width, overhead)
+	suffixWidth := ansi.StringWidth(suffixText)
+	available := safeWidth(r.width, overhead+suffixWidth)
 	wrapped := ansi.Wrap(title, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
@@ -87,7 +92,7 @@ func (r *TaskLineRenderer) wrapTaskContent(title, prefixPart string, titleStyle 
 	for i, line := range wrapLines {
 		styledLine := titleStyle.Render(line)
 		if i == 0 {
-			result = append(result, prefixPart+styledLine)
+			result = append(result, prefixPart+styledLine+suffix)
 		} else {
 			result = append(result, indent+styledLine)
 		}
@@ -95,8 +100,9 @@ func (r *TaskLineRenderer) wrapTaskContent(title, prefixPart string, titleStyle 
 	return strings.Join(result, "\n")
 }
 
-func (r *TaskLineRenderer) wrapSelectedContent(title, prefixPart string, overhead int, titleStyle lipgloss.Style) string {
-	available := safeWidth(r.width, overhead)
+func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart string, overhead int, titleStyle lipgloss.Style, suffix, suffixText string) string {
+	suffixWidth := ansi.StringWidth(suffixText)
+	available := safeWidth(r.width, overhead+suffixWidth)
 	wrapped := ansi.Wrap(title, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
@@ -105,7 +111,7 @@ func (r *TaskLineRenderer) wrapSelectedContent(title, prefixPart string, overhea
 	for i, line := range wrapLines {
 		styledTitle := titleStyle.Render(line)
 		if i == 0 {
-			result = append(result, prefixPart+styledTitle)
+			result = append(result, prefixPart+styledTitle+suffix)
 		} else {
 			styledIndent := ui.SelectedStyle.Render(indent)
 			result = append(result, styledIndent+styledTitle)
@@ -157,4 +163,34 @@ func safeWidth(totalWidth, overhead int) int {
 		return 1
 	}
 	return available
+}
+
+func (r *TaskLineRenderer) formatEstimateBadge(minutes int, selected bool) string {
+	text := r.estimateBadgeText(minutes)
+	if text == "" {
+		return ""
+	}
+	if selected {
+		return ui.SelectedStyle.Render(text)
+	}
+	return ui.MutedStyle.Render(text)
+}
+
+func (r *TaskLineRenderer) estimateBadgeText(minutes int) string {
+	if minutes == 0 {
+		return ""
+	}
+	return " ~" + formatEstimateShort(minutes)
+}
+
+func formatEstimateShort(minutes int) string {
+	if minutes < 60 {
+		return fmt.Sprintf("%dm", minutes)
+	}
+	hours := minutes / 60
+	if hours < 8 {
+		return fmt.Sprintf("%dh", hours)
+	}
+	days := hours / 8
+	return fmt.Sprintf("%dd", days)
 }

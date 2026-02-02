@@ -12,6 +12,7 @@ const (
 	ModeFilter
 	ModeExternalEdit
 	ModeInfo
+	ModeEstimatePicker
 )
 
 type Action int
@@ -24,6 +25,7 @@ const (
 	ActionAddTask
 	ActionAddCategory
 	ActionChangePriority
+	ActionChangeEstimate
 	ActionMoveItem
 	ActionSort
 	ActionCopy
@@ -80,6 +82,10 @@ func (m *Machine) IsInfo() bool {
 	return m.current == ModeInfo
 }
 
+func (m *Machine) IsEstimatePicker() bool {
+	return m.current == ModeEstimatePicker
+}
+
 func (m *Machine) TransitionTo(mode Mode) bool {
 	if !m.canTransition(mode) {
 		return false
@@ -108,6 +114,8 @@ func (m *Machine) canTransition(target Mode) bool {
 		return target == ModeNormal
 	case ModeInfo:
 		return target == ModeNormal
+	case ModeEstimatePicker:
+		return target == ModeNormal
 	}
 	return false
 }
@@ -127,6 +135,8 @@ func (m *Machine) CanPerformAction(action Action) bool {
 	case ModeProjectPicker:
 		return false
 	case ModeFilter:
+		return false
+	case ModeEstimatePicker:
 		return false
 	}
 	return false
@@ -182,4 +192,8 @@ func (m *Machine) ToggleInfo() {
 	} else if m.current == ModeNormal {
 		m.current = ModeInfo
 	}
+}
+
+func (m *Machine) ToEstimatePicker() bool {
+	return m.TransitionTo(ModeEstimatePicker)
 }

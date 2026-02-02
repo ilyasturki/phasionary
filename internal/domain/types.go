@@ -39,14 +39,17 @@ type Category struct {
 }
 
 type Task struct {
-	ID             string `json:"id"`
-	Title          string `json:"title"`
-	Status         string `json:"status"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
-	Priority       string `json:"priority,omitempty"`
-	CompletionDate string `json:"completion_date,omitempty"`
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	Status          string `json:"status"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
+	Priority        string `json:"priority,omitempty"`
+	CompletionDate  string `json:"completion_date,omitempty"`
+	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
 }
+
+var EstimatePresets = []int{0, 15, 30, 60, 120, 240, 480, 960, 1440, 2400}
 
 func NowTimestamp() string {
 	return time.Now().UTC().Format(time.RFC3339)
@@ -191,6 +194,11 @@ func (t *Task) DecreasePriority() bool {
 	t.Priority = newPriority
 	t.UpdatedAt = NowTimestamp()
 	return true
+}
+
+func (t *Task) SetEstimate(minutes int) {
+	t.EstimateMinutes = minutes
+	t.UpdatedAt = NowTimestamp()
 }
 
 func (t *Task) CycleStatus() bool {

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
 	"phasionary/internal/config"
@@ -8,18 +9,19 @@ import (
 )
 
 type UIState struct {
-	Selection    *selection.Manager
-	Modes        *modes.Machine
-	Edit         EditState
-	Picker       ProjectPickerState
-	Options      OptionsState
-	Filter       FilterState
-	ExternalEdit ExternalEditState
-	StatusMsg    string
-	ScrollOffset int
-	PendingKey   rune
-	Width        int
-	Height       int
+	Selection      *selection.Manager
+	Modes          *modes.Machine
+	Edit           EditState
+	Picker         ProjectPickerState
+	Options        OptionsState
+	Filter         FilterState
+	ExternalEdit   ExternalEditState
+	EstimatePicker components.EstimatePickerState
+	StatusMsg      string
+	ScrollOffset   int
+	PendingKey     rune
+	Width          int
+	Height         int
 }
 
 type Dependencies struct {

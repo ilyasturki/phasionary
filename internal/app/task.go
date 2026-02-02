@@ -3,6 +3,7 @@ package app
 import (
 	"sort"
 
+	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -93,6 +94,29 @@ func (m *model) decreasePriority() {
 	if task.DecreasePriority() {
 		m.storeTaskUpdate()
 	}
+}
+
+func (m *model) openEstimatePicker() {
+	if !m.ui.Modes.CanPerformAction(modes.ActionChangeEstimate) {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		return
+	}
+	task := m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+	m.ui.EstimatePicker = components.NewEstimatePickerState(task.EstimateMinutes)
+	m.ui.Modes.ToEstimatePicker()
+}
+
+func (m *model) selectEstimate(minutes int) {
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		return
+	}
+	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+	task.SetEstimate(minutes)
+	m.storeTaskUpdate()
 }
 
 func (m *model) moveTaskDown() {
@@ -216,6 +240,13 @@ func getTaskSortDate(task domain.Task) string {
 	return task.CreatedAt
 }
 
+func estimateOrder(estimate int) int {
+	if estimate == 0 {
+		return 1
+	}
+	return 0
+}
+
 func sortCategoryTasks(tasks []domain.Task, ascending bool) {
 	sort.SliceStable(tasks, func(i, j int) bool {
 		orderI := statusOrder(tasks[i].Status)
@@ -233,6 +264,20 @@ func sortCategoryTasks(tasks []domain.Task, ascending bool) {
 				return prioI < prioJ
 			}
 			return prioI > prioJ
+		}
+		estOrderI := estimateOrder(tasks[i].EstimateMinutes)
+		estOrderJ := estimateOrder(tasks[j].EstimateMinutes)
+		if estOrderI != estOrderJ {
+			if ascending {
+				return estOrderI < estOrderJ
+			}
+			return estOrderI > estOrderJ
+		}
+		if tasks[i].EstimateMinutes != tasks[j].EstimateMinutes {
+			if ascending {
+				return tasks[i].EstimateMinutes < tasks[j].EstimateMinutes
+			}
+			return tasks[i].EstimateMinutes > tasks[j].EstimateMinutes
 		}
 		dateI := getTaskSortDate(tasks[i])
 		dateJ := getTaskSortDate(tasks[j])

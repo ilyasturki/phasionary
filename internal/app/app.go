@@ -99,6 +99,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleFilterKey(msg), nil
 	case modes.ModeInfo:
 		return m.handleInfoKey(msg), nil
+	case modes.ModeEstimatePicker:
+		return m.handleEstimatePickerKey(msg), nil
 	case modes.ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
@@ -159,6 +161,21 @@ func (m model) handleFilterKey(msg tea.KeyMsg) model {
 func (m model) handleInfoKey(msg tea.KeyMsg) model {
 	switch msg.String() {
 	case "i", "q", "esc":
+		m.ui.Modes.ToNormal()
+	}
+	return m
+}
+
+func (m model) handleEstimatePickerKey(msg tea.KeyMsg) model {
+	switch msg.String() {
+	case "q", "esc":
+		m.ui.Modes.ToNormal()
+	case "j", "down":
+		m.ui.EstimatePicker.MoveDown()
+	case "k", "up":
+		m.ui.EstimatePicker.MoveUp()
+	case "enter":
+		m.selectEstimate(m.ui.EstimatePicker.SelectedValue())
 		m.ui.Modes.ToNormal()
 	}
 	return m
@@ -276,6 +293,9 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "i":
 		m.ui.Modes.ToInfo()
 		m.ui.PendingKey = 0
+	case "t":
+		m.openEstimatePicker()
+		m.ui.PendingKey = 0
 	default:
 		m.ui.PendingKey = 0
 	}
@@ -343,6 +363,8 @@ func (m model) View() string {
 		return modal.Render(content, m.filterView())
 	case modes.ModeInfo:
 		return modal.Render(content, m.infoView())
+	case modes.ModeEstimatePicker:
+		return modal.Render(content, m.estimatePickerView())
 	}
 	return content
 }

@@ -214,7 +214,7 @@ func (m model) shortcutsLine() string {
 	if m.ui.Modes.IsEdit() {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | a add task | A add category | enter edit | e external editor | space status | h/l priority | y copy | d delete | i info | p projects | o options | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | a add task | A add category | enter edit | e external editor | space status | h/l priority | t estimate | y copy | d delete | i info | p projects | o options | ? help | q quit")
 }
 
 func truncateText(s string, max int) string {
@@ -267,6 +267,7 @@ func (m model) helpView() string {
 		"  s/S           sort tasks by status",
 		"  f             filter tasks by status",
 		"  h/l           change priority",
+		"  t             set time estimate",
 		"  y             copy selected text",
 		"  d             delete selected item",
 		"  i             show item info",
@@ -448,9 +449,12 @@ func (m model) taskInfoLines(catIdx, taskIdx int) []string {
 		}
 	}
 
+	estimateDisplay := FormatEstimateLabel(task.EstimateMinutes)
+
 	lines = append(lines,
 		fmt.Sprintf("Status:   %s", statusDisplay),
 		fmt.Sprintf("Priority: %s", priorityDisplay),
+		fmt.Sprintf("Estimate: %s", estimateDisplay),
 		fmt.Sprintf("Category: %s", category.Name),
 		"",
 		fmt.Sprintf("Created:  %s", FormatDateWithRelative(task.CreatedAt)),
@@ -581,4 +585,36 @@ func formatPriorityLabel(priority string) string {
 	default:
 		return priority
 	}
+}
+
+func (m model) estimatePickerView() string {
+	lines := []string{ui.DialogTitleStyle.Render("Time Estimate"), ""}
+
+	presetLabels := []string{
+		"None",
+		"15 minutes",
+		"30 minutes",
+		"1 hour",
+		"2 hours",
+		"4 hours",
+		"1 day",
+		"2 days",
+		"3 days",
+		"5 days",
+	}
+
+	for i, label := range presetLabels {
+		prefix := "  "
+		if i == m.ui.EstimatePicker.Selected {
+			prefix = "> "
+		}
+		line := prefix + label
+		if i == m.ui.EstimatePicker.Selected {
+			line = ui.SelectedStyle.Render(line)
+		}
+		lines = append(lines, line)
+	}
+
+	lines = append(lines, "", ui.DialogHintStyle.Render("j/k navigate | enter select | esc cancel"))
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
