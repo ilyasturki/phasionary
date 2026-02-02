@@ -6,6 +6,70 @@ import (
 	"phasionary/internal/domain"
 )
 
+var filterStatuses = []string{
+	domain.StatusTodo,
+	domain.StatusInProgress,
+	domain.StatusCompleted,
+	domain.StatusCancelled,
+}
+
+type FilterState struct {
+	selected int
+	enabled  map[string]bool
+}
+
+func NewFilterState() FilterState {
+	return FilterState{
+		selected: 0,
+		enabled:  make(map[string]bool),
+	}
+}
+
+func (f *FilterState) IsStatusVisible(status string) bool {
+	if len(f.enabled) == 0 {
+		return true
+	}
+	return f.enabled[status]
+}
+
+func (f *FilterState) Toggle(status string) {
+	if f.enabled[status] {
+		delete(f.enabled, status)
+	} else {
+		f.enabled[status] = true
+	}
+}
+
+func (f *FilterState) HasActiveFilter() bool {
+	return len(f.enabled) > 0
+}
+
+func (f *FilterState) MoveUp() {
+	if f.selected > 0 {
+		f.selected--
+	}
+}
+
+func (f *FilterState) MoveDown() {
+	if f.selected < len(filterStatuses)-1 {
+		f.selected++
+	}
+}
+
+func (f *FilterState) ToggleSelected() {
+	if f.selected >= 0 && f.selected < len(filterStatuses) {
+		f.Toggle(filterStatuses[f.selected])
+	}
+}
+
+func (f *FilterState) Selected() int {
+	return f.selected
+}
+
+func (f *FilterState) IsEnabled(status string) bool {
+	return f.enabled[status]
+}
+
 type OptionsState struct {
 	selectedOption int
 }

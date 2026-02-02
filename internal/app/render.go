@@ -185,24 +185,28 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 }
 
 func (m model) statusLine() string {
+	filterIndicator := ""
+	if m.ui.Filter.HasActiveFilter() {
+		filterIndicator = " [filtered]"
+	}
 	if m.ui.StatusMsg != "" {
-		return ui.StatusLineStyle.Render(m.ui.StatusMsg)
+		return ui.StatusLineStyle.Render(m.ui.StatusMsg + filterIndicator)
 	}
 	position, ok := m.selectedPosition()
 	if !ok {
-		return ui.StatusLineStyle.Render("No items to display.")
+		return ui.StatusLineStyle.Render("No items to display." + filterIndicator)
 	}
 	if position.Kind == focusProject {
-		summary := fmt.Sprintf("Project: %s", m.project.Name)
+		summary := fmt.Sprintf("Project: %s%s", m.project.Name, filterIndicator)
 		return ui.StatusLineStyle.Render(summary)
 	}
 	category := m.project.Categories[position.CategoryIndex]
 	if position.Kind == focusCategory {
-		summary := fmt.Sprintf("Category: %s (%d tasks)", category.Name, len(category.Tasks))
+		summary := fmt.Sprintf("Category: %s (%d tasks)%s", category.Name, len(category.Tasks), filterIndicator)
 		return ui.StatusLineStyle.Render(summary)
 	}
 	task := category.Tasks[position.TaskIndex]
-	summary := fmt.Sprintf("Selected: %s / %s (%s)", category.Name, task.Title, task.Status)
+	summary := fmt.Sprintf("Selected: %s / %s (%s)%s", category.Name, task.Title, task.Status, filterIndicator)
 	return ui.StatusLineStyle.Render(summary)
 }
 
@@ -210,7 +214,7 @@ func (m model) shortcutsLine() string {
 	if m.ui.Modes.IsEdit() {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | a add task | A add category | enter edit | space status | h/l priority | y copy | d delete | p projects | o options | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | a add task | A add category | enter edit | space status | h/l priority | y copy | d delete | p projects | o options | ? help | q quit")
 }
 
 func truncateText(s string, max int) string {
@@ -260,6 +264,7 @@ func (m model) helpView() string {
 		"  space         toggle task status",
 		"  J/K           reorder task/category up/down",
 		"  s/S           sort tasks by status",
+		"  f             filter tasks by status",
 		"  h/l           change priority",
 		"  y             copy selected text",
 		"  d             delete selected item",
@@ -291,6 +296,33 @@ func (m model) optionsView() string {
 		"",
 		"space/tab toggle | q/esc/enter close",
 	}
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (m model) filterView() string {
+	statusLabels := map[string]string{
+		domain.StatusTodo:       "Todo",
+		domain.StatusInProgress: "In Progress",
+		domain.StatusCompleted:  "Completed",
+		domain.StatusCancelled:  "Cancelled",
+	}
+	lines := []string{"Filter by Status:", ""}
+	for i, status := range filterStatuses {
+		prefix := "  "
+		if i == m.ui.Filter.Selected() {
+			prefix = "> "
+		}
+		checkbox := "[ ]"
+		if m.ui.Filter.IsEnabled(status) {
+			checkbox = "[x]"
+		}
+		line := fmt.Sprintf("%s%s %s", prefix, checkbox, statusLabels[status])
+		if i == m.ui.Filter.Selected() {
+			line = ui.SelectedStyle.Render(line)
+		}
+		lines = append(lines, line)
+	}
+	lines = append(lines, "", "j/k navigate | space toggle | q/esc/f close")
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 

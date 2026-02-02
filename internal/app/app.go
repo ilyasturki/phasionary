@@ -92,6 +92,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleOptionsKey(msg), nil
 	case modes.ModeProjectPicker:
 		return m.handleProjectPickerKey(msg), nil
+	case modes.ModeFilter:
+		return m.handleFilterKey(msg), nil
 	case modes.ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
@@ -128,6 +130,21 @@ func (m model) handleOptionsKey(msg tea.KeyMsg) model {
 		// Ready for more options
 	case " ", "tab", "h", "l":
 		m.toggleSelectedOption()
+	}
+	return m
+}
+
+func (m model) handleFilterKey(msg tea.KeyMsg) model {
+	switch msg.String() {
+	case "q", "esc", "f":
+		m.ui.Modes.ToNormal()
+		m.rebuildPositions()
+	case "j", "down":
+		m.ui.Filter.MoveDown()
+	case "k", "up":
+		m.ui.Filter.MoveUp()
+	case " ":
+		m.ui.Filter.ToggleSelected()
 	}
 	return m
 }
@@ -235,6 +252,9 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "S":
 		m.sortTasksByStatusReverse()
 		m.ui.PendingKey = 0
+	case "f":
+		m.ui.Modes.ToFilter()
+		m.ui.PendingKey = 0
 	default:
 		m.ui.PendingKey = 0
 	}
@@ -295,6 +315,8 @@ func (m model) View() string {
 		return modal.Render(content, m.optionsView())
 	case modes.ModeProjectPicker:
 		return modal.Render(content, m.projectPickerView())
+	case modes.ModeFilter:
+		return modal.Render(content, m.filterView())
 	}
 	return content
 }
@@ -359,7 +381,7 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager) err
 		return err
 	}
 
-	positions := rebuildPositions(project.Categories)
+	positions := rebuildPositions(project.Categories, nil)
 	initialSelection := findFirstTaskIndex(positions)
 	selMgr := selection.NewManager(toSelectionPositions(positions), initialSelection)
 	modeMachine := modes.NewMachine(modes.ModeNormal)

@@ -13,6 +13,7 @@ type UIState struct {
 	Edit         EditState
 	Picker       ProjectPickerState
 	Options      OptionsState
+	Filter       FilterState
 	StatusMsg    string
 	ScrollOffset int
 	PendingKey   rune
@@ -29,6 +30,7 @@ func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {
 	return &UIState{
 		Selection: sel,
 		Modes:     modeMachine,
+		Filter:    NewFilterState(),
 	}
 }
 

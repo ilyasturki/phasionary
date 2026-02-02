@@ -9,6 +9,7 @@ const (
 	ModeConfirmDelete
 	ModeOptions
 	ModeProjectPicker
+	ModeFilter
 )
 
 type Action int
@@ -65,6 +66,10 @@ func (m *Machine) IsProjectPicker() bool {
 	return m.current == ModeProjectPicker
 }
 
+func (m *Machine) IsFilter() bool {
+	return m.current == ModeFilter
+}
+
 func (m *Machine) TransitionTo(mode Mode) bool {
 	if !m.canTransition(mode) {
 		return false
@@ -87,6 +92,8 @@ func (m *Machine) canTransition(target Mode) bool {
 		return target == ModeNormal
 	case ModeProjectPicker:
 		return target == ModeNormal
+	case ModeFilter:
+		return target == ModeNormal
 	}
 	return false
 }
@@ -104,6 +111,8 @@ func (m *Machine) CanPerformAction(action Action) bool {
 	case ModeOptions:
 		return false
 	case ModeProjectPicker:
+		return false
+	case ModeFilter:
 		return false
 	}
 	return false
@@ -131,6 +140,10 @@ func (m *Machine) ToOptions() bool {
 
 func (m *Machine) ToProjectPicker() bool {
 	return m.TransitionTo(ModeProjectPicker)
+}
+
+func (m *Machine) ToFilter() bool {
+	return m.TransitionTo(ModeFilter)
 }
 
 func (m *Machine) ToggleHelp() {

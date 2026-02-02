@@ -50,13 +50,15 @@ type LayoutBuilder struct {
 	config        LayoutConfig
 	width         int
 	statusDisplay string
+	filter        *FilterState
 }
 
-func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string) *LayoutBuilder {
+func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filter *FilterState) *LayoutBuilder {
 	return &LayoutBuilder{
 		config:        config,
 		width:         width,
 		statusDisplay: statusDisplay,
+		filter:        filter,
 	}
 }
 
@@ -114,7 +116,14 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []focusPosition)
 		totalHeight += catHeight
 		posIndex++
 
-		if len(category.Tasks) == 0 {
+		visibleTaskCount := 0
+		for _, task := range category.Tasks {
+			if b.filter == nil || b.filter.IsStatusVisible(task.Status) {
+				visibleTaskCount++
+			}
+		}
+
+		if visibleTaskCount == 0 {
 			// "(no tasks)" placeholder - not selectable
 			items = append(items, LayoutItem{
 				Kind:          LayoutEmptyCategory,
@@ -141,6 +150,9 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []focusPosition)
 
 		// Tasks (consecutive tasks have no blank lines between them)
 		for taskIdx, task := range category.Tasks {
+			if b.filter != nil && !b.filter.IsStatusVisible(task.Status) {
+				continue
+			}
 			taskHeight := b.countTaskLines(task)
 			items = append(items, LayoutItem{
 				Kind:          LayoutTask,
@@ -176,7 +188,7 @@ func (b *LayoutBuilder) countTaskLines(task domain.Task) int {
 }
 
 func (m *model) buildLayout() *Layout {
-	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.ui.Width, m.deps.CfgManager.Get().StatusDisplay)
+	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.ui.Width, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter)
 	layout := builder.Build(m.project, m.positions())
 	return &layout
 }

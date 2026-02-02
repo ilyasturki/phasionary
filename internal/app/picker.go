@@ -74,7 +74,8 @@ func (m *model) selectProject() {
 	}
 
 	m.project = project
-	positions := rebuildPositions(project.Categories)
+	m.ui.Filter = NewFilterState()
+	positions := rebuildPositions(project.Categories, &m.ui.Filter)
 	initialSelection := findFirstTaskIndex(positions)
 	m.ui.Selection.SetPositions(toSelectionPositions(positions))
 	m.ui.Selection.SetSelected(initialSelection)
