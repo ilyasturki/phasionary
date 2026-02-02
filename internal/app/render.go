@@ -241,14 +241,14 @@ func (m model) confirmDeleteView() string {
 	lines := []string{
 		message,
 		"",
-		"y/enter confirm | n/esc cancel",
+		ui.DialogHintStyle.Render("y/enter confirm | n/esc cancel"),
 	}
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (m model) helpView() string {
 	lines := []string{
-		"Navigation:",
+		ui.DialogTitleStyle.Render("Navigation:"),
 		"  j/k or ↑/↓    move selection",
 		"  ctrl+d/u      half-page down/up",
 		"  ctrl+f/b      full-page down/up",
@@ -257,7 +257,7 @@ func (m model) helpView() string {
 		"  zz            center selection on screen",
 		"  p             switch project",
 		"",
-		"Actions:",
+		ui.DialogTitleStyle.Render("Actions:"),
 		"  a             add new task",
 		"  A             add new category",
 		"  enter         edit selected item",
@@ -272,7 +272,7 @@ func (m model) helpView() string {
 		"  ?             toggle help",
 		"  q or ctrl+c   quit",
 		"",
-		"Editing:",
+		ui.DialogTitleStyle.Render("Editing:"),
 		"  enter         save changes",
 		"  esc           cancel editing",
 		"  ←/→           move cursor",
@@ -281,7 +281,7 @@ func (m model) helpView() string {
 		"  ctrl+k/u      delete to end/start",
 		"  ctrl+←/→      word navigation",
 	}
-	return ui.HelpDialogStyle.Render(ui.MutedStyle.Render(strings.Join(lines, "\n")))
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (m model) optionsView() string {
@@ -290,11 +290,11 @@ func (m model) optionsView() string {
 		statusValue = "Icons"
 	}
 	lines := []string{
-		"Options",
+		ui.DialogTitleStyle.Render("Options"),
 		"",
 		fmt.Sprintf("> Status Display: [%s]", statusValue),
 		"",
-		"space/tab toggle | q/esc/enter close",
+		ui.DialogHintStyle.Render("space/tab toggle | q/esc/enter close"),
 	}
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
@@ -306,7 +306,7 @@ func (m model) filterView() string {
 		domain.StatusCompleted:  "Completed",
 		domain.StatusCancelled:  "Cancelled",
 	}
-	lines := []string{"Filter by Status:", ""}
+	lines := []string{ui.DialogTitleStyle.Render("Filter by Status:"), ""}
 	for i, status := range filterStatuses {
 		prefix := "  "
 		if i == m.ui.Filter.Selected() {
@@ -322,12 +322,12 @@ func (m model) filterView() string {
 		}
 		lines = append(lines, line)
 	}
-	lines = append(lines, "", "j/k navigate | space toggle | q/esc/f close")
+	lines = append(lines, "", ui.DialogHintStyle.Render("j/k navigate | space toggle | q/esc/f close"))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (m model) projectPickerView() string {
-	lines := []string{"Select Project:", ""}
+	lines := []string{ui.DialogTitleStyle.Render("Select Project:"), ""}
 
 	visibleEnd := m.ui.Picker.scrollOffset + pickerVisibleItems
 	if visibleEnd > len(m.ui.Picker.projects) {
@@ -335,7 +335,7 @@ func (m model) projectPickerView() string {
 	}
 
 	if m.ui.Picker.scrollOffset > 0 {
-		lines = append(lines, ui.MutedStyle.Render("  ↑ more above"))
+		lines = append(lines, ui.DialogHintStyle.Render("  ↑ more above"))
 	}
 
 	for i := m.ui.Picker.scrollOffset; i < visibleEnd; i++ {
@@ -352,16 +352,16 @@ func (m model) projectPickerView() string {
 		if i == m.ui.Picker.selected {
 			line = ui.SelectedStyle.Render(line)
 		} else if p.ID == m.project.ID {
-			line = prefix + p.Name + ui.MutedStyle.Render(" (current)")
+			line = prefix + p.Name + ui.DialogHintStyle.Render(" (current)")
 		}
 		lines = append(lines, line)
 	}
 
 	if visibleEnd < len(m.ui.Picker.projects) {
-		lines = append(lines, ui.MutedStyle.Render("  ↓ more below"))
+		lines = append(lines, ui.DialogHintStyle.Render("  ↓ more below"))
 	}
 
-	lines = append(lines, "", "j/k navigate | enter select | esc cancel")
+	lines = append(lines, "", ui.DialogHintStyle.Render("j/k navigate | enter select | esc cancel"))
 
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }

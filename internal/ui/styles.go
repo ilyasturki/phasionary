@@ -3,12 +3,15 @@ package ui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	HeaderStyle     = lipgloss.NewStyle().Bold(true)
-	MutedStyle      = lipgloss.NewStyle().Faint(true)
-	CategoryStyle   = lipgloss.NewStyle().Bold(true)
-	SelectedStyle = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("15")).Foreground(lipgloss.Color("0"))
-	StatusLineStyle = lipgloss.NewStyle().Faint(true)
-	HelpDialogStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
+	HeaderStyle      = lipgloss.NewStyle().Bold(true)
+	MutedStyle       = lipgloss.NewStyle().Faint(true)
+	CategoryStyle    = lipgloss.NewStyle().Bold(true)
+	SelectedStyle    = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("15")).Foreground(lipgloss.Color("0"))
+	StatusLineStyle  = lipgloss.NewStyle().Faint(true)
+	HelpDialogStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
+	DialogTitleStyle = lipgloss.NewStyle().Bold(true)
+	DialogHintStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+	SuccessStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 )
 
 func StatusStyle(status string) lipgloss.Style {
