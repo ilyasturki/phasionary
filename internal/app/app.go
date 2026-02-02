@@ -97,6 +97,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleProjectPickerKey(msg)
 	case modes.ModeFilter:
 		return m.handleFilterKey(msg), nil
+	case modes.ModeInfo:
+		return m.handleInfoKey(msg), nil
 	case modes.ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
@@ -150,6 +152,14 @@ func (m model) handleFilterKey(msg tea.KeyMsg) model {
 		m.ui.Filter.MoveUp()
 	case " ":
 		m.ui.Filter.ToggleSelected()
+	}
+	return m
+}
+
+func (m model) handleInfoKey(msg tea.KeyMsg) model {
+	switch msg.String() {
+	case "i", "q", "esc":
+		m.ui.Modes.ToNormal()
 	}
 	return m
 }
@@ -263,6 +273,9 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		m.ui.PendingKey = 0
 		return m, m.startExternalEdit()
+	case "i":
+		m.ui.Modes.ToInfo()
+		m.ui.PendingKey = 0
 	default:
 		m.ui.PendingKey = 0
 	}
@@ -328,6 +341,8 @@ func (m model) View() string {
 		return modal.Render(content, m.projectPickerView())
 	case modes.ModeFilter:
 		return modal.Render(content, m.filterView())
+	case modes.ModeInfo:
+		return modal.Render(content, m.infoView())
 	}
 	return content
 }

@@ -34,6 +34,7 @@ type Category struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 	Tasks     []Task `json:"tasks"`
 }
 
@@ -92,10 +93,12 @@ func NewCategory(name string) (Category, error) {
 	if err != nil {
 		return Category{}, err
 	}
+	now := NowTimestamp()
 	return Category{
 		ID:        id,
 		Name:      name,
-		CreatedAt: NowTimestamp(),
+		CreatedAt: now,
+		UpdatedAt: now,
 		Tasks:     []Task{},
 	}, nil
 }
@@ -213,6 +216,7 @@ func (t *Task) CycleStatus() bool {
 
 func (c *Category) AddTask(task Task) {
 	c.Tasks = append(c.Tasks, task)
+	c.UpdatedAt = NowTimestamp()
 }
 
 func (c *Category) RemoveTask(index int) error {
@@ -220,6 +224,7 @@ func (c *Category) RemoveTask(index int) error {
 		return errors.New("task index out of range")
 	}
 	c.Tasks = append(c.Tasks[:index], c.Tasks[index+1:]...)
+	c.UpdatedAt = NowTimestamp()
 	return nil
 }
 

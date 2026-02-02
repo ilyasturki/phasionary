@@ -214,7 +214,7 @@ func (m model) shortcutsLine() string {
 	if m.ui.Modes.IsEdit() {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | a add task | A add category | enter edit | e external editor | space status | h/l priority | y copy | d delete | p projects | o options | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | a add task | A add category | enter edit | e external editor | space status | h/l priority | y copy | d delete | i info | p projects | o options | ? help | q quit")
 }
 
 func truncateText(s string, max int) string {
@@ -269,6 +269,7 @@ func (m model) helpView() string {
 		"  h/l           change priority",
 		"  y             copy selected text",
 		"  d             delete selected item",
+		"  i             show item info",
 		"  o             options",
 		"  ?             toggle help",
 		"  q or ctrl+c   quit",
@@ -398,4 +399,186 @@ func (m model) renderAddProjectLine(isSelected bool) string {
 		return ui.SelectedStyle.Render(line)
 	}
 	return ui.MutedStyle.Render(line)
+}
+
+func (m model) infoView() string {
+	pos, ok := m.selectedPosition()
+	if !ok {
+		return ""
+	}
+
+	var lines []string
+	switch pos.Kind {
+	case focusProject:
+		lines = m.projectInfoLines()
+	case focusCategory:
+		lines = m.categoryInfoLines(pos.CategoryIndex)
+	case focusTask:
+		lines = m.taskInfoLines(pos.CategoryIndex, pos.TaskIndex)
+	}
+
+	lines = append(lines, "", ui.DialogHintStyle.Render("i/esc/q close"))
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (m model) taskInfoLines(catIdx, taskIdx int) []string {
+	task := m.project.Categories[catIdx].Tasks[taskIdx]
+	category := m.project.Categories[catIdx]
+
+	statusDisplay := formatStatusLabel(task.Status)
+	priorityDisplay := formatPriorityLabel(task.Priority)
+
+	lines := []string{
+		ui.DialogTitleStyle.Render("Task Info"),
+		"",
+	}
+
+	const infoMaxWidth = 60
+	const titleLabel = "Title:    "
+	labelWidth := len(titleLabel)
+	available := infoMaxWidth - labelWidth
+	wrapped := ansi.Wrap(task.Title, available, "")
+	titleLines := strings.Split(wrapped, "\n")
+	indent := strings.Repeat(" ", labelWidth)
+	for i, line := range titleLines {
+		if i == 0 {
+			lines = append(lines, titleLabel+line)
+		} else {
+			lines = append(lines, indent+line)
+		}
+	}
+
+	lines = append(lines,
+		fmt.Sprintf("Status:   %s", statusDisplay),
+		fmt.Sprintf("Priority: %s", priorityDisplay),
+		fmt.Sprintf("Category: %s", category.Name),
+		"",
+		fmt.Sprintf("Created:  %s", FormatDateWithRelative(task.CreatedAt)),
+		fmt.Sprintf("Updated:  %s", FormatDateWithRelative(task.UpdatedAt)),
+	)
+
+	if task.CompletionDate != "" {
+		lines = append(lines, fmt.Sprintf("Completed: %s", FormatDateWithRelative(task.CompletionDate)))
+	}
+
+	return lines
+}
+
+func (m model) categoryInfoLines(catIdx int) []string {
+	category := m.project.Categories[catIdx]
+
+	todoCount := 0
+	inProgressCount := 0
+	completedCount := 0
+	cancelledCount := 0
+
+	for _, task := range category.Tasks {
+		switch task.Status {
+		case domain.StatusTodo:
+			todoCount++
+		case domain.StatusInProgress:
+			inProgressCount++
+		case domain.StatusCompleted:
+			completedCount++
+		case domain.StatusCancelled:
+			cancelledCount++
+		}
+	}
+
+	lines := []string{
+		ui.DialogTitleStyle.Render("Category Info"),
+		"",
+		fmt.Sprintf("Name:     %s", category.Name),
+		fmt.Sprintf("Created:  %s", FormatDateWithRelative(category.CreatedAt)),
+	}
+
+	if category.UpdatedAt != "" {
+		lines = append(lines, fmt.Sprintf("Updated:  %s", FormatDateWithRelative(category.UpdatedAt)))
+	}
+
+	lines = append(lines,
+		"",
+		fmt.Sprintf("Total Tasks: %d", len(category.Tasks)),
+		"",
+		"Task Breakdown:",
+		fmt.Sprintf("  Todo:        %d", todoCount),
+		fmt.Sprintf("  In Progress: %d", inProgressCount),
+		fmt.Sprintf("  Completed:   %d", completedCount),
+		fmt.Sprintf("  Cancelled:   %d", cancelledCount),
+	)
+
+	return lines
+}
+
+func (m model) projectInfoLines() []string {
+	totalTasks := 0
+	todoCount := 0
+	inProgressCount := 0
+	completedCount := 0
+	cancelledCount := 0
+
+	for _, cat := range m.project.Categories {
+		totalTasks += len(cat.Tasks)
+		for _, task := range cat.Tasks {
+			switch task.Status {
+			case domain.StatusTodo:
+				todoCount++
+			case domain.StatusInProgress:
+				inProgressCount++
+			case domain.StatusCompleted:
+				completedCount++
+			case domain.StatusCancelled:
+				cancelledCount++
+			}
+		}
+	}
+
+	lines := []string{
+		ui.DialogTitleStyle.Render("Project Info"),
+		"",
+		fmt.Sprintf("Name:       %s", m.project.Name),
+		fmt.Sprintf("Created:    %s", FormatDateWithRelative(m.project.CreatedAt)),
+		fmt.Sprintf("Updated:    %s", FormatDateWithRelative(m.project.UpdatedAt)),
+		"",
+		fmt.Sprintf("Categories: %d", len(m.project.Categories)),
+		fmt.Sprintf("Total Tasks: %d", totalTasks),
+		"",
+		"Task Breakdown:",
+		fmt.Sprintf("  Todo:        %d", todoCount),
+		fmt.Sprintf("  In Progress: %d", inProgressCount),
+		fmt.Sprintf("  Completed:   %d", completedCount),
+		fmt.Sprintf("  Cancelled:   %d", cancelledCount),
+	}
+
+	return lines
+}
+
+func formatStatusLabel(status string) string {
+	switch status {
+	case domain.StatusTodo:
+		return "Todo"
+	case domain.StatusInProgress:
+		return "In Progress"
+	case domain.StatusCompleted:
+		return "Completed"
+	case domain.StatusCancelled:
+		return "Cancelled"
+	default:
+		return status
+	}
+}
+
+func formatPriorityLabel(priority string) string {
+	switch priority {
+	case domain.PriorityHigh:
+		return "High"
+	case domain.PriorityMedium:
+		return "Medium"
+	case domain.PriorityLow:
+		return "Low"
+	case "":
+		return "None"
+	default:
+		return priority
+	}
 }
