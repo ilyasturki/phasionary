@@ -64,6 +64,13 @@ Task sort order within categories: Priority > Deadline > Time estimate > Title (
 - All timestamps in UTC ISO 8601
 - Project/category names are case-insensitive unique
 
+## Key Architectural Decisions
+
+- **State separation**: Model holds domain data, UI state, and dependencies as separate concerns
+- **Persistence**: Synchronous full-project save on every change; no undo support
+- **Navigation**: Flat position list derived from nested structure; rebuilt after structural changes
+- **Config**: `~/.config/phasionary/config.json`
+
 ## Code Style Requirements
 
 - Write comments only when necessary, prefer self-documenting code with clear naming
