@@ -19,3 +19,7 @@ coverage.*
 
 # Local data
 /data/
+
+# Nix/direnv
+.direnv/
+result
