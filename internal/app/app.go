@@ -289,6 +289,10 @@ func (m model) copySelected() tea.Cmd {
 }
 
 func (m model) View() string {
+	if m.ui.Height == 0 {
+		return ""
+	}
+
 	layout := m.buildLayout()
 	viewport := NewViewport(layout, m.ui.Height, DefaultLayoutConfig())
 	viewport.ComputeVisibility(m.ui.ScrollOffset)
@@ -300,8 +304,7 @@ func (m model) View() string {
 	}
 
 	for i := viewport.VisibleStart; i < viewport.VisibleEnd; i++ {
-		rendered := m.renderLayoutItem(layout.Items[i])
-		lines = append(lines, rendered)
+		lines = append(lines, m.renderLayoutItem(layout.Items[i]))
 	}
 
 	if viewport.HasMoreBelow {
@@ -312,7 +315,7 @@ func (m model) View() string {
 
 	statusLine := m.statusLine()
 	shortcuts := m.shortcutsLine()
-	content := body + "\n\n" + statusLine + "\n" + shortcuts + "\n"
+	content := body + "\n\n" + statusLine + "\n" + shortcuts
 	modal := components.NewModal(m.ui.Width, m.ui.Height)
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:

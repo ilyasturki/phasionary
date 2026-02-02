@@ -29,12 +29,14 @@ func (v *Viewport) availableHeight() int {
 	return v.ScreenHeight - v.Config.FooterHeight
 }
 
-func (v *Viewport) contentHeight() int {
+func (v *Viewport) contentHeight(reserveMoreBelow bool) int {
 	availHeight := v.availableHeight()
 	if v.ScrollOffset > 0 {
 		availHeight-- // "more above" indicator
 	}
-	availHeight-- // "more below" indicator (reserved)
+	if reserveMoreBelow {
+		availHeight-- // "more below" indicator
+	}
 	if availHeight < 1 {
 		availHeight = 1
 	}
@@ -53,27 +55,46 @@ func (v *Viewport) ComputeVisibility(scrollOffset int) {
 		return
 	}
 
-	availHeight := v.contentHeight()
-	usedHeight := 0
-	positionCursor := 0
-
-	// Find the starting position index from scrollOffset
-	// ScrollOffset refers to position indices (selectable items), not layout items
-	for i, item := range v.Layout.Items {
-		if item.PositionIndex >= 0 && positionCursor >= scrollOffset {
-			v.VisibleStart = i
-			break
-		}
-		if item.PositionIndex >= 0 {
-			positionCursor++
-		}
-	}
-
-	if v.VisibleStart < 0 {
+	// When scrollOffset is 0, always start from the beginning
+	// This ensures the project title is always visible at startup
+	if scrollOffset == 0 {
 		v.VisibleStart = 0
+	} else {
+		// Find the starting layout item index from scrollOffset
+		// ScrollOffset refers to position indices (selectable items), not layout items
+		positionCursor := 0
+		for i, item := range v.Layout.Items {
+			if item.PositionIndex >= 0 && positionCursor >= scrollOffset {
+				v.VisibleStart = i
+				break
+			}
+			if item.PositionIndex >= 0 {
+				positionCursor++
+			}
+		}
+		if v.VisibleStart < 0 {
+			v.VisibleStart = 0
+		}
 	}
 
-	// Determine visible range based on available height
+	// Two-pass approach: first try without reserving "more below" space
+	// If content doesn't fit, recalculate with the reserved space
+	v.computeVisibleRange(false)
+
+	if v.HasMoreBelow {
+		// Content didn't fit, recalculate with reserved indicator space
+		v.computeVisibleRange(true)
+	}
+}
+
+func (v *Viewport) computeVisibleRange(reserveMoreBelow bool) {
+	availHeight := v.contentHeight(reserveMoreBelow)
+	usedHeight := 0
+
+	v.HasMoreBelow = false
+	v.VisibleEnd = -1
+	v.itemRowStart = nil
+
 	startRow := 0
 	if v.HasMoreAbove {
 		startRow = 1
