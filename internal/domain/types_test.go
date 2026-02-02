@@ -29,11 +29,11 @@ func TestTask_IncreasePriority(t *testing.T) {
 		assert.Equal(t, PriorityHigh, task.Priority)
 	})
 
-	t.Run("empty priority defaults to medium", func(t *testing.T) {
+	t.Run("empty priority increases as medium", func(t *testing.T) {
 		task := Task{Priority: ""}
 		changed := task.IncreasePriority()
 		assert.True(t, changed)
-		assert.Equal(t, PriorityMedium, task.Priority)
+		assert.Equal(t, PriorityHigh, task.Priority)
 	})
 }
 
@@ -59,11 +59,11 @@ func TestTask_DecreasePriority(t *testing.T) {
 		assert.Equal(t, PriorityLow, task.Priority)
 	})
 
-	t.Run("empty priority defaults to medium", func(t *testing.T) {
+	t.Run("empty priority decreases as medium", func(t *testing.T) {
 		task := Task{Priority: ""}
 		changed := task.DecreasePriority()
 		assert.True(t, changed)
-		assert.Equal(t, PriorityMedium, task.Priority)
+		assert.Equal(t, PriorityLow, task.Priority)
 	})
 }
 

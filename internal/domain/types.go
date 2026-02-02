@@ -161,7 +161,7 @@ func (t *Task) IncreasePriority() bool {
 	switch t.Priority {
 	case PriorityLow:
 		newPriority = PriorityMedium
-	case PriorityMedium:
+	case PriorityMedium, "":
 		newPriority = PriorityHigh
 	case PriorityHigh:
 		return false
@@ -178,7 +178,7 @@ func (t *Task) DecreasePriority() bool {
 	switch t.Priority {
 	case PriorityHigh:
 		newPriority = PriorityMedium
-	case PriorityMedium:
+	case PriorityMedium, "":
 		newPriority = PriorityLow
 	case PriorityLow:
 		return false
@@ -246,4 +246,3 @@ func (p *Project) RemoveCategory(index int) error {
 	p.UpdatedAt = NowTimestamp()
 	return nil
 }
-

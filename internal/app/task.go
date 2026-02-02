@@ -200,7 +200,7 @@ func priorityOrder(priority string) int {
 	switch priority {
 	case domain.PriorityHigh:
 		return 0
-	case domain.PriorityMedium:
+	case domain.PriorityMedium, "":
 		return 1
 	case domain.PriorityLow:
 		return 2
