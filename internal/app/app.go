@@ -56,6 +56,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.ui.StatusMsg = "Copied!"
 		}
+	case editorFinishedMsg:
+		m.handleEditorFinished(msg)
+		return m, nil
 	case tea.MouseMsg:
 		if !m.ui.Modes.IsNormal() {
 			break
@@ -97,6 +100,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case modes.ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
+	case modes.ModeExternalEdit:
+		return m, nil
 	default:
 		return m.handleNormalKey(msg)
 	}
@@ -255,6 +260,9 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f":
 		m.ui.Modes.ToFilter()
 		m.ui.PendingKey = 0
+	case "e":
+		m.ui.PendingKey = 0
+		return m, m.startExternalEdit()
 	default:
 		m.ui.PendingKey = 0
 	}

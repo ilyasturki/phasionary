@@ -14,6 +14,7 @@ type UIState struct {
 	Picker       ProjectPickerState
 	Options      OptionsState
 	Filter       FilterState
+	ExternalEdit ExternalEditState
 	StatusMsg    string
 	ScrollOffset int
 	PendingKey   rune

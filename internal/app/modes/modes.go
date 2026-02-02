@@ -10,6 +10,7 @@ const (
 	ModeOptions
 	ModeProjectPicker
 	ModeFilter
+	ModeExternalEdit
 )
 
 type Action int
@@ -70,6 +71,10 @@ func (m *Machine) IsFilter() bool {
 	return m.current == ModeFilter
 }
 
+func (m *Machine) IsExternalEdit() bool {
+	return m.current == ModeExternalEdit
+}
+
 func (m *Machine) TransitionTo(mode Mode) bool {
 	if !m.canTransition(mode) {
 		return false
@@ -93,6 +98,8 @@ func (m *Machine) canTransition(target Mode) bool {
 	case ModeProjectPicker:
 		return target == ModeNormal
 	case ModeFilter:
+		return target == ModeNormal
+	case ModeExternalEdit:
 		return target == ModeNormal
 	}
 	return false
@@ -144,6 +151,10 @@ func (m *Machine) ToProjectPicker() bool {
 
 func (m *Machine) ToFilter() bool {
 	return m.TransitionTo(ModeFilter)
+}
+
+func (m *Machine) ToExternalEdit() bool {
+	return m.TransitionTo(ModeExternalEdit)
 }
 
 func (m *Machine) ToggleHelp() {
