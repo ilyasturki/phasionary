@@ -282,9 +282,9 @@ func sortCategoryTasks(tasks []domain.Task, ascending bool) {
 		dateI := getTaskSortDate(tasks[i])
 		dateJ := getTaskSortDate(tasks[j])
 		if ascending {
-			return dateI < dateJ
+			return dateI > dateJ // Ascending: newest first
 		}
-		return dateI > dateJ
+		return dateI < dateJ // Descending: oldest first
 	})
 }
 
