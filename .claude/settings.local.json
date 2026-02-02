@@ -12,7 +12,8 @@
       "Bash(wc:*)",
       "Bash(go list:*)",
       "Bash(go get:*)",
-      "Bash(git grep:*)"
+      "Bash(git grep:*)",
+      "Bash(sort:*)"
     ]
   },
   "enabledPlugins": {
