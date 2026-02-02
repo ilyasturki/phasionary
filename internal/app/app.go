@@ -94,7 +94,7 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case modes.ModeOptions:
 		return m.handleOptionsKey(msg), nil
 	case modes.ModeProjectPicker:
-		return m.handleProjectPickerKey(msg), nil
+		return m.handleProjectPickerKey(msg)
 	case modes.ModeFilter:
 		return m.handleFilterKey(msg), nil
 	case modes.ModeEdit:

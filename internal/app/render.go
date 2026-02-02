@@ -330,9 +330,10 @@ func (m model) filterView() string {
 func (m model) projectPickerView() string {
 	lines := []string{ui.DialogTitleStyle.Render("Select Project:"), ""}
 
+	total := m.ui.Picker.totalItems()
 	visibleEnd := m.ui.Picker.scrollOffset + pickerVisibleItems
-	if visibleEnd > len(m.ui.Picker.projects) {
-		visibleEnd = len(m.ui.Picker.projects)
+	if visibleEnd > total {
+		visibleEnd = total
 	}
 
 	if m.ui.Picker.scrollOffset > 0 {
@@ -340,9 +341,14 @@ func (m model) projectPickerView() string {
 	}
 
 	for i := m.ui.Picker.scrollOffset; i < visibleEnd; i++ {
+		isSelected := i == m.ui.Picker.selected
+		if i == len(m.ui.Picker.projects) {
+			lines = append(lines, m.renderAddProjectLine(isSelected))
+			continue
+		}
 		p := m.ui.Picker.projects[i]
 		prefix := "  "
-		if i == m.ui.Picker.selected {
+		if isSelected {
 			prefix = "> "
 		}
 		name := p.Name
@@ -350,7 +356,7 @@ func (m model) projectPickerView() string {
 			name += " (current)"
 		}
 		line := prefix + name
-		if i == m.ui.Picker.selected {
+		if isSelected {
 			line = ui.SelectedStyle.Render(line)
 		} else if p.ID == m.project.ID {
 			line = prefix + p.Name + ui.DialogHintStyle.Render(" (current)")
@@ -358,11 +364,38 @@ func (m model) projectPickerView() string {
 		lines = append(lines, line)
 	}
 
-	if visibleEnd < len(m.ui.Picker.projects) {
+	if visibleEnd < total {
 		lines = append(lines, ui.DialogHintStyle.Render("  ↓ more below"))
 	}
 
-	lines = append(lines, "", ui.DialogHintStyle.Render("j/k navigate | enter select | esc cancel"))
+	hintText := "j/k navigate | enter select | esc cancel"
+	if m.ui.Picker.isAdding {
+		hintText = "enter create | esc cancel"
+	}
+	lines = append(lines, "", ui.DialogHintStyle.Render(hintText))
 
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (m model) renderAddProjectLine(isSelected bool) string {
+	prefix := "  "
+	if isSelected {
+		prefix = "> "
+	}
+
+	if m.ui.Picker.isAdding && isSelected {
+		split := splitAtCursor(m.ui.Picker.input.Value(), m.ui.Picker.input.Position())
+		return fmt.Sprintf("%s+ %s%s%s",
+			prefix,
+			split.left,
+			ui.SelectedStyle.Render(split.cursorCh),
+			split.right,
+		)
+	}
+
+	line := prefix + "+ New Project"
+	if isSelected {
+		return ui.SelectedStyle.Render(line)
+	}
+	return ui.MutedStyle.Render(line)
 }

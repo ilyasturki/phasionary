@@ -78,12 +78,35 @@ type ProjectPickerState struct {
 	projects     []domain.Project
 	selected     int
 	scrollOffset int
+	isAdding     bool
+	input        textinput.Model
 }
 
 func (p *ProjectPickerState) reset() {
 	p.projects = nil
 	p.selected = 0
 	p.scrollOffset = 0
+	p.isAdding = false
+	p.input = textinput.Model{}
+}
+
+func (p *ProjectPickerState) totalItems() int {
+	return len(p.projects) + 1
+}
+
+func (p *ProjectPickerState) isOnAddButton() bool {
+	return p.selected == len(p.projects)
+}
+
+func (p *ProjectPickerState) startAdding() {
+	p.isAdding = true
+	p.input = textinput.New()
+	p.input.Focus()
+}
+
+func (p *ProjectPickerState) cancelAdding() {
+	p.isAdding = false
+	p.input = textinput.Model{}
 }
 
 type EditState struct {
