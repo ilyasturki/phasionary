@@ -23,8 +23,9 @@ type UIState struct {
 }
 
 type Dependencies struct {
-	Store      data.ProjectRepository
-	CfgManager *config.Manager
+	Store        data.ProjectRepository
+	CfgManager   *config.Manager
+	StateManager *data.StateManager
 }
 
 func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {
@@ -35,9 +36,10 @@ func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {
 	}
 }
 
-func NewDependencies(store data.ProjectRepository, cfgManager *config.Manager) *Dependencies {
+func NewDependencies(store data.ProjectRepository, cfgManager *config.Manager, stateManager *data.StateManager) *Dependencies {
 	return &Dependencies{
-		Store:      store,
-		CfgManager: cfgManager,
+		Store:        store,
+		CfgManager:   cfgManager,
+		StateManager: stateManager,
 	}
 }

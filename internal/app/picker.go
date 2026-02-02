@@ -49,6 +49,9 @@ func (m model) handleProjectPickerKey(msg tea.KeyMsg) (model, tea.Cmd) {
 			m.selectProject()
 		}
 	case "esc", "q":
+		if m.project.ID == "" {
+			return m, tea.Quit
+		}
 		m.ui.Picker.reset()
 		m.ui.Modes.ToNormal()
 	}
@@ -81,6 +84,8 @@ func (m *model) createProjectFromPicker() {
 		m.ui.StatusMsg = fmt.Sprintf("Error: %v", err)
 		return
 	}
+
+	_ = m.deps.StateManager.SetLastProjectID(project.ID)
 
 	m.project = project
 	m.ui.Filter = NewFilterState()
@@ -117,6 +122,8 @@ func (m *model) selectProject() {
 		m.ui.Modes.ToNormal()
 		return
 	}
+
+	_ = m.deps.StateManager.SetLastProjectID(project.ID)
 
 	m.project = project
 	m.ui.Filter = NewFilterState()

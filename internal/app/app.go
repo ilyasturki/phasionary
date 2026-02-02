@@ -386,37 +386,70 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager) err
 	if err := store.Ensure(); err != nil {
 		return err
 	}
+
+	stateManager := data.NewStateManager(dataDir)
+	if err := stateManager.Load(); err != nil {
+		return err
+	}
+
 	projects, err := store.ListProjects()
 	if err != nil {
 		return err
 	}
+
+	var project domain.Project
+	startMode := modes.ModeNormal
+
 	if len(projects) == 0 {
-		if _, err := store.InitDefault(); err != nil {
+		project, err = store.InitDefault()
+		if err != nil {
 			return err
 		}
-	}
-
-	project, err := store.LoadProject(projectSelector)
-	if err != nil {
-		if errors.Is(err, data.ErrProjectNotFound) {
-			if projectSelector == "" {
-				return fmt.Errorf("no projects available")
+		_ = stateManager.SetLastProjectID(project.ID)
+	} else if projectSelector != "" {
+		project, err = store.LoadProject(projectSelector)
+		if err != nil {
+			if errors.Is(err, data.ErrProjectNotFound) {
+				return fmt.Errorf("project %q not found", projectSelector)
 			}
-			return fmt.Errorf("project %q not found", projectSelector)
+			return err
 		}
-		return err
+		_ = stateManager.SetLastProjectID(project.ID)
+	} else if lastID := stateManager.GetLastProjectID(); lastID != "" {
+		project, err = store.LoadProject(lastID)
+		if err != nil {
+			if errors.Is(err, data.ErrProjectNotFound) {
+				startMode = modes.ModeProjectPicker
+			} else {
+				return err
+			}
+		} else {
+			_ = stateManager.SetLastProjectID(project.ID)
+		}
+	} else {
+		startMode = modes.ModeProjectPicker
 	}
 
 	positions := rebuildPositions(project.Categories, nil)
 	initialSelection := findFirstTaskIndex(positions)
 	selMgr := selection.NewManager(toSelectionPositions(positions), initialSelection)
-	modeMachine := modes.NewMachine(modes.ModeNormal)
+	modeMachine := modes.NewMachine(startMode)
 
-	program := tea.NewProgram(model{
+	m := model{
 		project: project,
 		ui:      NewUIState(selMgr, modeMachine),
-		deps:    NewDependencies(store, cfgManager),
-	}, tea.WithAltScreen(), tea.WithMouseCellMotion())
+		deps:    NewDependencies(store, cfgManager, stateManager),
+	}
+
+	if startMode == modes.ModeProjectPicker {
+		m.ui.Picker = ProjectPickerState{
+			projects:     projects,
+			selected:     0,
+			scrollOffset: 0,
+		}
+	}
+
+	program := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = program.Run()
 	return err
 }
