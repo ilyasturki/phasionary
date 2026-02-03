@@ -10,7 +10,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      version = "0.2.1";
+      version = "0.3.0";
     in
     {
       packages.${system} = {
