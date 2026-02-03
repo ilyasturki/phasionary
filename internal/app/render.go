@@ -428,7 +428,7 @@ func (m model) projectPickerView() string {
 		lines = append(lines, ui.DialogHintStyle.Render("  ↓ more below"))
 	}
 
-	hintText := "j/k navigate | enter select | d delete | esc cancel"
+	hintText := "j/k navigate | J/K reorder | enter select | d delete | esc cancel"
 	if m.ui.Picker.isAdding {
 		hintText = "enter create | esc cancel"
 	}

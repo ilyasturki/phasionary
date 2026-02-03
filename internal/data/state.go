@@ -10,6 +10,7 @@ import (
 
 type State struct {
 	DirectoryProjects map[string]string `json:"directory_projects,omitempty"`
+	ProjectOrder      []string          `json:"project_order,omitempty"`
 }
 
 type StateManager struct {
@@ -39,12 +40,14 @@ func (m *StateManager) Load() error {
 	var raw struct {
 		LastProjectID     string            `json:"last_project_id"`
 		DirectoryProjects map[string]string `json:"directory_projects,omitempty"`
+		ProjectOrder      []string          `json:"project_order,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
 	m.state.DirectoryProjects = raw.DirectoryProjects
+	m.state.ProjectOrder = raw.ProjectOrder
 	if m.state.DirectoryProjects == nil {
 		m.state.DirectoryProjects = make(map[string]string)
 	}
@@ -91,5 +94,14 @@ func (m *StateManager) SetLastProjectID(id string) error {
 		m.state.DirectoryProjects[m.currentDir] = id
 	}
 	m.state.DirectoryProjects[""] = id
+	return m.Save()
+}
+
+func (m *StateManager) GetProjectOrder() []string {
+	return m.state.ProjectOrder
+}
+
+func (m *StateManager) SetProjectOrder(order []string) error {
+	m.state.ProjectOrder = order
 	return m.Save()
 }

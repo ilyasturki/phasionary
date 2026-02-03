@@ -2,9 +2,11 @@ package app
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"phasionary/internal/domain"
 )
 
 const pickerVisibleItems = 10
@@ -15,6 +17,9 @@ func (m *model) openProjectPicker() {
 		m.ui.StatusMsg = fmt.Sprintf("Error loading projects: %v", err)
 		return
 	}
+
+	order := m.deps.StateManager.GetProjectOrder()
+	projects = orderProjects(projects, order)
 
 	currentIdx := 0
 	for i, p := range projects {
@@ -33,6 +38,38 @@ func (m *model) openProjectPicker() {
 	m.ui.Modes.ToProjectPicker()
 }
 
+func orderProjects(projects []domain.Project, order []string) []domain.Project {
+	if len(order) == 0 {
+		return projects
+	}
+
+	projectMap := make(map[string]domain.Project)
+	for _, p := range projects {
+		projectMap[p.ID] = p
+	}
+
+	var ordered []domain.Project
+	seen := make(map[string]bool)
+	for _, id := range order {
+		if p, ok := projectMap[id]; ok {
+			ordered = append(ordered, p)
+			seen[id] = true
+		}
+	}
+
+	var remaining []domain.Project
+	for _, p := range projects {
+		if !seen[p.ID] {
+			remaining = append(remaining, p)
+		}
+	}
+	sort.Slice(remaining, func(i, j int) bool {
+		return strings.ToLower(remaining[i].Name) < strings.ToLower(remaining[j].Name)
+	})
+
+	return append(ordered, remaining...)
+}
+
 func (m model) handleProjectPickerKey(msg tea.KeyMsg) (model, tea.Cmd) {
 	if m.ui.Picker.isAdding {
 		return m.handlePickerAddKey(msg)
@@ -42,6 +79,10 @@ func (m model) handleProjectPickerKey(msg tea.KeyMsg) (model, tea.Cmd) {
 		m.ui.Picker.moveSelection(1)
 	case "k", "up":
 		m.ui.Picker.moveSelection(-1)
+	case "J":
+		m.moveProjectDown()
+	case "K":
+		m.moveProjectUp()
 	case "enter":
 		if m.ui.Picker.isOnAddButton() {
 			m.ui.Picker.startAdding()
@@ -93,6 +134,8 @@ func (m *model) confirmDeleteProject() {
 		m.ui.Modes.ToProjectPicker()
 		return
 	}
+
+	m.removeProjectFromOrder(deleteID)
 
 	if m.project.ID == deleteID {
 		projects, err := m.deps.Store.ListProjects()
@@ -162,6 +205,9 @@ func (m *model) createProjectFromPicker() {
 	}
 
 	_ = m.deps.StateManager.SetLastProjectID(project.ID)
+	order := m.deps.StateManager.GetProjectOrder()
+	order = append(order, project.ID)
+	_ = m.deps.StateManager.SetProjectOrder(order)
 
 	m.project = project
 	m.ui.Filter = NewFilterState()
@@ -236,4 +282,45 @@ func (p *ProjectPickerState) ensureVisible() {
 	if p.selected >= p.scrollOffset+pickerVisibleItems {
 		p.scrollOffset = p.selected - pickerVisibleItems + 1
 	}
+}
+
+func (m *model) moveProjectDown() {
+	if m.ui.Picker.isOnAddButton() || m.ui.Picker.selected >= len(m.ui.Picker.projects)-1 {
+		return
+	}
+	idx := m.ui.Picker.selected
+	m.ui.Picker.projects[idx], m.ui.Picker.projects[idx+1] =
+		m.ui.Picker.projects[idx+1], m.ui.Picker.projects[idx]
+	m.ui.Picker.moveSelection(1)
+	m.saveProjectOrder()
+}
+
+func (m *model) moveProjectUp() {
+	if m.ui.Picker.isOnAddButton() || m.ui.Picker.selected <= 0 {
+		return
+	}
+	idx := m.ui.Picker.selected
+	m.ui.Picker.projects[idx], m.ui.Picker.projects[idx-1] =
+		m.ui.Picker.projects[idx-1], m.ui.Picker.projects[idx]
+	m.ui.Picker.moveSelection(-1)
+	m.saveProjectOrder()
+}
+
+func (m *model) saveProjectOrder() {
+	order := make([]string, len(m.ui.Picker.projects))
+	for i, p := range m.ui.Picker.projects {
+		order[i] = p.ID
+	}
+	_ = m.deps.StateManager.SetProjectOrder(order)
+}
+
+func (m *model) removeProjectFromOrder(id string) {
+	order := m.deps.StateManager.GetProjectOrder()
+	var newOrder []string
+	for _, pid := range order {
+		if pid != id {
+			newOrder = append(newOrder, pid)
+		}
+	}
+	_ = m.deps.StateManager.SetProjectOrder(newOrder)
 }
