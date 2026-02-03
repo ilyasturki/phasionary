@@ -10,6 +10,14 @@ run:
 run-app:
     ./phasionary --data ./data
 
+# Build the CLI binary using Nix.
+build-nix:
+    nix build
+
+# Run the CLI binary using Nix.
+run-nix:
+    nix run
+
 # Run all tests.
 test:
     go test ./...
