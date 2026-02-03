@@ -9,6 +9,7 @@ import (
 
 	"phasionary/internal/app"
 	"phasionary/internal/config"
+	"phasionary/internal/version"
 )
 
 func Execute() error {
@@ -41,8 +42,11 @@ func newRootCmd() *cobra.Command {
 		},
 	}
 
+	cmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", version.Version, version.Commit, version.BuildDate)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
+
+	cmd.Flags().BoolP("version", "v", false, "Print version information")
 
 	cmd.PersistentFlags().StringP("config", "c", "", "override config directory path")
 	cmd.PersistentFlags().StringP("data", "d", "", "override data directory path")
