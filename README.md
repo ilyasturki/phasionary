@@ -1,49 +1,90 @@
 # Phasionary
 
-Terminal-first, single-user project planning tool. Local-only, offline by default, keyboard-driven. This repository contains an ultra-minimal skeleton to validate the Go setup and project structure.
+A terminal-first, keyboard-driven project planning tool. Local-only, offline by default.
 
-## Status
+![Screenshot](docs/screenshot.png)
+<!-- TODO: Add screenshot -->
 
-This is a starter scaffold: a tiny TUI placeholder plus minimal CLI commands for init, project list/add, and task list/add/status.
+## Features
 
-## Requirements
+- **Keyboard-driven** - Vim-style navigation and commands
+- **Local-first** - All data stored locally as JSON files
+- **Offline by default** - No network dependency
+- **SSH-friendly** - Works over SSH and low-bandwidth terminals
+- **Single binary** - No dependencies to install
 
-- Go 1.22+
+## Installation
 
-## Build
+### From source
 
 ```bash
+git clone https://github.com/yourusername/phasionary.git
+cd phasionary
 go build -o phasionary ./cmd/phasionary
 ```
 
-## Run
+### NixOS
 
 ```bash
-./phasionary           # launches the minimal TUI
-./phasionary init      # creates the data directory and default project
+nix run github:yourusername/phasionary
 ```
 
-## Data Location
-
-- Default: `~/.local/share/phasionary/`
-- Override: `PHASIONARY_DATA_PATH` or `--data <path>`
-
-## CLI Examples
+## Usage
 
 ```bash
-./phasionary project list
-./phasionary project add "Client Portal"
-
-./phasionary task add "Set up schema" --category Feature --priority high --deadline 2026-01-22 --estimate 2h
-./phasionary task list --status todo --section current
-./phasionary task status <id> completed
+phasionary              # Open last project or project picker
+phasionary -p "myproj"  # Open specific project by name
 ```
 
-## Notes
+## Keybindings
 
-- Task storage uses one JSON file per project.
-- The TUI is intentionally minimal for now; it only confirms the app boots and the dependencies are wired.
+### Navigation
 
-## Docs
+| Key | Action |
+|-----|--------|
+| `j` / `↓` | Move down |
+| `k` / `↑` | Move up |
+| `gg` | Jump to top |
+| `G` | Jump to bottom |
+| `Ctrl+d` | Half page down |
+| `Ctrl+u` | Half page up |
+| `Ctrl+f` | Page down |
+| `Ctrl+b` | Page up |
+| `zz` | Center on selection |
 
-See `docs/` for product specs, data schema, keybindings, and target architecture.
+### Actions
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Edit selected item |
+| `Space` | Toggle task status |
+| `a` | Add new task |
+| `A` | Add new category |
+| `d` | Delete selected |
+| `y` | Copy to clipboard |
+| `e` | Edit in external editor |
+| `h` / `l` | Decrease / Increase priority |
+| `J` / `K` | Move item down / up |
+| `s` / `S` | Sort tasks by status |
+| `t` | Set time estimate |
+
+### Views
+
+| Key | Action |
+|-----|--------|
+| `?` | Toggle help |
+| `p` | Open project picker |
+| `o` | Open options |
+| `f` | Filter tasks |
+| `i` | View item info |
+| `q` | Quit |
+
+## Data Storage
+
+Projects are stored as JSON files in `~/.local/share/phasionary/`.
+
+Configuration is stored in `~/.config/phasionary/config.json`.
+
+## License
+
+MIT
