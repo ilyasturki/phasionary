@@ -71,9 +71,10 @@ func writeProjects(w io.Writer, projects []domain.Project) error {
 }
 
 type CategoryListItem struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	TaskCount int    `json:"task_count"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	TaskCount       int    `json:"task_count"`
+	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
 }
 
 type CategoriesOutput struct {
@@ -87,9 +88,10 @@ func writeCategories(w io.Writer, categories []domain.Category) error {
 		}
 		for _, c := range categories {
 			output.Categories = append(output.Categories, CategoryListItem{
-				ID:        c.ID,
-				Name:      c.Name,
-				TaskCount: len(c.Tasks),
+				ID:              c.ID,
+				Name:            c.Name,
+				TaskCount:       len(c.Tasks),
+				EstimateMinutes: c.EstimateMinutes,
 			})
 		}
 		return writeJSON(w, output)
@@ -254,20 +256,22 @@ type CategoryDetailOutput struct {
 }
 
 type CategoryDetail struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-	TaskCount int    `json:"task_count"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
+	TaskCount       int    `json:"task_count"`
+	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
 }
 
 func writeCategoryDetail(w io.Writer, cat domain.Category) error {
 	detail := CategoryDetail{
-		ID:        cat.ID,
-		Name:      cat.Name,
-		CreatedAt: cat.CreatedAt,
-		UpdatedAt: cat.UpdatedAt,
-		TaskCount: len(cat.Tasks),
+		ID:              cat.ID,
+		Name:            cat.Name,
+		CreatedAt:       cat.CreatedAt,
+		UpdatedAt:       cat.UpdatedAt,
+		TaskCount:       len(cat.Tasks),
+		EstimateMinutes: cat.EstimateMinutes,
 	}
 
 	if getOutputFormat() == FormatJSON {
@@ -278,6 +282,9 @@ func writeCategoryDetail(w io.Writer, cat domain.Category) error {
 	fmt.Fprintf(w, "Name:    %s\n", detail.Name)
 	fmt.Fprintf(w, "ID:      %s\n", detail.ID)
 	fmt.Fprintf(w, "Tasks:   %d\n", detail.TaskCount)
+	if detail.EstimateMinutes > 0 {
+		fmt.Fprintf(w, "Estimate: %s\n", formatDuration(detail.EstimateMinutes))
+	}
 	fmt.Fprintf(w, "Created: %s\n", detail.CreatedAt)
 	if detail.UpdatedAt != "" {
 		fmt.Fprintf(w, "Updated: %s\n", detail.UpdatedAt)

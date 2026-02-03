@@ -39,7 +39,7 @@ func (m model) renderEditProjectLine() string {
 	)
 }
 
-func renderCategoryLine(name string, selected bool, width int, focused bool) string {
+func renderCategoryLine(name string, estimateMinutes int, selected bool, width int, focused bool) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
@@ -48,11 +48,38 @@ func renderCategoryLine(name string, selected bool, width int, focused bool) str
 	if selected {
 		style = ui.GetSelectedStyle(focused)
 	}
-	if width <= 0 {
-		return style.Render(prefix + name)
+
+	estimateBadge := ""
+	estimateBadgeText := ""
+	if estimateMinutes > 0 {
+		estimateBadgeText = " ~" + FormatEstimate(estimateMinutes)
+		if selected {
+			estimateBadge = ui.GetSelectedStyle(focused).Render(estimateBadgeText)
+		} else {
+			estimateBadge = ui.MutedStyle.Render(estimateBadgeText)
+		}
 	}
-	wrapped := wrapWithPrefix(name, width, prefixWidth, prefix)
-	return style.Render(strings.Join(wrapped.lines, "\n"))
+
+	if width <= 0 {
+		return style.Render(prefix+name) + estimateBadge
+	}
+
+	suffixWidth := len(estimateBadgeText)
+	available := safeWidth(width, prefixWidth+suffixWidth)
+	wrapped := ansi.Wrap(name, available, "")
+	lines := strings.Split(wrapped, "\n")
+	indent := strings.Repeat(" ", prefixWidth)
+
+	var result []string
+	for i, line := range lines {
+		styledLine := style.Render(line)
+		if i == 0 {
+			result = append(result, style.Render(prefix)+styledLine+estimateBadge)
+		} else {
+			result = append(result, style.Render(indent)+styledLine)
+		}
+	}
+	return strings.Join(result, "\n")
 }
 
 func (m model) renderTaskLine(task domain.Task, selected bool, width int, focused bool) string {
@@ -509,10 +536,13 @@ func (m model) categoryInfoLines(catIdx int) []string {
 		}
 	}
 
+	estimateDisplay := FormatEstimateLabel(category.EstimateMinutes)
+
 	lines := []string{
 		ui.DialogTitleStyle.Render("Category Info"),
 		"",
 		fmt.Sprintf("Name:     %s", category.Name),
+		fmt.Sprintf("Estimate: %s", estimateDisplay),
 		fmt.Sprintf("Created:  %s", FormatDateWithRelative(category.CreatedAt)),
 	}
 

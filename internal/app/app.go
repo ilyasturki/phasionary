@@ -398,7 +398,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditCategoryLine()
 		}
-		return renderCategoryLine(category.Name, isSelected, m.ui.Width, focused)
+		return renderCategoryLine(category.Name, category.EstimateMinutes, isSelected, m.ui.Width, focused)
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]

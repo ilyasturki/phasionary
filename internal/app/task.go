@@ -101,21 +101,34 @@ func (m *model) openEstimatePicker() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusTask {
+	if !ok || position.Kind == focusProject {
 		return
 	}
-	task := m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
-	m.ui.EstimatePicker = components.NewEstimatePickerState(task.EstimateMinutes)
+
+	var currentEstimate int
+	if position.Kind == focusTask {
+		currentEstimate = m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex].EstimateMinutes
+	} else {
+		currentEstimate = m.project.Categories[position.CategoryIndex].EstimateMinutes
+	}
+
+	m.ui.EstimatePicker = components.NewEstimatePickerState(currentEstimate)
 	m.ui.Modes.ToEstimatePicker()
 }
 
 func (m *model) selectEstimate(minutes int) {
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusTask {
+	if !ok || position.Kind == focusProject {
 		return
 	}
-	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
-	task.SetEstimate(minutes)
+
+	if position.Kind == focusTask {
+		task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+		task.SetEstimate(minutes)
+	} else {
+		category := &m.project.Categories[position.CategoryIndex]
+		category.SetEstimate(minutes)
+	}
 	m.storeTaskUpdate()
 }
 

@@ -31,11 +31,12 @@ type Project struct {
 }
 
 type Category struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at,omitempty"`
-	Tasks     []Task `json:"tasks"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at,omitempty"`
+	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
+	Tasks           []Task `json:"tasks"`
 }
 
 type Task struct {
@@ -220,6 +221,11 @@ func (t *Task) CycleStatus() bool {
 	}
 	_ = t.SetStatus(nextStatus)
 	return true
+}
+
+func (c *Category) SetEstimate(minutes int) {
+	c.EstimateMinutes = minutes
+	c.UpdatedAt = NowTimestamp()
 }
 
 func (c *Category) AddTask(task Task) {
