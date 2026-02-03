@@ -9,17 +9,19 @@ import (
 )
 
 type State struct {
-	LastProjectID string `json:"last_project_id"`
+	DirectoryProjects map[string]string `json:"directory_projects,omitempty"`
 }
 
 type StateManager struct {
-	path  string
-	state State
+	path       string
+	currentDir string
+	state      State
 }
 
-func NewStateManager(dataDir string) *StateManager {
+func NewStateManager(dataDir, workingDir string) *StateManager {
 	return &StateManager{
-		path: filepath.Join(dataDir, "state.json"),
+		path:       filepath.Join(dataDir, "state.json"),
+		currentDir: workingDir,
 	}
 }
 
@@ -32,7 +34,29 @@ func (m *StateManager) Load() error {
 		}
 		return err
 	}
-	return json.Unmarshal(data, &m.state)
+
+	// Use a temporary struct to handle migration from old format
+	var raw struct {
+		LastProjectID     string            `json:"last_project_id"`
+		DirectoryProjects map[string]string `json:"directory_projects,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	m.state.DirectoryProjects = raw.DirectoryProjects
+	if m.state.DirectoryProjects == nil {
+		m.state.DirectoryProjects = make(map[string]string)
+	}
+
+	// Migrate old last_project_id to directory_projects[""] if not already set
+	if raw.LastProjectID != "" {
+		if _, ok := m.state.DirectoryProjects[""]; !ok {
+			m.state.DirectoryProjects[""] = raw.LastProjectID
+		}
+	}
+
+	return nil
 }
 
 func (m *StateManager) Save() error {
@@ -48,10 +72,24 @@ func (m *StateManager) Save() error {
 }
 
 func (m *StateManager) GetLastProjectID() string {
-	return m.state.LastProjectID
+	if m.state.DirectoryProjects == nil {
+		return ""
+	}
+	if m.currentDir != "" {
+		if id, ok := m.state.DirectoryProjects[m.currentDir]; ok {
+			return id
+		}
+	}
+	return m.state.DirectoryProjects[""]
 }
 
 func (m *StateManager) SetLastProjectID(id string) error {
-	m.state.LastProjectID = id
+	if m.state.DirectoryProjects == nil {
+		m.state.DirectoryProjects = make(map[string]string)
+	}
+	if m.currentDir != "" {
+		m.state.DirectoryProjects[m.currentDir] = id
+	}
+	m.state.DirectoryProjects[""] = id
 	return m.Save()
 }

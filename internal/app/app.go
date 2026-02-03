@@ -417,13 +417,13 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 	return ""
 }
 
-func Run(dataDir string, projectSelector string, cfgManager *config.Manager) error {
+func Run(dataDir string, projectSelector string, cfgManager *config.Manager, workingDir string) error {
 	store := data.NewStore(dataDir)
 	if err := store.Ensure(); err != nil {
 		return err
 	}
 
-	stateManager := data.NewStateManager(dataDir)
+	stateManager := data.NewStateManager(dataDir, workingDir)
 	if err := stateManager.Load(); err != nil {
 		return err
 	}
