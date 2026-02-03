@@ -103,11 +103,11 @@ func (m *Machine) canTransition(target Mode) bool {
 	case ModeHelp:
 		return target == ModeNormal
 	case ModeConfirmDelete:
-		return target == ModeNormal
+		return target == ModeNormal || target == ModeProjectPicker
 	case ModeOptions:
 		return target == ModeNormal
 	case ModeProjectPicker:
-		return target == ModeNormal
+		return target == ModeNormal || target == ModeConfirmDelete
 	case ModeFilter:
 		return target == ModeNormal
 	case ModeExternalEdit:
