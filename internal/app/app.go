@@ -122,9 +122,18 @@ func (m model) handleHelpKey(msg tea.KeyMsg) model {
 func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
 	switch msg.String() {
 	case "y", "enter":
-		m.confirmDeleteAction()
+		if m.ui.Picker.pendingDeleteID != "" {
+			m.confirmDeleteProject()
+		} else {
+			m.confirmDeleteAction()
+		}
 	case "n", "esc":
-		m.ui.Modes.ToNormal()
+		if m.ui.Picker.pendingDeleteID != "" {
+			m.ui.Picker.pendingDeleteID = ""
+			m.ui.Modes.ToProjectPicker()
+		} else {
+			m.ui.Modes.ToNormal()
+		}
 	}
 	return m
 }

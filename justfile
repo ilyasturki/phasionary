@@ -2,12 +2,12 @@
 build:
     go build -o phasionary ./cmd/phasionary
 
-# Run the CLI binary with the test data
+# Run the CLI binary
 run:
-    ./phasionary --data ./data
+    ./phasionary
 
-# Run the CLI binary with the default data
-run-default:
+# Run the CLI binary with the app data
+run-app:
     ./phasionary --data ./data
 
 # Run all tests.

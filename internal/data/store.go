@@ -20,6 +20,7 @@ type ProjectRepository interface {
 	LoadProject(selector string) (domain.Project, error)
 	SaveProject(project domain.Project) error
 	CreateProject(name string) (domain.Project, error)
+	DeleteProject(id string) error
 }
 
 // Store manages JSON persistence in a directory.
@@ -164,4 +165,12 @@ func (s *Store) loadProjectFile(path string) (domain.Project, error) {
 
 func (s *Store) projectPath(id string) string {
 	return filepath.Join(s.Dir, fmt.Sprintf("%s.json", id))
+}
+
+func (s *Store) DeleteProject(id string) error {
+	path := s.projectPath(id)
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		return ErrProjectNotFound
+	}
+	return os.Remove(path)
 }

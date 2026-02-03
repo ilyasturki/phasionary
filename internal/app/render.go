@@ -226,6 +226,10 @@ func truncateText(s string, max int) string {
 }
 
 func (m model) confirmDeleteView() string {
+	if m.ui.Picker.pendingDeleteID != "" {
+		return m.confirmDeleteProjectView()
+	}
+
 	position, ok := m.selectedPosition()
 	if !ok || position.Kind == focusProject {
 		return ""
@@ -240,6 +244,22 @@ func (m model) confirmDeleteView() string {
 	}
 	lines := []string{
 		message,
+		"",
+		ui.DialogHintStyle.Render("y/enter confirm | n/esc cancel"),
+	}
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (m model) confirmDeleteProjectView() string {
+	var projectName string
+	for _, p := range m.ui.Picker.projects {
+		if p.ID == m.ui.Picker.pendingDeleteID {
+			projectName = p.Name
+			break
+		}
+	}
+	lines := []string{
+		fmt.Sprintf("Delete project %q?", truncateText(projectName, 30)),
 		"",
 		ui.DialogHintStyle.Render("y/enter confirm | n/esc cancel"),
 	}
@@ -370,7 +390,7 @@ func (m model) projectPickerView() string {
 		lines = append(lines, ui.DialogHintStyle.Render("  ↓ more below"))
 	}
 
-	hintText := "j/k navigate | enter select | esc cancel"
+	hintText := "j/k navigate | enter select | d delete | esc cancel"
 	if m.ui.Picker.isAdding {
 		hintText = "enter create | esc cancel"
 	}

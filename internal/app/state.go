@@ -75,11 +75,12 @@ type OptionsState struct {
 }
 
 type ProjectPickerState struct {
-	projects     []domain.Project
-	selected     int
-	scrollOffset int
-	isAdding     bool
-	input        textinput.Model
+	projects        []domain.Project
+	selected        int
+	scrollOffset    int
+	isAdding        bool
+	input           textinput.Model
+	pendingDeleteID string
 }
 
 func (p *ProjectPickerState) reset() {
@@ -88,6 +89,7 @@ func (p *ProjectPickerState) reset() {
 	p.scrollOffset = 0
 	p.isAdding = false
 	p.input = textinput.Model{}
+	p.pendingDeleteID = ""
 }
 
 func (p *ProjectPickerState) totalItems() int {

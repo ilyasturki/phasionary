@@ -48,6 +48,8 @@ func (m model) handleProjectPickerKey(msg tea.KeyMsg) (model, tea.Cmd) {
 		} else {
 			m.selectProject()
 		}
+	case "d":
+		m.initiateProjectDelete()
 	case "esc", "q":
 		if m.project.ID == "" {
 			return m, tea.Quit
@@ -56,6 +58,79 @@ func (m model) handleProjectPickerKey(msg tea.KeyMsg) (model, tea.Cmd) {
 		m.ui.Modes.ToNormal()
 	}
 	return m, nil
+}
+
+func (m *model) initiateProjectDelete() {
+	if m.ui.Picker.isOnAddButton() {
+		return
+	}
+	if len(m.ui.Picker.projects) <= 1 {
+		m.ui.StatusMsg = "Cannot delete the only project"
+		return
+	}
+	selectedProject := m.ui.Picker.projects[m.ui.Picker.selected]
+	m.ui.Picker.pendingDeleteID = selectedProject.ID
+	m.ui.Modes.ToConfirmDelete()
+}
+
+func (m *model) confirmDeleteProject() {
+	deleteID := m.ui.Picker.pendingDeleteID
+	if deleteID == "" {
+		return
+	}
+
+	var deletedProjectName string
+	for _, p := range m.ui.Picker.projects {
+		if p.ID == deleteID {
+			deletedProjectName = p.Name
+			break
+		}
+	}
+
+	if err := m.deps.Store.DeleteProject(deleteID); err != nil {
+		m.ui.StatusMsg = fmt.Sprintf("Error deleting project: %v", err)
+		m.ui.Picker.pendingDeleteID = ""
+		m.ui.Modes.ToProjectPicker()
+		return
+	}
+
+	if m.project.ID == deleteID {
+		projects, err := m.deps.Store.ListProjects()
+		if err != nil {
+			m.ui.StatusMsg = fmt.Sprintf("Error loading projects: %v", err)
+			m.ui.Picker.pendingDeleteID = ""
+			m.ui.Modes.ToProjectPicker()
+			return
+		}
+		if len(projects) > 0 {
+			m.project = projects[0]
+			_ = m.deps.StateManager.SetLastProjectID(m.project.ID)
+			m.ui.Filter = NewFilterState()
+			positions := rebuildPositions(m.project.Categories, &m.ui.Filter)
+			initialSelection := findFirstTaskIndex(positions)
+			m.ui.Selection.SetPositions(toSelectionPositions(positions))
+			m.ui.Selection.SetSelected(initialSelection)
+			m.ui.ScrollOffset = 0
+		}
+	}
+
+	projects, err := m.deps.Store.ListProjects()
+	if err != nil {
+		m.ui.StatusMsg = fmt.Sprintf("Error reloading projects: %v", err)
+	} else {
+		m.ui.Picker.projects = projects
+		if m.ui.Picker.selected >= len(projects) {
+			m.ui.Picker.selected = len(projects) - 1
+		}
+		if m.ui.Picker.selected < 0 {
+			m.ui.Picker.selected = 0
+		}
+		m.ui.Picker.ensureVisible()
+	}
+
+	m.ui.StatusMsg = fmt.Sprintf("Deleted project: %s", deletedProjectName)
+	m.ui.Picker.pendingDeleteID = ""
+	m.ui.Modes.ToProjectPicker()
 }
 
 func (m model) handlePickerAddKey(msg tea.KeyMsg) (model, tea.Cmd) {
