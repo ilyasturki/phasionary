@@ -84,6 +84,8 @@ phasionary -p "myproj"  # Open specific project by name
 | `A` | Add new category |
 | `d` | Delete selected |
 | `y` | Copy to clipboard |
+| `x` | Cut task |
+| `p` | Paste task |
 | `e` | Edit in external editor |
 | `h` / `l` | Decrease / Increase priority |
 | `J` / `K` | Move item down / up |
@@ -95,7 +97,7 @@ phasionary -p "myproj"  # Open specific project by name
 | Key | Action |
 |-----|--------|
 | `?` | Toggle help |
-| `p` | Open project picker |
+| `P` | Open project picker |
 | `o` | Open options |
 | `f` | Filter tasks |
 | `i` | View item info |
