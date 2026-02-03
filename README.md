@@ -105,7 +105,7 @@ phasionary -p "myproj"  # Open specific project by name
 
 ## Data Storage
 
-Projects are stored as JSON files in `~/.local/share/phasionary/`.
+Projects are stored as JSON files in `~/.local/share/phasionary/projects/`.
 
 Configuration is stored in `~/.config/phasionary/config.json`.
 

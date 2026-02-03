@@ -35,7 +35,7 @@ func ResolveDataDir(input string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".local", "share", "phasionary"), nil
+	return filepath.Join(home, ".local", "share", "phasionary", "projects"), nil
 }
 
 // ResolveConfigDir returns the config directory path.

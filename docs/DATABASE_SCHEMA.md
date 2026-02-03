@@ -7,12 +7,12 @@
 - Directory auto-created on startup if missing
 
 ## Storage Locations
-- Linux: `~/.local/share/phasionary/`
+- Linux: `~/.local/share/phasionary/projects/`
 - Override with `PHASIONARY_DATA_PATH`
 
 ## Directory Structure
 ```
-~/.local/share/phasionary/
+~/.local/share/phasionary/projects/
 ├── {project-uuid-1}.json
 ├── {project-uuid-2}.json
 └── ...

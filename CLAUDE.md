@@ -10,7 +10,7 @@ Phasionary is a terminal-first, single-user project planning tool. Local-only, o
 
 - **TUI**: bubbletea + lipgloss
 - **CLI**: cobra + viper
-- **Storage**: Local JSON files (one per project) in `~/.local/share/phasionary/`
+- **Storage**: Local JSON files (one per project) in `~/.local/share/phasionary/projects/`
 - **Tests**: go test + testify
 - **Packaging**: goreleaser
 
