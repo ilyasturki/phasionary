@@ -40,9 +40,11 @@ func newRootCmd() *cobra.Command {
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 
-	cmd.PersistentFlags().String("config", "", "override config directory path")
-	cmd.PersistentFlags().String("data", "", "override data directory path")
-	cmd.PersistentFlags().String("project", "", "target project for commands")
+	cmd.PersistentFlags().StringP("config", "c", "", "override config directory path")
+	cmd.PersistentFlags().StringP("data", "d", "", "override data directory path")
+	cmd.PersistentFlags().StringP("project", "p", "", "target project for commands")
+	cmd.PersistentFlags().BoolP("json", "j", false, "output in JSON format")
+	cmd.PersistentFlags().BoolP("quiet", "q", false, "suppress non-essential output")
 
 	viper.AutomaticEnv()
 	if err := viper.BindEnv("config", config.EnvConfigPath); err != nil {
@@ -60,10 +62,23 @@ func newRootCmd() *cobra.Command {
 	if err := viper.BindPFlag("project", cmd.PersistentFlags().Lookup("project")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
+	if err := viper.BindPFlag("json", cmd.PersistentFlags().Lookup("json")); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	if err := viper.BindPFlag("quiet", cmd.PersistentFlags().Lookup("quiet")); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newProjectCmd())
+	cmd.AddCommand(newProjectsCmd())
 	cmd.AddCommand(newTaskCmd())
+	cmd.AddCommand(newTasksCmd())
+	cmd.AddCommand(newCategoryCmd())
+	cmd.AddCommand(newCategoriesCmd())
+	cmd.AddCommand(newExportCmd())
+	cmd.AddCommand(newImportCmd())
+	cmd.AddCommand(newConfigCmd())
 	cmd.AddCommand(newVersionCmd())
 
 	return cmd

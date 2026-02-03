@@ -15,7 +15,8 @@ const (
 
 // Config holds user preferences.
 type Config struct {
-	StatusDisplay string `json:"status_display,omitempty"`
+	StatusDisplay  string `json:"status_display,omitempty"`
+	DefaultProject string `json:"default_project,omitempty"`
 }
 
 // DefaultConfig returns a Config with default values.

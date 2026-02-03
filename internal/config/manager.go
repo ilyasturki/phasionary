@@ -64,3 +64,13 @@ func (m *Manager) Update(fn func(*Config)) error {
 	fn(&m.cfg)
 	return m.Save()
 }
+
+// SetDefaultProject sets the default project ID.
+func (m *Manager) SetDefaultProject(projectID string) {
+	m.cfg.DefaultProject = projectID
+}
+
+// Path returns the path to the config file.
+func (m *Manager) Path() string {
+	return m.path
+}
