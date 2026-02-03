@@ -3,7 +3,6 @@
 A terminal-first, keyboard-driven project planning tool. Local-only, offline by default.
 
 ![Screenshot](docs/screenshot.png)
-<!-- TODO: Add screenshot -->
 
 ## Features
 
@@ -18,7 +17,7 @@ A terminal-first, keyboard-driven project planning tool. Local-only, offline by 
 ### From source
 
 ```bash
-git clone https://github.com/yourusername/phasionary.git
+git clone https://github.com/ilyasturki/phasionary.git
 cd phasionary
 go build -o phasionary ./cmd/phasionary
 ```
@@ -26,7 +25,7 @@ go build -o phasionary ./cmd/phasionary
 ### NixOS
 
 ```bash
-nix run github:yourusername/phasionary
+nix run github:ilyasturki/phasionary
 ```
 
 ## Usage
