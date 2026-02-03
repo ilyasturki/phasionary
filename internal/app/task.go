@@ -289,10 +289,14 @@ func sortCategoryTasks(tasks []domain.Task, ascending bool) {
 }
 
 func (m *model) sortTasksByStatus() {
+	ascending := true
+	m.ui.LastSortAscending = &ascending
 	m.sortTasksByStatusOrder(true)
 }
 
 func (m *model) sortTasksByStatusReverse() {
+	ascending := false
+	m.ui.LastSortAscending = &ascending
 	m.sortTasksByStatusOrder(false)
 }
 

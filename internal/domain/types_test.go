@@ -107,6 +107,45 @@ func TestCategory_AddTask(t *testing.T) {
 	})
 }
 
+func TestCategory_InsertTask(t *testing.T) {
+	t.Run("inserts task at specified index", func(t *testing.T) {
+		cat := Category{Tasks: []Task{
+			{ID: "1"}, {ID: "3"},
+		}}
+		task := Task{ID: "2"}
+		cat.InsertTask(1, task)
+		assert.Len(t, cat.Tasks, 3)
+		assert.Equal(t, "1", cat.Tasks[0].ID)
+		assert.Equal(t, "2", cat.Tasks[1].ID)
+		assert.Equal(t, "3", cat.Tasks[2].ID)
+	})
+
+	t.Run("inserts at beginning with index 0", func(t *testing.T) {
+		cat := Category{Tasks: []Task{{ID: "2"}}}
+		task := Task{ID: "1"}
+		cat.InsertTask(0, task)
+		assert.Len(t, cat.Tasks, 2)
+		assert.Equal(t, "1", cat.Tasks[0].ID)
+		assert.Equal(t, "2", cat.Tasks[1].ID)
+	})
+
+	t.Run("appends at end for out of range index", func(t *testing.T) {
+		cat := Category{Tasks: []Task{{ID: "1"}}}
+		task := Task{ID: "2"}
+		cat.InsertTask(100, task)
+		assert.Len(t, cat.Tasks, 2)
+		assert.Equal(t, "2", cat.Tasks[1].ID)
+	})
+
+	t.Run("inserts at end for negative index (clamped)", func(t *testing.T) {
+		cat := Category{Tasks: []Task{{ID: "1"}}}
+		task := Task{ID: "2"}
+		cat.InsertTask(-1, task)
+		assert.Len(t, cat.Tasks, 2)
+		assert.Equal(t, "2", cat.Tasks[1].ID)
+	})
+}
+
 func TestCategory_RemoveTask(t *testing.T) {
 	t.Run("removes task at valid index", func(t *testing.T) {
 		cat := Category{Tasks: []Task{

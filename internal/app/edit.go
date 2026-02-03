@@ -42,9 +42,18 @@ func (m *model) startAddingTask() {
 	if err != nil {
 		return
 	}
-	m.project.Categories[catIndex].AddTask(newTask)
+
+	insertAtTop := m.ui.LastSortAscending == nil || *m.ui.LastSortAscending
+	var taskIndex int
+	if insertAtTop {
+		m.project.Categories[catIndex].InsertTask(0, newTask)
+		taskIndex = 0
+	} else {
+		m.project.Categories[catIndex].AddTask(newTask)
+		taskIndex = len(m.project.Categories[catIndex].Tasks) - 1
+	}
+
 	m.rebuildPositions()
-	taskIndex := len(m.project.Categories[catIndex].Tasks) - 1
 	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
 		return p.Kind == selection.FocusTask && p.CategoryIndex == catIndex && p.TaskIndex == taskIndex
 	})

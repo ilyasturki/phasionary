@@ -227,6 +227,16 @@ func (c *Category) AddTask(task Task) {
 	c.UpdatedAt = NowTimestamp()
 }
 
+func (c *Category) InsertTask(index int, task Task) {
+	if index < 0 || index > len(c.Tasks) {
+		index = len(c.Tasks)
+	}
+	c.Tasks = append(c.Tasks, Task{})
+	copy(c.Tasks[index+1:], c.Tasks[index:])
+	c.Tasks[index] = task
+	c.UpdatedAt = NowTimestamp()
+}
+
 func (c *Category) RemoveTask(index int) error {
 	if index < 0 || index >= len(c.Tasks) {
 		return errors.New("task index out of range")
