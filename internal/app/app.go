@@ -59,6 +59,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorFinishedMsg:
 		m.handleEditorFinished(msg)
 		return m, nil
+	case tea.FocusMsg:
+		m.ui.WindowFocused = true
+	case tea.BlurMsg:
+		m.ui.WindowFocused = false
 	case tea.MouseMsg:
 		if !m.ui.Modes.IsNormal() {
 			break
@@ -380,27 +384,28 @@ func (m model) View() string {
 
 func (m model) renderLayoutItem(item LayoutItem) string {
 	isSelected := item.PositionIndex >= 0 && item.PositionIndex == m.selected()
+	focused := m.ui.WindowFocused
 
 	switch item.Kind {
 	case LayoutProject:
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditProjectLine()
 		}
-		return renderProjectLine(m.project.Name, isSelected)
+		return renderProjectLine(m.project.Name, isSelected, focused)
 
 	case LayoutCategory:
 		category := m.project.Categories[item.CategoryIndex]
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditCategoryLine()
 		}
-		return renderCategoryLine(category.Name, isSelected, m.ui.Width)
+		return renderCategoryLine(category.Name, isSelected, m.ui.Width, focused)
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditTaskLine(task)
 		}
-		return m.renderTaskLine(task, isSelected, m.ui.Width)
+		return m.renderTaskLine(task, isSelected, m.ui.Width, focused)
 
 	case LayoutEmptyCategory:
 		return ui.MutedStyle.Render("  (no tasks)")
@@ -480,7 +485,7 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager) err
 		}
 	}
 
-	program := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	program := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
 	_, err = program.Run()
 	return err
 }

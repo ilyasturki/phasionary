@@ -12,14 +12,14 @@ import (
 	"phasionary/internal/ui"
 )
 
-func renderProjectLine(name string, selected bool) string {
+func renderProjectLine(name string, selected bool, focused bool) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
 	line := fmt.Sprintf("%s■ %s", prefix, name)
 	if selected {
-		return ui.SelectedStyle.Render(line)
+		return ui.GetSelectedStyle(focused).Render(line)
 	}
 	return ui.HeaderStyle.Render(line)
 }
@@ -28,7 +28,7 @@ func (m model) renderEditProjectLine() string {
 	prefix := "> "
 	icon := "■ "
 	split := splitAtCursor(m.ui.Edit.input.Value(), m.ui.Edit.input.Position())
-	cursorStyle := ui.SelectedStyle
+	cursorStyle := ui.GetCursorStyle(m.ui.WindowFocused)
 	return fmt.Sprintf(
 		"%s%s%s%s%s",
 		prefix,
@@ -39,14 +39,14 @@ func (m model) renderEditProjectLine() string {
 	)
 }
 
-func renderCategoryLine(name string, selected bool, width int) string {
+func renderCategoryLine(name string, selected bool, width int, focused bool) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
 	style := ui.CategoryStyle
 	if selected {
-		style = ui.SelectedStyle
+		style = ui.GetSelectedStyle(focused)
 	}
 	if width <= 0 {
 		return style.Render(prefix + name)
@@ -55,8 +55,8 @@ func renderCategoryLine(name string, selected bool, width int) string {
 	return style.Render(strings.Join(wrapped.lines, "\n"))
 }
 
-func (m model) renderTaskLine(task domain.Task, selected bool, width int) string {
-	renderer := components.NewTaskLineRenderer(width, m.deps.CfgManager.Get().StatusDisplay)
+func (m model) renderTaskLine(task domain.Task, selected bool, width int, focused bool) string {
+	renderer := components.NewTaskLineRenderer(width, m.deps.CfgManager.Get().StatusDisplay, focused)
 	return renderer.Render(task, selected)
 }
 
@@ -95,8 +95,8 @@ func formatStatus(status, displayMode string) string {
 
 func (m model) renderEditCategoryLine() string {
 	prefix := "> "
+	cursorStyle := ui.GetCursorStyle(m.ui.WindowFocused)
 	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
-		cursorStyle := ui.SelectedStyle
 		placeholder := ui.MutedStyle.Render("Enter category name...")
 		styledText := cursorStyle.Render(" ") + placeholder
 		if m.ui.Width > 0 {
@@ -105,7 +105,7 @@ func (m model) renderEditCategoryLine() string {
 		}
 		return prefix + styledText
 	}
-	return renderCursorLine(m.ui.Edit.input.Value(), m.ui.Edit.input.Position(), m.ui.Width, prefixWidth, prefix, ui.CategoryStyle, ui.SelectedStyle)
+	return renderCursorLine(m.ui.Edit.input.Value(), m.ui.Edit.input.Position(), m.ui.Width, prefixWidth, prefix, ui.CategoryStyle, cursorStyle)
 }
 
 func (m model) renderEditTaskLine(task domain.Task) string {
@@ -121,8 +121,8 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	}
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, statusText, iconPrefix)
 	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, m.deps.CfgManager.Get().StatusDisplay) + "] " + iconPlain)
+	cursorStyle := ui.GetCursorStyle(m.ui.WindowFocused)
 	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
-		cursorStyle := ui.SelectedStyle
 		placeholder := ui.MutedStyle.Render("Enter task title...")
 		styledText := cursorStyle.Render(" ") + placeholder
 		if m.ui.Width > 0 {
@@ -149,7 +149,7 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		split := splitAtCursor(edited, m.ui.Edit.input.Position())
 		return prefixPart +
 			titleStyle.Render(split.left) +
-			ui.SelectedStyle.Render(split.cursorCh) +
+			cursorStyle.Render(split.cursorCh) +
 			titleStyle.Render(split.right)
 	}
 	available := safeWidth(m.ui.Width, overhead)
@@ -168,9 +168,9 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 			l := string(lineRunes[:offset])
 			c := string(lineRunes[offset])
 			r := string(lineRunes[offset+1:])
-			styledLine = titleStyle.Render(l) + ui.SelectedStyle.Render(c) + titleStyle.Render(r)
+			styledLine = titleStyle.Render(l) + cursorStyle.Render(c) + titleStyle.Render(r)
 		} else if cursor == pos+lineLen {
-			styledLine = titleStyle.Render(line) + ui.SelectedStyle.Render(" ")
+			styledLine = titleStyle.Render(line) + cursorStyle.Render(" ")
 		} else {
 			styledLine = titleStyle.Render(line)
 		}
@@ -410,7 +410,7 @@ func (m model) renderAddProjectLine(isSelected bool) string {
 		return fmt.Sprintf("%s+ %s%s%s",
 			prefix,
 			split.left,
-			ui.SelectedStyle.Render(split.cursorCh),
+			ui.GetCursorStyle(m.ui.WindowFocused).Render(split.cursorCh),
 			split.right,
 		)
 	}

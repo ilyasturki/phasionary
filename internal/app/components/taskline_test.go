@@ -10,15 +10,16 @@ import (
 )
 
 func TestNewTaskLineRenderer(t *testing.T) {
-	renderer := NewTaskLineRenderer(80, "text")
+	renderer := NewTaskLineRenderer(80, "text", true)
 	assert.NotNil(t, renderer)
 	assert.Equal(t, 80, renderer.width)
 	assert.Equal(t, "text", renderer.statusDisplay)
+	assert.True(t, renderer.focused)
 }
 
 func TestTaskLineRenderer_Render(t *testing.T) {
 	t.Run("renders unselected task", func(t *testing.T) {
-		renderer := NewTaskLineRenderer(0, "text")
+		renderer := NewTaskLineRenderer(0, "text", true)
 		task := domain.Task{
 			Title:    "Test task",
 			Status:   domain.StatusTodo,
@@ -31,7 +32,7 @@ func TestTaskLineRenderer_Render(t *testing.T) {
 	})
 
 	t.Run("renders selected task with cursor prefix", func(t *testing.T) {
-		renderer := NewTaskLineRenderer(0, "text")
+		renderer := NewTaskLineRenderer(0, "text", true)
 		task := domain.Task{
 			Title:    "Test task",
 			Status:   domain.StatusInProgress,
@@ -43,7 +44,7 @@ func TestTaskLineRenderer_Render(t *testing.T) {
 	})
 
 	t.Run("wraps long task titles", func(t *testing.T) {
-		renderer := NewTaskLineRenderer(40, "text")
+		renderer := NewTaskLineRenderer(40, "text", true)
 		task := domain.Task{
 			Title:  "This is a very long task title that should wrap to multiple lines",
 			Status: domain.StatusTodo,
@@ -54,7 +55,7 @@ func TestTaskLineRenderer_Render(t *testing.T) {
 	})
 
 	t.Run("renders with icon status display", func(t *testing.T) {
-		renderer := NewTaskLineRenderer(0, "icons")
+		renderer := NewTaskLineRenderer(0, "icons", true)
 		task := domain.Task{
 			Title:  "Test task",
 			Status: domain.StatusCompleted,
@@ -67,7 +68,7 @@ func TestTaskLineRenderer_Render(t *testing.T) {
 
 func TestTaskLineRenderer_StatusLabel(t *testing.T) {
 	t.Run("returns text labels when not icons mode", func(t *testing.T) {
-		renderer := NewTaskLineRenderer(0, "text")
+		renderer := NewTaskLineRenderer(0, "text", true)
 		assert.Contains(t, renderer.statusLabel(domain.StatusTodo), "todo")
 		assert.Contains(t, renderer.statusLabel(domain.StatusInProgress), "progress")
 		assert.Contains(t, renderer.statusLabel(domain.StatusCompleted), "completed")
@@ -75,7 +76,7 @@ func TestTaskLineRenderer_StatusLabel(t *testing.T) {
 	})
 
 	t.Run("returns icons when icons mode", func(t *testing.T) {
-		renderer := NewTaskLineRenderer(0, "icons")
+		renderer := NewTaskLineRenderer(0, "icons", true)
 		assert.Equal(t, " ", renderer.statusLabel(domain.StatusTodo))
 		assert.Equal(t, "/", renderer.statusLabel(domain.StatusInProgress))
 		assert.Equal(t, "x", renderer.statusLabel(domain.StatusCompleted))

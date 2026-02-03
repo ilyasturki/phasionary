@@ -74,3 +74,55 @@ func SelectedStatusStyle(status string) lipgloss.Style {
 		return base.Foreground(lipgloss.Color("3")) // yellow text for todo
 	}
 }
+
+// Unfocused selection style (underline, no background - works in light/dark modes)
+var UnfocusedSelectedStyle = lipgloss.NewStyle().Bold(true).Underline(true)
+
+// Unfocused cursor style for edit mode (underline only)
+var UnfocusedCursorStyle = lipgloss.NewStyle().Underline(true)
+
+func GetSelectedStyle(focused bool) lipgloss.Style {
+	if focused {
+		return SelectedStyle
+	}
+	return UnfocusedSelectedStyle
+}
+
+func GetSelectedStatusStyle(status string, focused bool) lipgloss.Style {
+	if focused {
+		return SelectedStatusStyle(status)
+	}
+	// Unfocused: use underline with status color
+	switch status {
+	case "in_progress":
+		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("4"))
+	case "completed":
+		return lipgloss.NewStyle().Bold(true).Underline(true).Faint(true)
+	case "cancelled":
+		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("1"))
+	default:
+		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("3"))
+	}
+}
+
+func GetSelectedPriorityStyle(priority string, focused bool) lipgloss.Style {
+	if focused {
+		return SelectedPriorityStyle(priority)
+	}
+	// Unfocused: use underline with priority color
+	switch priority {
+	case "high":
+		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("1"))
+	case "low":
+		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("6"))
+	default:
+		return lipgloss.NewStyle().Bold(true).Underline(true)
+	}
+}
+
+func GetCursorStyle(focused bool) lipgloss.Style {
+	if focused {
+		return SelectedStyle
+	}
+	return UnfocusedCursorStyle
+}

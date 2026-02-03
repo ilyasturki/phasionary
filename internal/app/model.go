@@ -23,6 +23,7 @@ type UIState struct {
 	Width              int
 	Height             int
 	LastSortAscending  *bool
+	WindowFocused      bool
 }
 
 type Dependencies struct {
@@ -33,9 +34,10 @@ type Dependencies struct {
 
 func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {
 	return &UIState{
-		Selection: sel,
-		Modes:     modeMachine,
-		Filter:    NewFilterState(),
+		Selection:     sel,
+		Modes:         modeMachine,
+		Filter:        NewFilterState(),
+		WindowFocused: true,
 	}
 }
 

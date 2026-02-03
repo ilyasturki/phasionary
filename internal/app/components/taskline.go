@@ -14,12 +14,14 @@ import (
 type TaskLineRenderer struct {
 	width         int
 	statusDisplay string
+	focused       bool
 }
 
-func NewTaskLineRenderer(width int, statusDisplay string) *TaskLineRenderer {
+func NewTaskLineRenderer(width int, statusDisplay string, focused bool) *TaskLineRenderer {
 	return &TaskLineRenderer{
 		width:         width,
 		statusDisplay: statusDisplay,
+		focused:       focused,
 	}
 }
 
@@ -55,8 +57,9 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 
 func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon string) string {
 	statusText := r.statusLabel(task.Status)
-	priorityStyle := ui.SelectedPriorityStyle(task.Priority)
-	statusStyle := ui.SelectedStatusStyle(task.Status)
+	priorityStyle := ui.GetSelectedPriorityStyle(task.Priority, r.focused)
+	statusStyle := ui.GetSelectedStatusStyle(task.Status, r.focused)
+	selectedStyle := ui.GetSelectedStyle(r.focused)
 
 	icon := ""
 	iconText := ""
@@ -68,9 +71,9 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, true)
 	estimateText := r.estimateBadgeText(task.EstimateMinutes)
 
-	prefixPart := ui.SelectedStyle.Render(prefix+"[") +
+	prefixPart := selectedStyle.Render(prefix+"[") +
 		statusStyle.Render(statusText) +
-		ui.SelectedStyle.Render("] ") + icon
+		selectedStyle.Render("] ") + icon
 
 	if r.width <= 0 {
 		return prefixPart + priorityStyle.Render(task.Title) + estimate
@@ -106,6 +109,7 @@ func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart strin
 	wrapped := ansi.Wrap(title, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
+	selectedStyle := ui.GetSelectedStyle(r.focused)
 
 	var result []string
 	for i, line := range wrapLines {
@@ -113,7 +117,7 @@ func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart strin
 		if i == 0 {
 			result = append(result, prefixPart+styledTitle+suffix)
 		} else {
-			styledIndent := ui.SelectedStyle.Render(indent)
+			styledIndent := selectedStyle.Render(indent)
 			result = append(result, styledIndent+styledTitle)
 		}
 	}
@@ -171,7 +175,7 @@ func (r *TaskLineRenderer) formatEstimateBadge(minutes int, selected bool) strin
 		return ""
 	}
 	if selected {
-		return ui.SelectedStyle.Render(text)
+		return ui.GetSelectedStyle(r.focused).Render(text)
 	}
 	return ui.MutedStyle.Render(text)
 }
