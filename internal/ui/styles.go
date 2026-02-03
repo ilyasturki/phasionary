@@ -38,6 +38,14 @@ func PriorityStyle(priority string) lipgloss.Style {
 	}
 }
 
+func TaskTitleStyle(priority, status string) lipgloss.Style {
+	base := PriorityStyle(priority)
+	if status == "completed" || status == "cancelled" {
+		return base.Faint(true)
+	}
+	return base
+}
+
 func PriorityIcon(priority string) string {
 	switch priority {
 	case "high":

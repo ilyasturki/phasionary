@@ -42,10 +42,10 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 	status := r.formatStatus(task.Status, false)
 	icon := ""
 	if priorityIcon != "" {
-		icon = ui.PriorityStyle(task.Priority).Render(priorityIcon) + " "
+		icon = ui.TaskTitleStyle(task.Priority, task.Status).Render(priorityIcon) + " "
 	}
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, false)
-	titleStyle := ui.PriorityStyle(task.Priority)
+	titleStyle := ui.TaskTitleStyle(task.Priority, task.Status)
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, status, icon)
 
 	if r.width <= 0 {
