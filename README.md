@@ -24,8 +24,31 @@ go build -o phasionary ./cmd/phasionary
 
 ### NixOS
 
+Try it without installing:
+
 ```bash
 nix run github:ilyasturki/phasionary
+```
+
+To add to your NixOS configuration, add the flake input:
+
+```nix
+# flake.nix
+{
+  inputs.phasionary.url = "github:ilyasturki/phasionary";
+}
+```
+
+Then add the package (pass `inputs` via `specialArgs`):
+
+```nix
+# configuration.nix or home-manager
+{ inputs, ... }:
+{
+  environment.systemPackages = [
+    inputs.phasionary.packages.x86_64-linux.default
+  ];
+}
 ```
 
 ## Usage
