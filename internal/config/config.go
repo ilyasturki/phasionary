@@ -26,10 +26,10 @@ func DefaultConfig() Config {
 
 func ResolveDataDir(input string) (string, error) {
 	if input != "" {
-		return input, nil
+		return filepath.Join(input, "projects"), nil
 	}
 	if env := os.Getenv(EnvDataPath); env != "" {
-		return env, nil
+		return filepath.Join(env, "projects"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
