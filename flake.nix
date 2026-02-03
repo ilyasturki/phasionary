@@ -24,6 +24,16 @@
             "-w"
             "-X phasionary/internal/version.Version=${version}"
           ];
+
+          nativeBuildInputs = [ pkgs.installShellFiles ];
+
+          postInstall = ''
+            installShellCompletion --cmd phasionary \
+              --bash <($out/bin/phasionary completion bash) \
+              --zsh <($out/bin/phasionary completion zsh) \
+              --fish <($out/bin/phasionary completion fish)
+          '';
+
           meta.platforms = pkgs.lib.platforms.linux;
         };
         default = self.packages.${system}.phasionary;
