@@ -5,26 +5,38 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      version = "0.1.1";
     in
     {
       packages.${system} = {
         phasionary = pkgs.buildGoModule {
           pname = "phasionary";
-          version = "0.1.0";
+          inherit version;
           src = ./.;
           vendorHash = "sha256-tndx/Cjoc5Wm09xKiFR4LBFwQJONEhZkhyKPzsAYYbI=";
-          ldflags = [ "-s" "-w" ];
+          ldflags = [
+            "-s"
+            "-w"
+            "-X phasionary/internal/version.Version=${version}"
+          ];
           meta.platforms = pkgs.lib.platforms.linux;
         };
         default = self.packages.${system}.phasionary;
       };
 
       devShells.${system}.default = pkgs.mkShell {
-        buildInputs = with pkgs; [ go gopls gotools delve just ];
+        buildInputs = with pkgs; [
+          go
+          gopls
+          gotools
+          delve
+          just
+        ];
       };
 
       apps.${system}.default = {

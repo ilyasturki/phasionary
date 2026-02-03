@@ -1,6 +1,6 @@
 # Build the CLI binary.
 build:
-    go build -o phasionary ./cmd/phasionary
+    go build -ldflags "-X phasionary/internal/version.Version=$(git describe --tags --always) -X phasionary/internal/version.Commit=$(git rev-parse --short HEAD) -X phasionary/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o phasionary ./cmd/phasionary
 
 # Run the CLI binary
 run:
