@@ -14,6 +14,7 @@ const (
 	LayoutCategory
 	LayoutTask
 	LayoutEmptyCategory // "(no tasks)" placeholder
+	LayoutFolded        // "(folded)" placeholder
 	LayoutSpacing       // Blank lines between elements
 )
 
@@ -51,14 +52,16 @@ type LayoutBuilder struct {
 	width         int
 	statusDisplay string
 	filter        *FilterState
+	fold          *FoldState
 }
 
-func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filter *FilterState) *LayoutBuilder {
+func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filter *FilterState, fold *FoldState) *LayoutBuilder {
 	return &LayoutBuilder{
 		config:        config,
 		width:         width,
 		statusDisplay: statusDisplay,
 		filter:        filter,
+		fold:          fold,
 	}
 }
 
@@ -104,8 +107,8 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []focusPosition)
 			totalHeight += b.config.BlankBetweenCats
 		}
 
-		// Category header
-		catHeight := countWrappedLines(category.Name, b.width, prefixWidth)
+		// Category header (add extra width for fold indicator)
+		catHeight := countWrappedLines(category.Name, b.width, prefixWidth+2)
 		items = append(items, LayoutItem{
 			Kind:          LayoutCategory,
 			Height:        catHeight,
@@ -115,6 +118,19 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []focusPosition)
 		})
 		totalHeight += catHeight
 		posIndex++
+
+		isFolded := b.fold != nil && b.fold.IsFolded(category.ID)
+		if isFolded {
+			items = append(items, LayoutItem{
+				Kind:          LayoutFolded,
+				Height:        1,
+				PositionIndex: -1,
+				CategoryIndex: catIdx,
+				TaskIndex:     -1,
+			})
+			totalHeight++
+			continue
+		}
 
 		visibleTaskCount := 0
 		for _, task := range category.Tasks {
@@ -188,7 +204,7 @@ func (b *LayoutBuilder) countTaskLines(task domain.Task) int {
 }
 
 func (m *model) buildLayout() *Layout {
-	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.ui.Width, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter)
+	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.ui.Width, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold)
 	layout := builder.Build(m.project, m.positions())
 	return &layout
 }

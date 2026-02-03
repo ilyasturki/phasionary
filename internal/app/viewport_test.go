@@ -33,7 +33,7 @@ func TestComputeVisibility_ScrollOffsetZero_ProjectVisible(t *testing.T) {
 	}
 
 	// Build layout
-	builder := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil)
+	builder := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil, nil)
 	layout := builder.Build(project, positions)
 
 	// Create viewport with reasonable screen height
@@ -72,7 +72,7 @@ func TestComputeVisibility_ZeroHeight_ProjectStillVisible(t *testing.T) {
 		{Kind: focusTask, CategoryIndex: 0, TaskIndex: 0},
 	}
 
-	builder := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil)
+	builder := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil, nil)
 	layout := builder.Build(project, positions)
 
 	// Create viewport with 0 height (startup condition)
@@ -107,7 +107,7 @@ func TestComputeVisibility_ScrollOffsetNonZero(t *testing.T) {
 		{Kind: focusTask, CategoryIndex: 0, TaskIndex: 1},
 	}
 
-	builder := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil)
+	builder := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil, nil)
 	layout := builder.Build(project, positions)
 	viewport := NewViewport(&layout, 20, DefaultLayoutConfig())
 

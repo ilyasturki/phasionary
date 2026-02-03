@@ -106,7 +106,8 @@ func (m *model) confirmDeleteProject() {
 			m.project = projects[0]
 			_ = m.deps.StateManager.SetLastProjectID(m.project.ID)
 			m.ui.Filter = NewFilterState()
-			positions := rebuildPositions(m.project.Categories, &m.ui.Filter)
+			m.ui.Fold = NewFoldState()
+			positions := rebuildPositions(m.project.Categories, &m.ui.Filter, &m.ui.Fold)
 			initialSelection := findFirstTaskIndex(positions)
 			m.ui.Selection.SetPositions(toSelectionPositions(positions))
 			m.ui.Selection.SetSelected(initialSelection)
@@ -164,7 +165,8 @@ func (m *model) createProjectFromPicker() {
 
 	m.project = project
 	m.ui.Filter = NewFilterState()
-	positions := rebuildPositions(project.Categories, &m.ui.Filter)
+	m.ui.Fold = NewFoldState()
+	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold)
 	initialSelection := findFirstTaskIndex(positions)
 	m.ui.Selection.SetPositions(toSelectionPositions(positions))
 	m.ui.Selection.SetSelected(initialSelection)
@@ -202,7 +204,8 @@ func (m *model) selectProject() {
 
 	m.project = project
 	m.ui.Filter = NewFilterState()
-	positions := rebuildPositions(project.Categories, &m.ui.Filter)
+	m.ui.Fold = NewFoldState()
+	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold)
 	initialSelection := findFirstTaskIndex(positions)
 	m.ui.Selection.SetPositions(toSelectionPositions(positions))
 	m.ui.Selection.SetSelected(initialSelection)

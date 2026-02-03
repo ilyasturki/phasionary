@@ -73,6 +73,9 @@ phasionary -p "myproj"  # Open specific project by name
 | `Ctrl+f` | Page down |
 | `Ctrl+b` | Page up |
 | `zz` | Center on selection |
+| `Tab` / `za` | Fold/unfold category |
+| `zc` | Fold all categories |
+| `zo` | Unfold all categories |
 
 ### Actions
 

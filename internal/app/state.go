@@ -111,6 +111,42 @@ func (p *ProjectPickerState) cancelAdding() {
 	p.input = textinput.Model{}
 }
 
+type FoldState struct {
+	folded map[string]bool
+}
+
+func NewFoldState() FoldState {
+	return FoldState{
+		folded: make(map[string]bool),
+	}
+}
+
+func (f *FoldState) IsFolded(categoryID string) bool {
+	return f.folded[categoryID]
+}
+
+func (f *FoldState) Toggle(categoryID string) {
+	if f.folded[categoryID] {
+		delete(f.folded, categoryID)
+	} else {
+		f.folded[categoryID] = true
+	}
+}
+
+func (f *FoldState) FoldAll(categoryIDs []string) {
+	for _, id := range categoryIDs {
+		f.folded[id] = true
+	}
+}
+
+func (f *FoldState) UnfoldAll() {
+	f.folded = make(map[string]bool)
+}
+
+func (f *FoldState) HasFolded() bool {
+	return len(f.folded) > 0
+}
+
 type EditState struct {
 	input     textinput.Model
 	isAdding  bool

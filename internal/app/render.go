@@ -39,7 +39,7 @@ func (m model) renderEditProjectLine() string {
 	)
 }
 
-func renderCategoryLine(name string, estimateMinutes int, selected bool, width int, focused bool) string {
+func renderCategoryLine(name string, estimateMinutes int, selected bool, folded bool, width int, focused bool) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
@@ -47,6 +47,11 @@ func renderCategoryLine(name string, estimateMinutes int, selected bool, width i
 	style := ui.CategoryStyle
 	if selected {
 		style = ui.GetSelectedStyle(focused)
+	}
+
+	foldIndicator := "▼ "
+	if folded {
+		foldIndicator = "▶ "
 	}
 
 	estimateBadge := ""
@@ -61,20 +66,21 @@ func renderCategoryLine(name string, estimateMinutes int, selected bool, width i
 	}
 
 	if width <= 0 {
-		return style.Render(prefix+name) + estimateBadge
+		return style.Render(prefix+foldIndicator+name) + estimateBadge
 	}
 
 	suffixWidth := len(estimateBadgeText)
-	available := safeWidth(width, prefixWidth+suffixWidth)
+	foldWidth := 2
+	available := safeWidth(width, prefixWidth+foldWidth+suffixWidth)
 	wrapped := ansi.Wrap(name, available, "")
 	lines := strings.Split(wrapped, "\n")
-	indent := strings.Repeat(" ", prefixWidth)
+	indent := strings.Repeat(" ", prefixWidth+foldWidth)
 
 	var result []string
 	for i, line := range lines {
 		styledLine := style.Render(line)
 		if i == 0 {
-			result = append(result, style.Render(prefix)+styledLine+estimateBadge)
+			result = append(result, style.Render(prefix+foldIndicator)+styledLine+estimateBadge)
 		} else {
 			result = append(result, style.Render(indent)+styledLine)
 		}
@@ -241,7 +247,7 @@ func (m model) shortcutsLine() string {
 	if m.ui.Modes.IsEdit() {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | a add task | A add category | enter edit | e external editor | space status | h/l priority | t estimate | y copy | x cut | p paste | d delete | i info | P projects | o options | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | Tab fold | a add task | A add category | enter edit | e external editor | space status | h/l priority | t estimate | y copy | x cut | p paste | d delete | i info | P projects | o options | ? help | q quit")
 }
 
 func truncateText(s string, max int) string {
@@ -302,6 +308,9 @@ func (m model) helpView() string {
 		"  gg            jump to first item",
 		"  G             jump to last item",
 		"  zz            center selection on screen",
+		"  Tab/za        fold/unfold category",
+		"  zc            fold all categories",
+		"  zo            unfold all categories",
 		"  P             switch project",
 		"",
 		ui.DialogTitleStyle.Render("Actions:"),

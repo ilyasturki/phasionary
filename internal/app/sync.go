@@ -11,7 +11,7 @@ func (m *model) storeTaskUpdate() {
 	}
 }
 
-func rebuildPositions(categories []domain.Category, filter *FilterState) []focusPosition {
+func rebuildPositions(categories []domain.Category, filter *FilterState, fold *FoldState) []focusPosition {
 	positions := make([]focusPosition, 0)
 	positions = append(positions, focusPosition{
 		Kind:          focusProject,
@@ -24,6 +24,9 @@ func rebuildPositions(categories []domain.Category, filter *FilterState) []focus
 			CategoryIndex: cIndex,
 			TaskIndex:     -1,
 		})
+		if fold != nil && fold.IsFolded(category.ID) {
+			continue
+		}
 		for tIndex, task := range category.Tasks {
 			if filter != nil && !filter.IsStatusVisible(task.Status) {
 				continue
@@ -39,6 +42,6 @@ func rebuildPositions(categories []domain.Category, filter *FilterState) []focus
 }
 
 func (m *model) rebuildPositions() {
-	positions := rebuildPositions(m.project.Categories, &m.ui.Filter)
+	positions := rebuildPositions(m.project.Categories, &m.ui.Filter, &m.ui.Fold)
 	m.ui.Selection.SetPositions(toSelectionPositions(positions))
 }

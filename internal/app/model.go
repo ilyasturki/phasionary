@@ -22,6 +22,7 @@ type UIState struct {
 	Picker             ProjectPickerState
 	Options            OptionsState
 	Filter             FilterState
+	Fold               FoldState
 	ExternalEdit       ExternalEditState
 	EstimatePicker     components.EstimatePickerState
 	Clipboard          ClipboardState
@@ -45,6 +46,7 @@ func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {
 		Selection:     sel,
 		Modes:         modeMachine,
 		Filter:        NewFilterState(),
+		Fold:          NewFoldState(),
 		WindowFocused: true,
 	}
 }

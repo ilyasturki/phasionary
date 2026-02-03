@@ -223,9 +223,6 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.startEditing()
 		m.ui.PendingKey = 0
-	case "a":
-		m.startAddingTask()
-		m.ui.PendingKey = 0
 	case "A":
 		m.startAddingCategory()
 		m.ui.PendingKey = 0
@@ -277,10 +274,6 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "G":
 		m.jumpToLast()
 		m.ui.PendingKey = 0
-	case "o":
-		m.ui.Modes.ToOptions()
-		m.ui.Options = OptionsState{selectedOption: 0}
-		m.ui.PendingKey = 0
 	case "x":
 		m.cutSelectedTask()
 		m.ui.PendingKey = 0
@@ -290,12 +283,39 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "P":
 		m.openProjectPicker()
 		m.ui.PendingKey = 0
+	case "tab":
+		m.toggleFold()
+		m.ui.PendingKey = 0
 	case "z":
 		if m.ui.PendingKey == 'z' {
 			m.centerOnSelected()
 			m.ui.PendingKey = 0
 		} else {
 			m.ui.PendingKey = 'z'
+		}
+	case "a":
+		if m.ui.PendingKey == 'z' {
+			m.toggleFold()
+			m.ui.PendingKey = 0
+		} else {
+			m.startAddingTask()
+			m.ui.PendingKey = 0
+		}
+	case "c":
+		if m.ui.PendingKey == 'z' {
+			m.foldAll()
+			m.ui.PendingKey = 0
+		} else {
+			m.ui.PendingKey = 0
+		}
+	case "o":
+		if m.ui.PendingKey == 'z' {
+			m.unfoldAll()
+			m.ui.PendingKey = 0
+		} else {
+			m.ui.Modes.ToOptions()
+			m.ui.Options = OptionsState{selectedOption: 0}
+			m.ui.PendingKey = 0
 		}
 	case "s":
 		m.sortTasksByStatus()
@@ -411,7 +431,8 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditCategoryLine()
 		}
-		return renderCategoryLine(category.Name, category.EstimateMinutes, isSelected, m.ui.Width, focused)
+		folded := m.ui.Fold.IsFolded(category.ID)
+		return renderCategoryLine(category.Name, category.EstimateMinutes, isSelected, folded, m.ui.Width, focused)
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
@@ -421,7 +442,10 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		return m.renderTaskLine(task, isSelected, m.ui.Width, focused)
 
 	case LayoutEmptyCategory:
-		return ui.MutedStyle.Render("  (no tasks)")
+		return ui.MutedStyle.Render("    (no tasks)")
+
+	case LayoutFolded:
+		return ui.MutedStyle.Render("    (folded)")
 
 	case LayoutSpacing:
 		return strings.Repeat("\n", item.Height-1)
@@ -479,7 +503,7 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager, wor
 		startMode = modes.ModeProjectPicker
 	}
 
-	positions := rebuildPositions(project.Categories, nil)
+	positions := rebuildPositions(project.Categories, nil, nil)
 	initialSelection := findFirstTaskIndex(positions)
 	selMgr := selection.NewManager(toSelectionPositions(positions), initialSelection)
 	modeMachine := modes.NewMachine(startMode)
