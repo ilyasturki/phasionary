@@ -241,7 +241,7 @@ func (m model) shortcutsLine() string {
 	if m.ui.Modes.IsEdit() {
 		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
 	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | a add task | A add category | enter edit | e external editor | space status | h/l priority | t estimate | y copy | d delete | i info | p projects | o options | ? help | q quit")
+	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | a add task | A add category | enter edit | e external editor | space status | h/l priority | t estimate | y copy | x cut | p paste | d delete | i info | P projects | o options | ? help | q quit")
 }
 
 func truncateText(s string, max int) string {
@@ -302,7 +302,7 @@ func (m model) helpView() string {
 		"  gg            jump to first item",
 		"  G             jump to last item",
 		"  zz            center selection on screen",
-		"  p             switch project",
+		"  P             switch project",
 		"",
 		ui.DialogTitleStyle.Render("Actions:"),
 		"  a             add new task",
@@ -316,6 +316,8 @@ func (m model) helpView() string {
 		"  h/l           change priority",
 		"  t             set time estimate",
 		"  y             copy selected text",
+		"  x             mark task for cut",
+		"  p             paste cut task",
 		"  d             delete selected item",
 		"  i             show item info",
 		"  o             options",

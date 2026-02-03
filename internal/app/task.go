@@ -37,6 +37,15 @@ func (m *model) confirmDeleteAction() {
 func (m *model) deleteTask(position focusPosition) {
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
+
+	task := m.project.Categories[catIndex].Tasks[taskIndex]
+	taskCopy := task
+	m.ui.Clipboard = ClipboardState{
+		Task:     &taskCopy,
+		IsCut:    false,
+		SourceID: "",
+	}
+
 	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
@@ -342,4 +351,107 @@ func (m *model) sortTasksByStatusOrder(ascending bool) {
 
 	m.ensureVisible()
 	m.storeTaskUpdate()
+}
+
+func (m *model) cutSelectedTask() {
+	if !m.ui.Modes.CanPerformAction(modes.ActionDeleteItem) {
+		return
+	}
+	position, ok := m.selectedPosition()
+	if !ok || position.Kind != focusTask {
+		m.ui.StatusMsg = "Can only cut tasks"
+		return
+	}
+
+	task := m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+	taskCopy := task
+	m.ui.Clipboard = ClipboardState{
+		Task:     &taskCopy,
+		IsCut:    true,
+		SourceID: task.ID,
+	}
+
+	title := task.Title
+	if len([]rune(title)) > 30 {
+		title = string([]rune(title)[:30]) + "..."
+	}
+	m.ui.StatusMsg = "Marked for cut: " + title
+}
+
+func (m *model) pasteTask() {
+	if m.ui.Clipboard.Task == nil {
+		m.ui.StatusMsg = "Nothing to paste"
+		return
+	}
+
+	newID, err := domain.NewID()
+	if err != nil {
+		m.ui.StatusMsg = "Failed to create task ID"
+		return
+	}
+
+	newTask := domain.Task{
+		ID:              newID,
+		Title:           m.ui.Clipboard.Task.Title,
+		Status:          m.ui.Clipboard.Task.Status,
+		CreatedAt:       m.ui.Clipboard.Task.CreatedAt,
+		UpdatedAt:       domain.NowTimestamp(),
+		Priority:        m.ui.Clipboard.Task.Priority,
+		CompletionDate:  m.ui.Clipboard.Task.CompletionDate,
+		EstimateMinutes: m.ui.Clipboard.Task.EstimateMinutes,
+	}
+
+	position, ok := m.selectedPosition()
+	var catIndex, taskIndex int
+
+	if !ok || len(m.project.Categories) == 0 {
+		m.ui.StatusMsg = "No category to paste into"
+		return
+	}
+
+	switch position.Kind {
+	case focusProject:
+		catIndex = 0
+		taskIndex = 0
+	case focusCategory:
+		catIndex = position.CategoryIndex
+		taskIndex = 0
+	case focusTask:
+		catIndex = position.CategoryIndex
+		taskIndex = position.TaskIndex
+	}
+
+	if m.ui.Clipboard.IsCut {
+		m.removeTaskByID(m.ui.Clipboard.SourceID)
+	}
+
+	m.project.Categories[catIndex].InsertTask(taskIndex, newTask)
+
+	statusMsg := "Pasted!"
+	if m.ui.Clipboard.IsCut {
+		statusMsg = "Moved!"
+	}
+	m.ui.Clipboard = ClipboardState{}
+
+	m.rebuildPositions()
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		if p.Kind != selection.FocusTask {
+			return false
+		}
+		return m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == newID
+	})
+	m.ensureVisible()
+	m.storeTaskUpdate()
+	m.ui.StatusMsg = statusMsg
+}
+
+func (m *model) removeTaskByID(id string) {
+	for catIdx := range m.project.Categories {
+		for taskIdx, task := range m.project.Categories[catIdx].Tasks {
+			if task.ID == id {
+				_ = m.project.Categories[catIdx].RemoveTask(taskIdx)
+				return
+			}
+		}
+	}
 }

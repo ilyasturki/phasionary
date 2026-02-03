@@ -6,7 +6,14 @@ import (
 	"phasionary/internal/app/selection"
 	"phasionary/internal/config"
 	"phasionary/internal/data"
+	"phasionary/internal/domain"
 )
+
+type ClipboardState struct {
+	Task     *domain.Task
+	IsCut    bool
+	SourceID string
+}
 
 type UIState struct {
 	Selection          *selection.Manager
@@ -17,6 +24,7 @@ type UIState struct {
 	Filter             FilterState
 	ExternalEdit       ExternalEditState
 	EstimatePicker     components.EstimatePickerState
+	Clipboard          ClipboardState
 	StatusMsg          string
 	ScrollOffset       int
 	PendingKey         rune

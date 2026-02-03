@@ -281,7 +281,13 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ui.Modes.ToOptions()
 		m.ui.Options = OptionsState{selectedOption: 0}
 		m.ui.PendingKey = 0
+	case "x":
+		m.cutSelectedTask()
+		m.ui.PendingKey = 0
 	case "p":
+		m.pasteTask()
+		m.ui.PendingKey = 0
+	case "P":
 		m.openProjectPicker()
 		m.ui.PendingKey = 0
 	case "z":
@@ -315,7 +321,7 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) copySelected() tea.Cmd {
+func (m *model) copySelected() tea.Cmd {
 	pos, ok := m.selectedPosition()
 	if !ok {
 		return nil
@@ -326,8 +332,15 @@ func (m model) copySelected() tea.Cmd {
 		text = m.project.Name
 	case focusCategory:
 		text = m.project.Categories[pos.CategoryIndex].Name
-	default:
-		text = m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
+	case focusTask:
+		task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
+		text = task.Title
+		taskCopy := task
+		m.ui.Clipboard = ClipboardState{
+			Task:     &taskCopy,
+			IsCut:    false,
+			SourceID: "",
+		}
 	}
 	return func() tea.Msg {
 		return clipboardResultMsg{err: clipboard.WriteAll(text)}
