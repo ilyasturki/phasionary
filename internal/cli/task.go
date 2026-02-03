@@ -74,6 +74,10 @@ func newTasksCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&category, "category", "C", "", "filter by category name")
 	cmd.Flags().StringVar(&priority, "priority", "", "filter by priority (high, medium, low)")
 
+	_ = cmd.RegisterFlagCompletionFunc("status", completeStatuses)
+	_ = cmd.RegisterFlagCompletionFunc("category", completeCategories)
+	_ = cmd.RegisterFlagCompletionFunc("priority", completePriorities)
+
 	return cmd
 }
 
@@ -96,10 +100,11 @@ func newTaskCmd() *cobra.Command {
 
 func newTaskShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "show <id-or-title>",
-		Aliases: []string{"t"},
-		Short:   "Show task details",
-		Args:    cobra.ExactArgs(1),
+		Use:               "show <id-or-title>",
+		Aliases:           []string{"t"},
+		Short:             "Show task details",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {
@@ -186,6 +191,9 @@ func newTaskAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&priority, "priority", "", "priority: high|medium|low")
 	cmd.Flags().StringVarP(&estimate, "estimate", "e", "", "time estimate: 30, 2h, 1.5h, 2h30m")
 
+	_ = cmd.RegisterFlagCompletionFunc("category", completeCategories)
+	_ = cmd.RegisterFlagCompletionFunc("priority", completePriorities)
+
 	return cmd
 }
 
@@ -197,10 +205,11 @@ func newTaskEditCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:     "edit <id-or-title>",
-		Aliases: []string{"te"},
-		Short:   "Edit task properties",
-		Args:    cobra.ExactArgs(1),
+		Use:               "edit <id-or-title>",
+		Aliases:           []string{"te"},
+		Short:             "Edit task properties",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {
@@ -246,6 +255,8 @@ func newTaskEditCmd() *cobra.Command {
 	cmd.Flags().StringVar(&priority, "priority", "", "priority: high|medium|low")
 	cmd.Flags().StringVarP(&estimate, "estimate", "e", "", "time estimate: 30, 2h, 1.5h, 2h30m")
 
+	_ = cmd.RegisterFlagCompletionFunc("priority", completePriorities)
+
 	return cmd
 }
 
@@ -253,10 +264,11 @@ func newTaskDeleteCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:     "delete <id-or-title>",
-		Aliases: []string{"td"},
-		Short:   "Delete a task",
-		Args:    cobra.ExactArgs(1),
+		Use:               "delete <id-or-title>",
+		Aliases:           []string{"td"},
+		Short:             "Delete a task",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {
@@ -307,6 +319,12 @@ func newTaskStatusCmd() *cobra.Command {
 		Aliases: []string{"tst"},
 		Short:   "Update task status",
 		Args:    cobra.ExactArgs(2),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return completeTasks(cmd, args, toComplete)
+			}
+			return completeStatuses(cmd, args, toComplete)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			selector := args[0]
 			status := args[1]
@@ -351,6 +369,12 @@ func newTaskPriorityCmd() *cobra.Command {
 		Aliases: []string{"tp"},
 		Short:   "Update task priority",
 		Args:    cobra.ExactArgs(2),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return completeTasks(cmd, args, toComplete)
+			}
+			return completePriorities(cmd, args, toComplete)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			selector := args[0]
 			priority := args[1]
@@ -395,6 +419,12 @@ func newTaskMoveCmd() *cobra.Command {
 		Aliases: []string{"tm"},
 		Short:   "Move task to different category",
 		Args:    cobra.ExactArgs(2),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				return completeTasks(cmd, args, toComplete)
+			}
+			return completeCategories(cmd, args, toComplete)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			selector := args[0]
 			targetCategory := args[1]

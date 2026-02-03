@@ -1,0 +1,115 @@
+package cli
+
+import (
+	"os"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	"phasionary/internal/domain"
+)
+
+func newCompletionCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "completion [bash|zsh|fish]",
+		Short: "Generate shell completion script",
+		Long: `Generate shell completion script for phasionary.
+
+Bash:
+  $ source <(phasionary completion bash)
+  # Persist: phasionary completion bash > /etc/bash_completion.d/phasionary
+
+Zsh:
+  $ phasionary completion zsh > "${fpath[1]}/_phasionary"
+
+Fish:
+  $ phasionary completion fish > ~/.config/fish/completions/phasionary.fish
+`,
+		ValidArgs:             []string{"bash", "zsh", "fish"},
+		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+		DisableFlagsInUseLine: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			switch args[0] {
+			case "bash":
+				return cmd.Root().GenBashCompletion(os.Stdout)
+			case "zsh":
+				return cmd.Root().GenZshCompletion(os.Stdout)
+			case "fish":
+				return cmd.Root().GenFishCompletion(os.Stdout, true)
+			}
+			return nil
+		},
+	}
+	return cmd
+}
+
+func completeProjects(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	store, err := storeFromViper()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	projects, err := store.ListProjects()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	var completions []string
+	for _, p := range projects {
+		completions = append(completions, p.Name)
+	}
+	return completions, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeTasks(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	store, err := storeFromViper()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	project, err := store.LoadProject(viper.GetString("project"))
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	var completions []string
+	for _, cat := range project.Categories {
+		for _, task := range cat.Tasks {
+			completions = append(completions, task.ID)
+		}
+	}
+	return completions, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeCategories(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	store, err := storeFromViper()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	project, err := store.LoadProject(viper.GetString("project"))
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	var completions []string
+	for _, cat := range project.Categories {
+		completions = append(completions, cat.Name)
+	}
+	return completions, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeStatuses(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{
+		domain.StatusTodo,
+		domain.StatusInProgress,
+		domain.StatusCompleted,
+		domain.StatusCancelled,
+	}, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completePriorities(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{
+		domain.PriorityHigh,
+		domain.PriorityMedium,
+		domain.PriorityLow,
+	}, cobra.ShellCompDirectiveNoFileComp
+}
+
+func completeExportFormats(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{"json", "markdown"}, cobra.ShellCompDirectiveNoFileComp
+}

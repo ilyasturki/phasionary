@@ -47,10 +47,11 @@ func newProjectCmd() *cobra.Command {
 
 func newProjectShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "show [name-or-id]",
-		Aliases: []string{"p"},
-		Short:   "Show project details",
-		Args:    cobra.MaximumNArgs(1),
+		Use:               "show [name-or-id]",
+		Aliases:           []string{"p"},
+		Short:             "Show project details",
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeProjects,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {
@@ -96,10 +97,11 @@ func newProjectEditCmd() *cobra.Command {
 	var name string
 
 	cmd := &cobra.Command{
-		Use:     "edit [name-or-id]",
-		Aliases: []string{"pe"},
-		Short:   "Edit project (rename)",
-		Args:    cobra.MaximumNArgs(1),
+		Use:               "edit [name-or-id]",
+		Aliases:           []string{"pe"},
+		Short:             "Edit project (rename)",
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeProjects,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
@@ -137,10 +139,11 @@ func newProjectDeleteCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:     "delete [name-or-id]",
-		Aliases: []string{"pd"},
-		Short:   "Delete a project",
-		Args:    cobra.MaximumNArgs(1),
+		Use:               "delete [name-or-id]",
+		Aliases:           []string{"pd"},
+		Short:             "Delete a project",
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: completeProjects,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {
@@ -183,10 +186,11 @@ func newProjectDeleteCmd() *cobra.Command {
 
 func newProjectUseCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "use <name-or-id>",
-		Aliases: []string{"pu"},
-		Short:   "Set default project",
-		Args:    cobra.ExactArgs(1),
+		Use:               "use <name-or-id>",
+		Aliases:           []string{"pu"},
+		Short:             "Set default project",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeProjects,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {

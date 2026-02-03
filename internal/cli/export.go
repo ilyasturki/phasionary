@@ -71,6 +71,8 @@ func newExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&format, "format", "f", "markdown", "output format: json or markdown")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "output file path (defaults to stdout)")
 
+	_ = cmd.RegisterFlagCompletionFunc("format", completeExportFormats)
+
 	return cmd
 }
 
@@ -141,6 +143,8 @@ func newImportCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&format, "format", "f", "", "input format: json or markdown (auto-detected from extension)")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "override project name")
+
+	_ = cmd.RegisterFlagCompletionFunc("format", completeExportFormats)
 
 	return cmd
 }

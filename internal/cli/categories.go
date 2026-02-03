@@ -45,10 +45,11 @@ func newCategoryCmd() *cobra.Command {
 
 func newCategoryShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "show <name-or-id>",
-		Aliases: []string{"c"},
-		Short:   "Show category details",
-		Args:    cobra.ExactArgs(1),
+		Use:               "show <name-or-id>",
+		Aliases:           []string{"c"},
+		Short:             "Show category details",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCategories,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {
@@ -114,10 +115,11 @@ func newCategoryEditCmd() *cobra.Command {
 	var name string
 
 	cmd := &cobra.Command{
-		Use:     "edit <name-or-id>",
-		Aliases: []string{"ce"},
-		Short:   "Edit category (rename)",
-		Args:    cobra.ExactArgs(1),
+		Use:               "edit <name-or-id>",
+		Aliases:           []string{"ce"},
+		Short:             "Edit category (rename)",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCategories,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
@@ -165,10 +167,11 @@ func newCategoryDeleteCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:     "delete <name-or-id>",
-		Aliases: []string{"cd"},
-		Short:   "Delete a category",
-		Args:    cobra.ExactArgs(1),
+		Use:               "delete <name-or-id>",
+		Aliases:           []string{"cd"},
+		Short:             "Delete a category",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeCategories,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {
