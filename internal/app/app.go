@@ -86,10 +86,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.String() == "?" {
-		m.ui.Modes.ToggleHelp()
-		return m, nil
-	}
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:
 		return m.handleHelpKey(msg), nil
@@ -111,6 +107,10 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case modes.ModeExternalEdit:
 		return m, nil
 	default:
+		if msg.String() == "?" {
+			m.ui.Modes.ToggleHelp()
+			return m, nil
+		}
 		return m.handleNormalKey(msg)
 	}
 }
