@@ -243,13 +243,6 @@ func (m model) statusLine() string {
 	return ui.StatusLineStyle.Render(summary)
 }
 
-func (m model) shortcutsLine() string {
-	if m.ui.Modes.IsEdit() {
-		return ui.StatusLineStyle.Render("Shortcuts: enter save | esc cancel | arrows move cursor | ? help")
-	}
-	return ui.StatusLineStyle.Render("Shortcuts: j/k move | J/K reorder | s sort | f filter | Tab fold | a add task | A add category | enter edit | e external editor | space status | h/l priority | t estimate | y copy | x cut | p paste | d delete | i info | P projects | o options | ? help | q quit")
-}
-
 func truncateText(s string, max int) string {
 	runes := []rune(s)
 	if len(runes) <= max {

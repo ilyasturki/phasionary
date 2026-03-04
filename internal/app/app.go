@@ -393,8 +393,7 @@ func (m model) View() string {
 	body := strings.Join(lines, "\n")
 
 	statusLine := m.statusLine()
-	shortcuts := m.shortcutsLine()
-	content := body + "\n\n" + statusLine + "\n" + shortcuts
+	content := body + "\n\n" + statusLine
 	modal := components.NewModal(m.ui.Width, m.ui.Height)
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:
