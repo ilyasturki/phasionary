@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"phasionary/internal/app/components"
+	"phasionary/internal/export"
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
 	"phasionary/internal/config"
@@ -235,6 +236,9 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "y":
 		m.ui.PendingKey = 0
 		return m, m.copySelected()
+	case "Y":
+		m.ui.PendingKey = 0
+		return m, m.copyCategoryContent()
 	case "d":
 		m.deleteSelected()
 		m.ui.PendingKey = 0
@@ -362,6 +366,17 @@ func (m *model) copySelected() tea.Cmd {
 			SourceID: "",
 		}
 	}
+	return func() tea.Msg {
+		return clipboardResultMsg{err: clipboard.WriteAll(text)}
+	}
+}
+
+func (m *model) copyCategoryContent() tea.Cmd {
+	pos, ok := m.selectedPosition()
+	if !ok || pos.Kind == focusProject {
+		return nil
+	}
+	text := export.ExportCategoryMarkdown(m.project.Categories[pos.CategoryIndex])
 	return func() tea.Msg {
 		return clipboardResultMsg{err: clipboard.WriteAll(text)}
 	}

@@ -43,23 +43,28 @@ func markerToStatus(marker string) string {
 	}
 }
 
+func ExportCategoryMarkdown(cat domain.Category) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "## %s\n\n", cat.Name)
+	for _, task := range cat.Tasks {
+		marker := statusToMarker(task.Status)
+		line := fmt.Sprintf("- [%s] %s", marker, task.Title)
+		if task.Priority != "" {
+			line += fmt.Sprintf(" (%s)", task.Priority)
+		}
+		sb.WriteString(line)
+		sb.WriteByte('\n')
+	}
+	return sb.String()
+}
+
 func ExportMarkdown(project domain.Project, w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "# %s\n", project.Name); err != nil {
 		return err
 	}
 	for _, cat := range project.Categories {
-		if _, err := fmt.Fprintf(w, "\n## %s\n\n", cat.Name); err != nil {
+		if _, err := fmt.Fprintf(w, "\n%s", ExportCategoryMarkdown(cat)); err != nil {
 			return err
-		}
-		for _, task := range cat.Tasks {
-			marker := statusToMarker(task.Status)
-			line := fmt.Sprintf("- [%s] %s", marker, task.Title)
-			if task.Priority != "" {
-				line += fmt.Sprintf(" (%s)", task.Priority)
-			}
-			if _, err := fmt.Fprintln(w, line); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
