@@ -139,6 +139,19 @@ func (m *model) finishEditing() {
 		if task.Title != trimmed || m.ui.Edit.isAdding {
 			task.Title = trimmed
 			task.UpdatedAt = domain.NowTimestamp()
+
+			if m.ui.Edit.isAdding {
+				taskID := task.ID
+				ascending := m.ui.LastSortAscending == nil || *m.ui.LastSortAscending
+				sortCategoryTasks(m.project.Categories[position.CategoryIndex].Tasks, ascending)
+				m.rebuildPositions()
+				m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+					return p.Kind == selection.FocusTask &&
+						p.CategoryIndex == position.CategoryIndex &&
+						m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == taskID
+				})
+			}
+
 			m.storeTaskUpdate()
 		}
 	case focusCategory:
