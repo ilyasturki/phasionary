@@ -121,6 +121,22 @@ func NewFoldState() FoldState {
 	}
 }
 
+func NewFoldStateFrom(foldedIDs []string) FoldState {
+	folded := make(map[string]bool, len(foldedIDs))
+	for _, id := range foldedIDs {
+		folded[id] = true
+	}
+	return FoldState{folded: folded}
+}
+
+func (f *FoldState) FoldedIDs() []string {
+	ids := make([]string, 0, len(f.folded))
+	for id := range f.folded {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 func (f *FoldState) IsFolded(categoryID string) bool {
 	return f.folded[categoryID]
 }

@@ -136,6 +136,7 @@ func (m *model) confirmDeleteProject() {
 	}
 
 	m.removeProjectFromOrder(deleteID)
+	_ = m.deps.StateManager.DeleteFoldedCategories(deleteID)
 
 	if m.project.ID == deleteID {
 		projects, err := m.deps.Store.ListProjects()
@@ -149,7 +150,7 @@ func (m *model) confirmDeleteProject() {
 			m.project = projects[0]
 			_ = m.deps.StateManager.SetLastProjectID(m.project.ID)
 			m.ui.Filter = NewFilterState()
-			m.ui.Fold = NewFoldState()
+			m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(m.project.ID))
 			positions := rebuildPositions(m.project.Categories, &m.ui.Filter, &m.ui.Fold)
 			initialSelection := findFirstTaskIndex(positions)
 			m.ui.Selection.SetPositions(toSelectionPositions(positions))
@@ -250,7 +251,7 @@ func (m *model) selectProject() {
 
 	m.project = project
 	m.ui.Filter = NewFilterState()
-	m.ui.Fold = NewFoldState()
+	m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(project.ID))
 	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold)
 	initialSelection := findFirstTaskIndex(positions)
 	m.ui.Selection.SetPositions(toSelectionPositions(positions))

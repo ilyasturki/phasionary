@@ -502,7 +502,8 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager, wor
 		startMode = modes.ModeProjectPicker
 	}
 
-	positions := rebuildPositions(project.Categories, nil, nil)
+	foldState := NewFoldStateFrom(stateManager.GetFoldedCategories(project.ID))
+	positions := rebuildPositions(project.Categories, nil, &foldState)
 	initialSelection := findFirstTaskIndex(positions)
 	selMgr := selection.NewManager(toSelectionPositions(positions), initialSelection)
 	modeMachine := modes.NewMachine(startMode)
@@ -512,6 +513,7 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager, wor
 		ui:      NewUIState(selMgr, modeMachine),
 		deps:    NewDependencies(store, cfgManager, stateManager),
 	}
+	m.ui.Fold = foldState
 
 	if startMode == modes.ModeProjectPicker {
 		m.ui.Picker = ProjectPickerState{

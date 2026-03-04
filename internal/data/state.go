@@ -9,8 +9,9 @@ import (
 )
 
 type State struct {
-	DirectoryProjects map[string]string `json:"directory_projects,omitempty"`
-	ProjectOrder      []string          `json:"project_order,omitempty"`
+	DirectoryProjects map[string]string   `json:"directory_projects,omitempty"`
+	ProjectOrder      []string            `json:"project_order,omitempty"`
+	FoldedCategories  map[string][]string `json:"folded_categories,omitempty"`
 }
 
 type StateManager struct {
@@ -38,9 +39,10 @@ func (m *StateManager) Load() error {
 
 	// Use a temporary struct to handle migration from old format
 	var raw struct {
-		LastProjectID     string            `json:"last_project_id"`
-		DirectoryProjects map[string]string `json:"directory_projects,omitempty"`
-		ProjectOrder      []string          `json:"project_order,omitempty"`
+		LastProjectID     string              `json:"last_project_id"`
+		DirectoryProjects map[string]string   `json:"directory_projects,omitempty"`
+		ProjectOrder      []string            `json:"project_order,omitempty"`
+		FoldedCategories  map[string][]string `json:"folded_categories,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -48,6 +50,7 @@ func (m *StateManager) Load() error {
 
 	m.state.DirectoryProjects = raw.DirectoryProjects
 	m.state.ProjectOrder = raw.ProjectOrder
+	m.state.FoldedCategories = raw.FoldedCategories
 	if m.state.DirectoryProjects == nil {
 		m.state.DirectoryProjects = make(map[string]string)
 	}
@@ -103,5 +106,32 @@ func (m *StateManager) GetProjectOrder() []string {
 
 func (m *StateManager) SetProjectOrder(order []string) error {
 	m.state.ProjectOrder = order
+	return m.Save()
+}
+
+func (m *StateManager) GetFoldedCategories(projectID string) []string {
+	if m.state.FoldedCategories == nil {
+		return nil
+	}
+	return m.state.FoldedCategories[projectID]
+}
+
+func (m *StateManager) SetFoldedCategories(projectID string, categoryIDs []string) error {
+	if m.state.FoldedCategories == nil {
+		m.state.FoldedCategories = make(map[string][]string)
+	}
+	if len(categoryIDs) == 0 {
+		delete(m.state.FoldedCategories, projectID)
+	} else {
+		m.state.FoldedCategories[projectID] = categoryIDs
+	}
+	return m.Save()
+}
+
+func (m *StateManager) DeleteFoldedCategories(projectID string) error {
+	if m.state.FoldedCategories == nil {
+		return nil
+	}
+	delete(m.state.FoldedCategories, projectID)
 	return m.Save()
 }

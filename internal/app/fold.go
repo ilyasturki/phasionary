@@ -18,6 +18,7 @@ func (m *model) toggleFold() {
 	}
 
 	m.ui.Fold.Toggle(categoryID)
+	m.saveFoldState()
 	m.rebuildPositions()
 	m.ensureVisible()
 }
@@ -28,6 +29,7 @@ func (m *model) foldAll() {
 		categoryIDs[i] = cat.ID
 	}
 	m.ui.Fold.FoldAll(categoryIDs)
+	m.saveFoldState()
 
 	pos, ok := m.selectedPosition()
 	if ok && pos.Kind == focusTask {
@@ -40,8 +42,13 @@ func (m *model) foldAll() {
 
 func (m *model) unfoldAll() {
 	m.ui.Fold.UnfoldAll()
+	m.saveFoldState()
 	m.rebuildPositions()
 	m.ensureVisible()
+}
+
+func (m *model) saveFoldState() {
+	_ = m.deps.StateManager.SetFoldedCategories(m.project.ID, m.ui.Fold.FoldedIDs())
 }
 
 func (m *model) findCategoryPositionIndex(categoryIndex int) int {
