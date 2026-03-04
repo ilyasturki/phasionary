@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -14,6 +15,21 @@ const (
 	blankBetweenCat = 1
 	blankAfterCat   = 1
 )
+
+func sanitizeInput(input *textinput.Model) {
+	val := input.Value()
+	cleaned := strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == '\t' {
+			return ' '
+		}
+		return r
+	}, val)
+	if cleaned != val {
+		pos := input.Position()
+		input.SetValue(cleaned)
+		input.SetCursor(pos)
+	}
+}
 
 func safeWidth(totalWidth, overhead int) int {
 	available := totalWidth - overhead
@@ -97,19 +113,29 @@ func renderCursorLine(text string, cursor int, width, overhead int, prefix strin
 	wrapped := ansi.Wrap(text, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
-	pos := 0
+	runes := []rune(text)
+	srcPos := 0
 	var result []string
 	for i, line := range wrapLines {
 		lineRunes := []rune(line)
 		lineLen := len(lineRunes)
+		lineEnd := srcPos + lineLen
+
+		nextStart := lineEnd
+		if i < len(wrapLines)-1 {
+			for nextStart < len(runes) && runes[nextStart] == ' ' {
+				nextStart++
+			}
+		}
+
 		var styledLine string
-		if cursor >= pos && cursor < pos+lineLen {
-			offset := cursor - pos
+		if cursor >= srcPos && cursor < lineEnd {
+			offset := cursor - srcPos
 			l := string(lineRunes[:offset])
 			c := string(lineRunes[offset])
 			r := string(lineRunes[offset+1:])
 			styledLine = textStyle.Render(l) + cursorStyle.Render(c) + textStyle.Render(r)
-		} else if cursor == pos+lineLen {
+		} else if cursor >= lineEnd && (i == len(wrapLines)-1 || cursor < nextStart) {
 			styledLine = textStyle.Render(line) + cursorStyle.Render(" ")
 		} else {
 			styledLine = textStyle.Render(line)
@@ -119,7 +145,7 @@ func renderCursorLine(text string, cursor int, width, overhead int, prefix strin
 		} else {
 			result = append(result, indent+styledLine)
 		}
-		pos += lineLen + 1
+		srcPos = nextStart
 	}
 	return strings.Join(result, "\n")
 }

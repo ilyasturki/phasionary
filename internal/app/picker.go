@@ -189,6 +189,7 @@ func (m model) handlePickerAddKey(msg tea.KeyMsg) (model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.ui.Picker.input, cmd = m.ui.Picker.input.Update(msg)
+	sanitizeInput(&m.ui.Picker.input)
 	return m, cmd
 }
 

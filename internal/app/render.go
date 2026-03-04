@@ -189,20 +189,30 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	wrapped := ansi.Wrap(edited, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
-	pos := 0
+	runes := []rune(edited)
+	srcPos := 0
 	var result []string
 	cursor := m.ui.Edit.input.Position()
 	for i, line := range wrapLines {
 		lineRunes := []rune(line)
 		lineLen := len(lineRunes)
+		lineEnd := srcPos + lineLen
+
+		nextStart := lineEnd
+		if i < len(wrapLines)-1 {
+			for nextStart < len(runes) && runes[nextStart] == ' ' {
+				nextStart++
+			}
+		}
+
 		var styledLine string
-		if cursor >= pos && cursor < pos+lineLen {
-			offset := cursor - pos
+		if cursor >= srcPos && cursor < lineEnd {
+			offset := cursor - srcPos
 			l := string(lineRunes[:offset])
 			c := string(lineRunes[offset])
 			r := string(lineRunes[offset+1:])
 			styledLine = titleStyle.Render(l) + cursorStyle.Render(c) + titleStyle.Render(r)
-		} else if cursor == pos+lineLen {
+		} else if cursor >= lineEnd && (i == len(wrapLines)-1 || cursor < nextStart) {
 			styledLine = titleStyle.Render(line) + cursorStyle.Render(" ")
 		} else {
 			styledLine = titleStyle.Render(line)
@@ -212,7 +222,7 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		} else {
 			result = append(result, indent+styledLine)
 		}
-		pos += lineLen + 1
+		srcPos = nextStart
 	}
 	return strings.Join(result, "\n")
 }

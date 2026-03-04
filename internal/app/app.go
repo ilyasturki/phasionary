@@ -82,6 +82,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		m.ui.StatusMsg = ""
 		return m.handleKeyMsg(msg)
+	default:
+		return m.forwardToInput(msg)
 	}
 	return m, nil
 }
