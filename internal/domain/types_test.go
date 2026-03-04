@@ -82,11 +82,11 @@ func TestTask_CycleStatus(t *testing.T) {
 		assert.Equal(t, StatusCompleted, task.Status)
 	})
 
-	t.Run("cycles from completed to todo", func(t *testing.T) {
+	t.Run("cycles from completed to cancelled", func(t *testing.T) {
 		task := Task{Status: StatusCompleted}
 		changed := task.CycleStatus()
 		assert.True(t, changed)
-		assert.Equal(t, StatusTodo, task.Status)
+		assert.Equal(t, StatusCancelled, task.Status)
 	})
 
 	t.Run("cycles from cancelled to todo", func(t *testing.T) {

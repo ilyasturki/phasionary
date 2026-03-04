@@ -210,7 +210,7 @@ func (t *Task) CycleStatus() bool {
 	case StatusInProgress:
 		nextStatus = StatusCompleted
 	case StatusCompleted:
-		nextStatus = StatusTodo
+		nextStatus = StatusCancelled
 	case StatusCancelled:
 		nextStatus = StatusTodo
 	default:
