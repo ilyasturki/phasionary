@@ -39,7 +39,7 @@ func (m model) renderEditProjectLine() string {
 	)
 }
 
-func renderCategoryLine(name string, estimateMinutes int, selected bool, folded bool, width int, focused bool) string {
+func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string, selected bool, folded bool, width int, focused bool) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
@@ -54,6 +54,17 @@ func renderCategoryLine(name string, estimateMinutes int, selected bool, folded 
 		foldIndicator = "▶ "
 	}
 
+	statusBadge := ""
+	statusBadgeText := ""
+	if aggregateStatus != "" {
+		statusBadgeText = " [" + statusIcon(aggregateStatus) + "]"
+		if selected {
+			statusBadge = ui.GetSelectedStatusStyle(aggregateStatus, focused).Render(statusBadgeText)
+		} else {
+			statusBadge = ui.StatusStyle(aggregateStatus).Render(statusBadgeText)
+		}
+	}
+
 	estimateBadge := ""
 	estimateBadgeText := ""
 	if estimateMinutes > 0 {
@@ -65,11 +76,13 @@ func renderCategoryLine(name string, estimateMinutes int, selected bool, folded 
 		}
 	}
 
+	suffix := statusBadge + estimateBadge
+
 	if width <= 0 {
-		return style.Render(prefix+foldIndicator+name) + estimateBadge
+		return style.Render(prefix+foldIndicator+name) + suffix
 	}
 
-	suffixWidth := len(estimateBadgeText)
+	suffixWidth := len(statusBadgeText) + len(estimateBadgeText)
 	foldWidth := 2
 	available := safeWidth(width, prefixWidth+foldWidth+suffixWidth)
 	wrapped := ansi.Wrap(name, available, "")
@@ -80,7 +93,7 @@ func renderCategoryLine(name string, estimateMinutes int, selected bool, folded 
 	for i, line := range lines {
 		styledLine := style.Render(line)
 		if i == 0 {
-			result = append(result, style.Render(prefix+foldIndicator)+styledLine+estimateBadge)
+			result = append(result, style.Render(prefix+foldIndicator)+styledLine+suffix)
 		} else {
 			result = append(result, style.Render(indent)+styledLine)
 		}

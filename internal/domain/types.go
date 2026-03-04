@@ -223,6 +223,35 @@ func (t *Task) CycleStatus() bool {
 	return true
 }
 
+func (c *Category) AggregateStatus() string {
+	if len(c.Tasks) == 0 {
+		return ""
+	}
+	allDone := true
+	hasInProgress := false
+	hasCompleted := false
+	for _, t := range c.Tasks {
+		if t.Status == StatusInProgress {
+			hasInProgress = true
+		}
+		if t.Status == StatusCompleted || t.Status == StatusCancelled {
+			hasCompleted = true
+		} else {
+			allDone = false
+		}
+	}
+	if hasInProgress {
+		return StatusInProgress
+	}
+	if allDone {
+		return StatusCompleted
+	}
+	if hasCompleted {
+		return StatusInProgress
+	}
+	return StatusTodo
+}
+
 func (c *Category) SetEstimate(minutes int) {
 	c.EstimateMinutes = minutes
 	c.UpdatedAt = NowTimestamp()

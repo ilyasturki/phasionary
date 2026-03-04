@@ -448,7 +448,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 			return m.renderEditCategoryLine()
 		}
 		folded := m.ui.Fold.IsFolded(category.ID)
-		return renderCategoryLine(category.Name, category.EstimateMinutes, isSelected, folded, m.ui.Width, focused)
+		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Width, focused)
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]

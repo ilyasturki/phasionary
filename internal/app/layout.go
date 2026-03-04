@@ -107,8 +107,12 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []focusPosition)
 			totalHeight += b.config.BlankBetweenCats
 		}
 
-		// Category header (add extra width for fold indicator)
-		catHeight := countWrappedLines(category.Name, b.width, prefixWidth+2)
+		// Category header (add extra width for fold indicator + status badge)
+		catSuffixWidth := 0
+		if category.AggregateStatus() != "" {
+			catSuffixWidth += 4 // " [x]"
+		}
+		catHeight := countWrappedLines(category.Name, b.width, prefixWidth+2+catSuffixWidth)
 		items = append(items, LayoutItem{
 			Kind:          LayoutCategory,
 			Height:        catHeight,

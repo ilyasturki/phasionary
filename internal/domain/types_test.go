@@ -236,6 +236,55 @@ func TestProject_RemoveCategory(t *testing.T) {
 	})
 }
 
+func TestCategory_AggregateStatus(t *testing.T) {
+	t.Run("empty category returns empty string", func(t *testing.T) {
+		cat := Category{Tasks: []Task{}}
+		assert.Equal(t, "", cat.AggregateStatus())
+	})
+
+	t.Run("all todo returns todo", func(t *testing.T) {
+		cat := Category{Tasks: []Task{
+			{Status: StatusTodo}, {Status: StatusTodo},
+		}}
+		assert.Equal(t, StatusTodo, cat.AggregateStatus())
+	})
+
+	t.Run("all completed returns completed", func(t *testing.T) {
+		cat := Category{Tasks: []Task{
+			{Status: StatusCompleted}, {Status: StatusCompleted},
+		}}
+		assert.Equal(t, StatusCompleted, cat.AggregateStatus())
+	})
+
+	t.Run("all cancelled returns completed", func(t *testing.T) {
+		cat := Category{Tasks: []Task{
+			{Status: StatusCancelled}, {Status: StatusCancelled},
+		}}
+		assert.Equal(t, StatusCompleted, cat.AggregateStatus())
+	})
+
+	t.Run("completed and cancelled mix returns completed", func(t *testing.T) {
+		cat := Category{Tasks: []Task{
+			{Status: StatusCompleted}, {Status: StatusCancelled},
+		}}
+		assert.Equal(t, StatusCompleted, cat.AggregateStatus())
+	})
+
+	t.Run("any in_progress returns in_progress", func(t *testing.T) {
+		cat := Category{Tasks: []Task{
+			{Status: StatusTodo}, {Status: StatusInProgress}, {Status: StatusCompleted},
+		}}
+		assert.Equal(t, StatusInProgress, cat.AggregateStatus())
+	})
+
+	t.Run("mix of todo and completed returns in_progress", func(t *testing.T) {
+		cat := Category{Tasks: []Task{
+			{Status: StatusTodo}, {Status: StatusCompleted},
+		}}
+		assert.Equal(t, StatusInProgress, cat.AggregateStatus())
+	})
+}
+
 func TestTask_SetStatus(t *testing.T) {
 	t.Run("sets status and updates timestamp", func(t *testing.T) {
 		task := Task{Status: StatusTodo}
