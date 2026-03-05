@@ -1,23 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(/home/yasso/.claude/plugins/cache/claude-plugins-official/ralph-loop/f70b65538da0/scripts/setup-ralph-loop.sh:*)",
       "Bash(go test:*)",
       "Bash(go build:*)",
-      "Bash(go mod tidy:*)",
       "Bash(go vet:*)",
       "Bash(go doc:*)",
-      "Bash(./phasionary:*)",
-      "Bash(head:*)",
-      "Bash(wc:*)",
       "Bash(go list:*)",
       "Bash(go get:*)",
-      "Bash(git grep:*)",
-      "Bash(sort:*)",
-      "Bash(just build:*)"
+      "Read(~/.local/share/phasionary)",
+      "Bash(./phasionary:*)"
     ]
-  },
-  "enabledPlugins": {
-    "ralph-loop@claude-plugins-official": true
   }
 }
