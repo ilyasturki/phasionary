@@ -22,7 +22,7 @@ type StateManager struct {
 
 func NewStateManager(dataDir, workingDir string) *StateManager {
 	return &StateManager{
-		path:       filepath.Join(dataDir, "state.json"),
+		path:       filepath.Join(dataDir, "..", "state.json"),
 		currentDir: workingDir,
 	}
 }

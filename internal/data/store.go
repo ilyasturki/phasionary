@@ -59,6 +59,9 @@ func (s *Store) ListProjects() ([]domain.Project, error) {
 		if err != nil {
 			return nil, err
 		}
+		if project.ID == "" {
+			continue
+		}
 		projects = append(projects, project)
 	}
 	sort.Slice(projects, func(i, j int) bool {
