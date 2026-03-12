@@ -323,6 +323,7 @@ func (m model) helpView() string {
 		"  ctrl+f/b      full-page down/up",
 		"  gg            jump to first item",
 		"  G             jump to last item",
+		"  }/{           next/previous category",
 		"  zz            center selection on screen",
 		"  Tab/za        fold/unfold category",
 		"  zc            fold all categories",

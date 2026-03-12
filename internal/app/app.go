@@ -341,6 +341,12 @@ func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "t":
 		m.openEstimatePicker()
 		m.ui.PendingKey = 0
+	case "}":
+		m.jumpToNextCategory()
+		m.ui.PendingKey = 0
+	case "{":
+		m.jumpToPrevCategory()
+		m.ui.PendingKey = 0
 	default:
 		m.ui.PendingKey = 0
 	}
