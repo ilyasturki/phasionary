@@ -82,9 +82,7 @@ func (m *StateManager) GetLastProjectID() string {
 		return ""
 	}
 	if m.currentDir != "" {
-		if id, ok := m.state.DirectoryProjects[m.currentDir]; ok {
-			return id
-		}
+		return m.state.DirectoryProjects[m.currentDir]
 	}
 	return m.state.DirectoryProjects[""]
 }
@@ -93,10 +91,8 @@ func (m *StateManager) SetLastProjectID(id string) error {
 	if m.state.DirectoryProjects == nil {
 		m.state.DirectoryProjects = make(map[string]string)
 	}
-	if m.currentDir != "" {
-		m.state.DirectoryProjects[m.currentDir] = id
-	}
-	m.state.DirectoryProjects[""] = id
+	key := m.currentDir
+	m.state.DirectoryProjects[key] = id
 	return m.Save()
 }
 
