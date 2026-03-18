@@ -3,10 +3,14 @@ package ui
 import "github.com/charmbracelet/lipgloss"
 
 var (
+	// Adaptive colors that swap for light/dark terminal backgrounds
+	SelectionBg = lipgloss.AdaptiveColor{Light: "0", Dark: "15"}
+	SelectionFg = lipgloss.AdaptiveColor{Light: "15", Dark: "0"}
+
 	HeaderStyle      = lipgloss.NewStyle().Bold(true)
 	MutedStyle       = lipgloss.NewStyle().Faint(true)
 	CategoryStyle    = lipgloss.NewStyle().Bold(true)
-	SelectedStyle    = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("15")).Foreground(lipgloss.Color("0"))
+	SelectedStyle    = lipgloss.NewStyle().Bold(true).Background(SelectionBg).Foreground(SelectionFg)
 	StatusLineStyle  = lipgloss.NewStyle().Faint(true)
 	HelpDialogStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
 	DialogTitleStyle = lipgloss.NewStyle().Bold(true)
@@ -58,28 +62,28 @@ func PriorityIcon(priority string) string {
 }
 
 func SelectedPriorityStyle(priority string) lipgloss.Style {
-	base := lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("15"))
+	base := lipgloss.NewStyle().Bold(true).Background(SelectionBg)
 	switch priority {
 	case "high":
-		return base.Foreground(lipgloss.Color("1")) // red text
+		return base.Foreground(lipgloss.Color("1"))
 	case "low":
-		return base.Foreground(lipgloss.Color("6")) // cyan text
+		return base.Foreground(lipgloss.Color("6"))
 	default:
-		return base.Foreground(lipgloss.Color("0")) // black text for contrast
+		return base.Foreground(SelectionFg)
 	}
 }
 
 func SelectedStatusStyle(status string) lipgloss.Style {
-	base := lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("15"))
+	base := lipgloss.NewStyle().Bold(true).Background(SelectionBg)
 	switch status {
 	case "in_progress":
-		return base.Foreground(lipgloss.Color("4")) // blue text
+		return base.Foreground(lipgloss.Color("4"))
 	case "completed":
-		return base.Foreground(lipgloss.Color("8")) // gray text
+		return base.Foreground(lipgloss.Color("8"))
 	case "cancelled":
-		return base.Foreground(lipgloss.Color("1")) // red text
+		return base.Foreground(lipgloss.Color("1"))
 	default:
-		return base.Foreground(lipgloss.Color("3")) // yellow text for todo
+		return base.Foreground(lipgloss.Color("3"))
 	}
 }
 
