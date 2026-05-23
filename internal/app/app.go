@@ -102,7 +102,7 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) handleHelpKey(msg tea.KeyMsg) model {
 	switch msg.String() {
-	case "q", "esc":
+	case "q", "esc", "?":
 		m.ui.Modes.ToNormal()
 	}
 	return m

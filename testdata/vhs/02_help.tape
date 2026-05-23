@@ -16,10 +16,9 @@ Type "?"
 Sleep 600ms
 Screenshot "/tmp/phas-vt/vhs-out/02_help_open.png"
 
-# ? does NOT close help (only q/esc do) — see app.go:103
 Type "?"
 Sleep 500ms
-Screenshot "/tmp/phas-vt/vhs-out/02_help_still_open.png"
+Screenshot "/tmp/phas-vt/vhs-out/02_help_closed.png"
 
 Hide
 Type "q"
