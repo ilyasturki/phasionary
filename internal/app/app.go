@@ -43,6 +43,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.ui.Screen.StatusMsg = "Copied!"
 		}
+	case openURLResultMsg:
+		m.handleOpenURLResult(msg)
 	case editorFinishedMsg:
 		m.handleEditorFinished(msg)
 		return m, nil
@@ -90,6 +92,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleInfoKey(msg), nil
 	case modes.ModeEstimatePicker:
 		return m.handleEstimatePickerKey(msg), nil
+	case modes.ModeURLPicker:
+		return m.handleURLPickerKey(msg)
 	case modes.ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
@@ -180,6 +184,28 @@ func (m model) handleEstimatePickerKey(msg tea.KeyMsg) model {
 		m.ui.Modes.ToNormal()
 	}
 	return m
+}
+
+func (m model) handleURLPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.ui.Modes.ToNormal()
+		return m, nil
+	case "j", "down":
+		m.ui.URLPicker.MoveDown()
+		return m, nil
+	case "k", "up":
+		m.ui.URLPicker.MoveUp()
+		return m, nil
+	case "enter":
+		url := m.ui.URLPicker.SelectedURL()
+		m.ui.Modes.ToNormal()
+		if url == "" {
+			return m, nil
+		}
+		return m, openURL(url)
+	}
+	return m, nil
 }
 
 func (m *model) toggleSelectedOption() {
@@ -280,6 +306,8 @@ func (m model) View() string {
 		return modal.Render(content, m.infoView())
 	case modes.ModeEstimatePicker:
 		return modal.Render(content, m.estimatePickerView())
+	case modes.ModeURLPicker:
+		return modal.Render(content, m.urlPickerView())
 	}
 	return content
 }

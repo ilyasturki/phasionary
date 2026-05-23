@@ -103,6 +103,8 @@ var normalBindings = []keyBinding{
 		action: void((*model).deleteSelected)},
 	{keys: []string{"i"}, desc: "show item info", section: sectionActions,
 		action: func(m *model) tea.Cmd { m.ui.Modes.ToInfo(); return nil }},
+	{keys: []string{"x"}, prefix: 'g', display: "gx", desc: "open URL in focused task", section: sectionActions,
+		action: func(m *model) tea.Cmd { return m.openLinksForSelected() }},
 	{keys: []string{"o"}, desc: "options", section: sectionActions,
 		action: func(m *model) tea.Cmd {
 			m.ui.Modes.ToOptions()

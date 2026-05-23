@@ -36,6 +36,7 @@ type UIState struct {
 	Fold              FoldState
 	ExternalEdit      ExternalEditState
 	EstimatePicker    components.EstimatePickerState
+	URLPicker         components.URLPickerState
 	Clipboard         ClipboardState
 	LastSortAscending *bool
 }

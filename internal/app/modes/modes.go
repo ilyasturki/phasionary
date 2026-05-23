@@ -13,6 +13,7 @@ const (
 	ModeExternalEdit
 	ModeInfo
 	ModeEstimatePicker
+	ModeURLPicker
 )
 
 type Action int
@@ -116,6 +117,8 @@ func (m *Machine) canTransition(target Mode) bool {
 		return target == ModeNormal
 	case ModeEstimatePicker:
 		return target == ModeNormal
+	case ModeURLPicker:
+		return target == ModeNormal
 	}
 	return false
 }
@@ -137,6 +140,8 @@ func (m *Machine) CanPerformAction(action Action) bool {
 	case ModeFilter:
 		return false
 	case ModeEstimatePicker:
+		return false
+	case ModeURLPicker:
 		return false
 	}
 	return false
@@ -196,4 +201,12 @@ func (m *Machine) ToggleInfo() {
 
 func (m *Machine) ToEstimatePicker() bool {
 	return m.TransitionTo(ModeEstimatePicker)
+}
+
+func (m *Machine) IsURLPicker() bool {
+	return m.current == ModeURLPicker
+}
+
+func (m *Machine) ToURLPicker() bool {
+	return m.TransitionTo(ModeURLPicker)
 }
