@@ -1,0 +1,193 @@
+{
+  "id": "872e2818-9fd7-44c6-e33e-e6ef4c934ef0",
+  "name": "Default",
+  "created_at": "2026-05-23T16:37:34Z",
+  "updated_at": "2026-05-23T16:37:34Z",
+  "categories": [
+    {
+      "id": "de2e32f7-b882-b2cb-309a-9048dbf3936c",
+      "name": "Feature",
+      "created_at": "2026-05-23T16:37:34Z",
+      "updated_at": "2026-05-23T16:37:34Z",
+      "tasks": [
+        {
+          "id": "9652ac64-1187-6dd7-0a7b-f04bdb6c8f18",
+          "title": "Build the main dashboard",
+          "status": "in_progress",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "high",
+          "estimate_minutes": 480
+        },
+        {
+          "id": "d3f0a043-ad9a-593a-9a5a-7c46c39eabde",
+          "title": "Add user preferences panel",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "medium",
+          "estimate_minutes": 240
+        },
+        {
+          "id": "7b976e56-a104-9f6b-8153-86c6e5c4b046",
+          "title": "Wire up keyboard shortcuts modal",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "high",
+          "estimate_minutes": 120
+        },
+        {
+          "id": "037e68a2-f47f-b056-c190-09773836e22b",
+          "title": "Polish help overlay styling",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "medium",
+          "estimate_minutes": 45
+        },
+        {
+          "id": "798b67ad-b1ac-06e0-c232-07698ceabb10",
+          "title": "Add fold/unfold animations",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "low"
+        }
+      ]
+    },
+    {
+      "id": "a40673ab-453d-45b4-af2c-4e2dc88ae4f9",
+      "name": "Fix",
+      "created_at": "2026-05-23T16:37:34Z",
+      "updated_at": "2026-05-23T16:37:34Z",
+      "tasks": [
+        {
+          "id": "29252fdd-3ea1-10bc-2d37-210848995b11",
+          "title": "Resolve login timeout issue",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "high",
+          "estimate_minutes": 60
+        },
+        {
+          "id": "99280e58-5951-99dd-aacd-ffb3bd2e06b3",
+          "title": "Fix date formatting in reports",
+          "status": "completed",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "low",
+          "completion_date": "2026-05-23T16:37:34Z",
+          "estimate_minutes": 30
+        },
+        {
+          "id": "b6e8bd2d-e2f4-2219-4e20-0c141cba0d5b",
+          "title": "Crash when deleting last task",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "high",
+          "estimate_minutes": 60
+        },
+        {
+          "id": "91c0ce80-df60-f8b6-6aaf-9382b097dd7a",
+          "title": "Status bar overflow on narrow TTY",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "medium",
+          "estimate_minutes": 30
+        }
+      ]
+    },
+    {
+      "id": "4bb4abb2-d427-a66d-0e1a-e58a7c1526f7",
+      "name": "Ergonomy",
+      "created_at": "2026-05-23T16:37:34Z",
+      "updated_at": "2026-05-23T16:37:34Z",
+      "tasks": [
+        {
+          "id": "045c4442-f1e8-9dd6-4255-2743a1dc1968",
+          "title": "Improve keyboard navigation",
+          "status": "in_progress",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "medium",
+          "estimate_minutes": 120
+        },
+        {
+          "id": "f54c50cb-f552-cfa6-d5e0-66d0c700b5df",
+          "title": "Add dark mode support",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "low",
+          "estimate_minutes": 240
+        }
+      ]
+    },
+    {
+      "id": "df9c5465-cf17-c445-809c-a66f71a8c103",
+      "name": "Documentation",
+      "created_at": "2026-05-23T16:37:34Z",
+      "updated_at": "2026-05-23T16:37:34Z",
+      "tasks": [
+        {
+          "id": "f287196e-28e6-6c39-fa7c-afe32bf0db87",
+          "title": "Write getting started guide",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "medium",
+          "estimate_minutes": 120
+        },
+        {
+          "id": "4c0eb4cd-99e2-d86d-4f91-719587c8011a",
+          "title": "Document API endpoints",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "low",
+          "estimate_minutes": 480
+        }
+      ]
+    },
+    {
+      "id": "6ba6c5b2-f7dd-aca7-2f3a-3064c1f95af1",
+      "name": "Research",
+      "created_at": "2026-05-23T16:37:34Z",
+      "updated_at": "2026-05-23T16:37:34Z",
+      "tasks": [
+        {
+          "id": "f8cdde33-20c4-1b13-3695-43fa8a908e38",
+          "title": "Evaluate caching strategies",
+          "status": "completed",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "medium",
+          "completion_date": "2026-05-23T16:37:34Z",
+          "estimate_minutes": 240
+        },
+        {
+          "id": "738faebd-0b2c-8103-af22-716c434c3ae4",
+          "title": "Investigate performance bottlenecks",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "high",
+          "estimate_minutes": 120
+        },
+        {
+          "id": "03d35a74-669a-e05c-1d70-c8ca7a269a77",
+          "title": "Compare bubbletea vs tview perf",
+          "status": "todo",
+          "created_at": "2026-05-23T16:37:34Z",
+          "updated_at": "2026-05-23T16:37:34Z",
+          "priority": "low",
+          "estimate_minutes": 180
+        }
+      ]
+    }
+  ]
+}
