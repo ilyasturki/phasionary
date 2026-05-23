@@ -14,16 +14,31 @@ type State struct {
 	FoldedCategories  map[string][]string `json:"folded_categories,omitempty"`
 }
 
+// StateRepository abstracts persistence of UI state. Implemented by *StateManager.
+type StateRepository interface {
+	GetLastProjectID() string
+	SetLastProjectID(id string) error
+	GetProjectOrder() []string
+	SetProjectOrder(order []string) error
+	GetFoldedCategories(projectID string) []string
+	SetFoldedCategories(projectID string, categoryIDs []string) error
+	DeleteFoldedCategories(projectID string) error
+}
+
 type StateManager struct {
 	path       string
 	currentDir string
 	state      State
 }
 
-func NewStateManager(dataDir, workingDir string) *StateManager {
+var _ StateRepository = (*StateManager)(nil)
+
+// NewStateManager creates a state manager that persists to <stateDir>/state.json.
+// currentDir is used to scope the "last project" entry per-working-directory; pass "" for global.
+func NewStateManager(stateDir, currentDir string) *StateManager {
 	return &StateManager{
-		path:       filepath.Join(dataDir, "..", "state.json"),
-		currentDir: workingDir,
+		path:       filepath.Join(stateDir, "state.json"),
+		currentDir: currentDir,
 	}
 }
 

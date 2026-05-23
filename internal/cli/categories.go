@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"phasionary/internal/data"
 	"phasionary/internal/domain"
 )
 
@@ -15,15 +17,9 @@ func newCategoriesCmd() *cobra.Command {
 		Aliases: []string{"cs"},
 		Short:   "List categories",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-			return writeCategories(cmd.OutOrStdout(), project.Categories)
+			return viewProject(viper.GetString("project"), func(project domain.Project) error {
+				return writeCategories(cmd.OutOrStdout(), project.Categories)
+			})
 		},
 	}
 	return cmd
@@ -51,21 +47,13 @@ func newCategoryShowCmd() *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeCategories,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
-			cat, _, err := resolveCategory(project, args[0])
-			if err != nil {
-				return fmt.Errorf("category %q not found", args[0])
-			}
-
-			return writeCategoryDetail(cmd.OutOrStdout(), *cat)
+			return viewProject(viper.GetString("project"), func(project domain.Project) error {
+				cat, _, err := resolveCategory(project, args[0])
+				if err != nil {
+					return fmt.Errorf("category %q not found", args[0])
+				}
+				return writeCategoryDetail(cmd.OutOrStdout(), *cat)
+			})
 		},
 	}
 	return cmd
@@ -78,33 +66,23 @@ func newCategoryAddCmd() *cobra.Command {
 		Short:   "Add a category",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
 			name := args[0]
-			for _, cat := range project.Categories {
-				if domain.NormalizeName(cat.Name) == domain.NormalizeName(name) {
-					return fmt.Errorf("category %q already exists", name)
+			var created *domain.Category
+			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+				cat, err := project.AddCategoryNamed(name)
+				if err != nil {
+					if errors.Is(err, domain.ErrDuplicateCategoryName) {
+						return fmt.Errorf("category %q already exists", name)
+					}
+					return err
 				}
-			}
-
-			cat, err := domain.NewCategory(name)
+				created = cat
+				return nil
+			})
 			if err != nil {
 				return err
 			}
-
-			project.AddCategory(cat)
-			if err := store.SaveProject(project); err != nil {
-				return err
-			}
-
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Created category: %s (%s)", cat.Name, cat.ID))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Created category: %s (%s)", created.Name, created.ID))
 			return nil
 		},
 	}
@@ -125,35 +103,23 @@ func newCategoryEditCmd() *cobra.Command {
 				return fmt.Errorf("--name is required")
 			}
 
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
-			cat, catIdx, err := resolveCategory(project, args[0])
-			if err != nil {
-				return fmt.Errorf("category %q not found", args[0])
-			}
-
-			for i, c := range project.Categories {
-				if i != catIdx && domain.NormalizeName(c.Name) == domain.NormalizeName(name) {
-					return fmt.Errorf("category %q already exists", name)
+			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+				_, catIdx, err := resolveCategory(*project, args[0])
+				if err != nil {
+					return fmt.Errorf("category %q not found", args[0])
 				}
-			}
-
-			cat.Name = name
-			cat.UpdatedAt = domain.NowTimestamp()
-			project.Categories[catIdx] = *cat
-
-			if err := store.SaveProject(project); err != nil {
+				if err := project.RenameCategory(catIdx, name); err != nil {
+					if errors.Is(err, domain.ErrDuplicateCategoryName) {
+						return fmt.Errorf("category %q already exists", name)
+					}
+					return err
+				}
+				return nil
+			})
+			if err != nil {
 				return err
 			}
-
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Renamed category to: %s", cat.Name))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Renamed category to: %s", name))
 			return nil
 		},
 	}
@@ -173,11 +139,7 @@ func newCategoryDeleteCmd() *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeCategories,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
+			store, project, err := loadStoreAndProject(viper.GetString("project"))
 			if err != nil {
 				return err
 			}

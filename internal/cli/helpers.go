@@ -7,10 +7,51 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/viper"
+
+	"phasionary/internal/data"
 	"phasionary/internal/domain"
 )
 
 var ErrNotFound = errors.New("not found")
+
+func projectSelector(args []string) string {
+	if len(args) > 0 {
+		return args[0]
+	}
+	return viper.GetString("project")
+}
+
+func loadStoreAndProject(selector string) (*data.Store, domain.Project, error) {
+	store, err := storeFromViper()
+	if err != nil {
+		return nil, domain.Project{}, err
+	}
+	project, err := store.LoadProject(selector)
+	if err != nil {
+		return nil, domain.Project{}, err
+	}
+	return store, project, nil
+}
+
+func withProject(selector string, fn func(*data.Store, *domain.Project) error) error {
+	store, project, err := loadStoreAndProject(selector)
+	if err != nil {
+		return err
+	}
+	if err := fn(store, &project); err != nil {
+		return err
+	}
+	return store.SaveProject(project)
+}
+
+func viewProject(selector string, fn func(domain.Project) error) error {
+	_, project, err := loadStoreAndProject(selector)
+	if err != nil {
+		return err
+	}
+	return fn(project)
+}
 
 var timeEstimateRe = regexp.MustCompile(`^(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m?)?$`)
 
@@ -48,34 +89,42 @@ func parseTimeEstimate(input string) (int, error) {
 	return int(total), nil
 }
 
-func resolveTask(project domain.Project, selector string) (*domain.Task, string, int, int, error) {
+type TaskRef struct {
+	Task          *domain.Task
+	CategoryName  string
+	CategoryIndex int
+	TaskIndex     int
+}
+
+func resolveTask(project domain.Project, selector string) (TaskRef, error) {
 	selector = strings.TrimSpace(selector)
 	if selector == "" {
-		return nil, "", -1, -1, ErrNotFound
+		return TaskRef{}, ErrNotFound
 	}
 
 	needle := domain.NormalizeName(selector)
-	minPrefixLen := 4
+	const minPrefixLen = 4
 
 	for cIdx := range project.Categories {
 		for tIdx := range project.Categories[cIdx].Tasks {
 			task := &project.Categories[cIdx].Tasks[tIdx]
 
-			if task.ID == selector {
-				return task, project.Categories[cIdx].Name, cIdx, tIdx, nil
-			}
+			matched := task.ID == selector ||
+				(len(selector) >= minPrefixLen && strings.HasPrefix(strings.ToLower(task.ID), strings.ToLower(selector))) ||
+				domain.NormalizeName(task.Title) == needle
 
-			if len(selector) >= minPrefixLen && strings.HasPrefix(strings.ToLower(task.ID), strings.ToLower(selector)) {
-				return task, project.Categories[cIdx].Name, cIdx, tIdx, nil
-			}
-
-			if domain.NormalizeName(task.Title) == needle {
-				return task, project.Categories[cIdx].Name, cIdx, tIdx, nil
+			if matched {
+				return TaskRef{
+					Task:          task,
+					CategoryName:  project.Categories[cIdx].Name,
+					CategoryIndex: cIdx,
+					TaskIndex:     tIdx,
+				}, nil
 			}
 		}
 	}
 
-	return nil, "", -1, -1, ErrNotFound
+	return TaskRef{}, ErrNotFound
 }
 
 func resolveCategory(project domain.Project, selector string) (*domain.Category, int, error) {

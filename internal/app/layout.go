@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/charmbracelet/x/ansi"
 
+	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
 )
@@ -65,7 +66,7 @@ func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filt
 	}
 }
 
-func (b *LayoutBuilder) Build(project domain.Project, positions []focusPosition) Layout {
+func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Position) Layout {
 	var items []LayoutItem
 	totalHeight := 0
 	posIndex := 0
@@ -208,7 +209,7 @@ func (b *LayoutBuilder) countTaskLines(task domain.Task) int {
 }
 
 func (m *model) buildLayout() *Layout {
-	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.ui.Width, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold)
+	builder := NewLayoutBuilder(DefaultLayoutConfig(), m.ui.Screen.Width, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold)
 	layout := builder.Build(m.project, m.positions())
 	return &layout
 }

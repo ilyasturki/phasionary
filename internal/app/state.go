@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/charmbracelet/bubbles/textinput"
 
+	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
 )
 
@@ -75,12 +76,11 @@ type OptionsState struct {
 }
 
 type ProjectPickerState struct {
-	projects        []domain.Project
-	selected        int
-	scrollOffset    int
-	isAdding        bool
-	input           textinput.Model
-	pendingDeleteID string
+	projects     []domain.Project
+	selected     int
+	scrollOffset int
+	isAdding     bool
+	input        textinput.Model
 }
 
 func (p *ProjectPickerState) reset() {
@@ -89,7 +89,23 @@ func (p *ProjectPickerState) reset() {
 	p.scrollOffset = 0
 	p.isAdding = false
 	p.input = textinput.Model{}
-	p.pendingDeleteID = ""
+}
+
+type ConfirmDeleteKind int
+
+const (
+	ConfirmDeleteSelection ConfirmDeleteKind = iota
+	ConfirmDeleteProject
+)
+
+type ConfirmDeleteState struct {
+	Kind      ConfirmDeleteKind
+	ProjectID string
+}
+
+func (c *ConfirmDeleteState) reset() {
+	c.Kind = ConfirmDeleteSelection
+	c.ProjectID = ""
 }
 
 func (p *ProjectPickerState) totalItems() int {
@@ -167,17 +183,17 @@ type EditState struct {
 	input     textinput.Model
 	isAdding  bool
 	newItemID string
-	itemType  focusKind
+	itemType  selection.FocusKind
 }
 
 func (e *EditState) reset() {
 	e.input = textinput.New()
 	e.isAdding = false
 	e.newItemID = ""
-	e.itemType = focusProject
+	e.itemType = selection.FocusProject
 }
 
-func newEditState(value string, isAdding bool, newID string, kind focusKind) EditState {
+func newEditState(value string, isAdding bool, newID string, kind selection.FocusKind) EditState {
 	ti := textinput.New()
 	ti.SetValue(value)
 	ti.SetCursor(len([]rune(value)))

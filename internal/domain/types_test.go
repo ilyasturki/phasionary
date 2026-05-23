@@ -283,6 +283,13 @@ func TestCategory_AggregateStatus(t *testing.T) {
 		}}
 		assert.Equal(t, StatusInProgress, cat.AggregateStatus())
 	})
+
+	t.Run("mix of todo and cancelled returns in_progress", func(t *testing.T) {
+		cat := Category{Tasks: []Task{
+			{Status: StatusTodo}, {Status: StatusCancelled},
+		}}
+		assert.Equal(t, StatusInProgress, cat.AggregateStatus())
+	})
 }
 
 func TestTask_SetStatus(t *testing.T) {

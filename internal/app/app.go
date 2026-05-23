@@ -3,37 +3,23 @@ package app
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"phasionary/internal/app/components"
-	"phasionary/internal/export"
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
 	"phasionary/internal/config"
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
+	"phasionary/internal/export"
 	"phasionary/internal/ui"
 )
 
 type clipboardResultMsg struct{ err error }
-
-
-type focusKind int
-
-const (
-	focusProject focusKind = iota
-	focusCategory
-	focusTask
-)
-
-type focusPosition struct {
-	Kind          focusKind
-	CategoryIndex int
-	TaskIndex     int
-}
 
 type model struct {
 	project domain.Project
@@ -48,22 +34,22 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.ui.Width = msg.Width
-		m.ui.Height = msg.Height
+		m.ui.Screen.Width = msg.Width
+		m.ui.Screen.Height = msg.Height
 		m.ensureVisible()
 	case clipboardResultMsg:
 		if msg.err != nil {
-			m.ui.StatusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
+			m.ui.Screen.StatusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
 		} else {
-			m.ui.StatusMsg = "Copied!"
+			m.ui.Screen.StatusMsg = "Copied!"
 		}
 	case editorFinishedMsg:
 		m.handleEditorFinished(msg)
 		return m, nil
 	case tea.FocusMsg:
-		m.ui.WindowFocused = true
+		m.ui.Screen.WindowFocused = true
 	case tea.BlurMsg:
-		m.ui.WindowFocused = false
+		m.ui.Screen.WindowFocused = false
 	case tea.MouseMsg:
 		if !m.ui.Modes.IsNormal() {
 			break
@@ -80,7 +66,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case tea.KeyMsg:
-		m.ui.StatusMsg = ""
+		m.ui.Screen.StatusMsg = ""
 		return m.handleKeyMsg(msg)
 	default:
 		return m.forwardToInput(msg)
@@ -110,10 +96,6 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case modes.ModeExternalEdit:
 		return m, nil
 	default:
-		if msg.String() == "?" {
-			m.ui.Modes.ToggleHelp()
-			return m, nil
-		}
 		return m.handleNormalKey(msg)
 	}
 }
@@ -129,16 +111,19 @@ func (m model) handleHelpKey(msg tea.KeyMsg) model {
 func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
 	switch msg.String() {
 	case "y", "enter":
-		if m.ui.Picker.pendingDeleteID != "" {
+		switch m.ui.ConfirmDelete.Kind {
+		case ConfirmDeleteProject:
 			m.confirmDeleteProject()
-		} else {
+		default:
 			m.confirmDeleteAction()
 		}
 	case "n", "esc":
-		if m.ui.Picker.pendingDeleteID != "" {
-			m.ui.Picker.pendingDeleteID = ""
+		switch m.ui.ConfirmDelete.Kind {
+		case ConfirmDeleteProject:
+			m.ui.ConfirmDelete.reset()
 			m.ui.Modes.ToProjectPicker()
-		} else {
+		default:
+			m.ui.ConfirmDelete.reset()
 			m.ui.Modes.ToNormal()
 		}
 	}
@@ -211,146 +196,8 @@ func (m *model) toggleSelectedOption() {
 }
 
 func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "ctrl+c":
-		return m, tea.Quit
-	case "up", "k":
-		m.moveSelection(-1)
-		m.ui.PendingKey = 0
-	case "down", "j":
-		m.moveSelection(1)
-		m.ui.PendingKey = 0
-	case " ":
-		m.toggleSelectedTask()
-		m.ui.PendingKey = 0
-	case "enter":
-		m.startEditing()
-		m.ui.PendingKey = 0
-	case "A":
-		m.startAddingCategory()
-		m.ui.PendingKey = 0
-	case "h":
-		m.decreasePriority()
-		m.ui.PendingKey = 0
-	case "l":
-		m.increasePriority()
-		m.ui.PendingKey = 0
-	case "y":
-		m.ui.PendingKey = 0
-		return m, m.copySelected()
-	case "Y":
-		m.ui.PendingKey = 0
-		return m, m.copyCategoryContent()
-	case "d":
-		m.deleteSelected()
-		m.ui.PendingKey = 0
-	case "J":
-		if pos, ok := m.selectedPosition(); ok && pos.Kind == focusCategory {
-			m.moveCategoryDown()
-		} else {
-			m.moveTaskDown()
-		}
-		m.ui.PendingKey = 0
-	case "K":
-		if pos, ok := m.selectedPosition(); ok && pos.Kind == focusCategory {
-			m.moveCategoryUp()
-		} else {
-			m.moveTaskUp()
-		}
-		m.ui.PendingKey = 0
-	case "ctrl+d":
-		m.moveSelectionByPage(0.5)
-		m.ui.PendingKey = 0
-	case "ctrl+u":
-		m.moveSelectionByPage(-0.5)
-		m.ui.PendingKey = 0
-	case "ctrl+f":
-		m.moveSelectionByPage(1.0)
-		m.ui.PendingKey = 0
-	case "ctrl+b":
-		m.moveSelectionByPage(-1.0)
-		m.ui.PendingKey = 0
-	case "g":
-		if m.ui.PendingKey == 'g' {
-			m.jumpToFirst()
-			m.ui.PendingKey = 0
-		} else {
-			m.ui.PendingKey = 'g'
-		}
-	case "G":
-		m.jumpToLast()
-		m.ui.PendingKey = 0
-	case "x":
-		m.cutSelectedTask()
-		m.ui.PendingKey = 0
-	case "p":
-		m.pasteTask()
-		m.ui.PendingKey = 0
-	case "P":
-		m.openProjectPicker()
-		m.ui.PendingKey = 0
-	case "tab":
-		m.toggleFold()
-		m.ui.PendingKey = 0
-	case "z":
-		if m.ui.PendingKey == 'z' {
-			m.centerOnSelected()
-			m.ui.PendingKey = 0
-		} else {
-			m.ui.PendingKey = 'z'
-		}
-	case "a":
-		if m.ui.PendingKey == 'z' {
-			m.toggleFold()
-			m.ui.PendingKey = 0
-		} else {
-			m.startAddingTask()
-			m.ui.PendingKey = 0
-		}
-	case "c":
-		if m.ui.PendingKey == 'z' {
-			m.foldAll()
-			m.ui.PendingKey = 0
-		} else {
-			m.ui.PendingKey = 0
-		}
-	case "o":
-		if m.ui.PendingKey == 'z' {
-			m.unfoldAll()
-			m.ui.PendingKey = 0
-		} else {
-			m.ui.Modes.ToOptions()
-			m.ui.Options = OptionsState{selectedOption: 0}
-			m.ui.PendingKey = 0
-		}
-	case "s":
-		m.sortTasksByStatus()
-		m.ui.PendingKey = 0
-	case "S":
-		m.sortTasksByStatusReverse()
-		m.ui.PendingKey = 0
-	case "f":
-		m.ui.Modes.ToFilter()
-		m.ui.PendingKey = 0
-	case "e":
-		m.ui.PendingKey = 0
-		return m, m.startExternalEdit()
-	case "i":
-		m.ui.Modes.ToInfo()
-		m.ui.PendingKey = 0
-	case "t":
-		m.openEstimatePicker()
-		m.ui.PendingKey = 0
-	case "}":
-		m.jumpToNextCategory()
-		m.ui.PendingKey = 0
-	case "{":
-		m.jumpToPrevCategory()
-		m.ui.PendingKey = 0
-	default:
-		m.ui.PendingKey = 0
-	}
-	return m, nil
+	cmd := m.dispatchNormalKey(msg.String())
+	return m, cmd
 }
 
 func (m *model) copySelected() tea.Cmd {
@@ -360,11 +207,11 @@ func (m *model) copySelected() tea.Cmd {
 	}
 	var text string
 	switch pos.Kind {
-	case focusProject:
+	case selection.FocusProject:
 		text = m.project.Name
-	case focusCategory:
+	case selection.FocusCategory:
 		text = m.project.Categories[pos.CategoryIndex].Name
-	case focusTask:
+	case selection.FocusTask:
 		task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
 		text = task.Title
 		taskCopy := task
@@ -381,7 +228,7 @@ func (m *model) copySelected() tea.Cmd {
 
 func (m *model) copyCategoryContent() tea.Cmd {
 	pos, ok := m.selectedPosition()
-	if !ok || pos.Kind == focusProject {
+	if !ok || pos.Kind == selection.FocusProject {
 		return nil
 	}
 	text := export.ExportCategoryMarkdown(m.project.Categories[pos.CategoryIndex])
@@ -391,13 +238,13 @@ func (m *model) copyCategoryContent() tea.Cmd {
 }
 
 func (m model) View() string {
-	if m.ui.Height == 0 {
+	if m.ui.Screen.Height == 0 {
 		return ""
 	}
 
 	layout := m.buildLayout()
-	viewport := NewViewport(layout, m.ui.Height, DefaultLayoutConfig())
-	viewport.ComputeVisibility(m.ui.ScrollOffset)
+	viewport := NewViewport(layout, m.ui.Screen.Height, DefaultLayoutConfig())
+	viewport.ComputeVisibility(m.ui.Screen.ScrollOffset)
 
 	var lines []string
 
@@ -417,7 +264,7 @@ func (m model) View() string {
 
 	statusLine := m.statusLine()
 	content := body + "\n\n" + statusLine
-	modal := components.NewModal(m.ui.Width, m.ui.Height)
+	modal := components.NewModal(m.ui.Screen.Width, m.ui.Screen.Height)
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:
 		return modal.Render(content, m.helpView())
@@ -439,7 +286,7 @@ func (m model) View() string {
 
 func (m model) renderLayoutItem(item LayoutItem) string {
 	isSelected := item.PositionIndex >= 0 && item.PositionIndex == m.selected()
-	focused := m.ui.WindowFocused
+	focused := m.ui.Screen.WindowFocused
 
 	switch item.Kind {
 	case LayoutProject:
@@ -454,14 +301,14 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 			return m.renderEditCategoryLine()
 		}
 		folded := m.ui.Fold.IsFolded(category.ID)
-		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Width, focused)
+		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Screen.Width, focused)
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditTaskLine(task)
 		}
-		return m.renderTaskLine(task, isSelected, m.ui.Width, focused)
+		return m.renderTaskLine(task, isSelected, m.ui.Screen.Width, focused)
 
 	case LayoutEmptyCategory:
 		return ui.MutedStyle.Render("    (no tasks)")
@@ -476,13 +323,13 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 	return ""
 }
 
-func Run(dataDir string, projectSelector string, cfgManager *config.Manager, workingDir string) error {
+func Run(dataDir string, projectSelector string, cfgManager config.Reader, workingDir string) error {
 	store := data.NewStore(dataDir)
 	if err := store.Ensure(); err != nil {
 		return err
 	}
 
-	stateManager := data.NewStateManager(dataDir, workingDir)
+	stateManager := data.NewStateManager(filepath.Dir(dataDir), workingDir)
 	if err := stateManager.Load(); err != nil {
 		return err
 	}
@@ -528,7 +375,7 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager, wor
 	foldState := NewFoldStateFrom(stateManager.GetFoldedCategories(project.ID))
 	positions := rebuildPositions(project.Categories, nil, &foldState)
 	initialSelection := findFirstTaskIndex(positions)
-	selMgr := selection.NewManager(toSelectionPositions(positions), initialSelection)
+	selMgr := selection.NewManager(positions, initialSelection)
 	modeMachine := modes.NewMachine(startMode)
 
 	m := model{
@@ -551,9 +398,9 @@ func Run(dataDir string, projectSelector string, cfgManager *config.Manager, wor
 	return err
 }
 
-func findFirstTaskIndex(positions []focusPosition) int {
+func findFirstTaskIndex(positions []selection.Position) int {
 	for i, pos := range positions {
-		if pos.Kind == focusTask {
+		if pos.Kind == selection.FocusTask {
 			return i
 		}
 	}

@@ -14,27 +14,29 @@ func (m *model) deleteSelected() {
 		return
 	}
 	pos, ok := m.selectedPosition()
-	if !ok || pos.Kind == focusProject {
+	if !ok || pos.Kind == selection.FocusProject {
 		return
 	}
+	m.ui.ConfirmDelete = ConfirmDeleteState{Kind: ConfirmDeleteSelection}
 	m.ui.Modes.ToConfirmDelete()
 }
 
 func (m *model) confirmDeleteAction() {
+	m.ui.ConfirmDelete.reset()
 	m.ui.Modes.ToNormal()
 	position, ok := m.selectedPosition()
 	if !ok {
 		return
 	}
 	switch position.Kind {
-	case focusTask:
+	case selection.FocusTask:
 		m.deleteTask(position)
-	case focusCategory:
+	case selection.FocusCategory:
 		m.deleteCategory(position)
 	}
 }
 
-func (m *model) deleteTask(position focusPosition) {
+func (m *model) deleteTask(position selection.Position) {
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
 
@@ -51,7 +53,7 @@ func (m *model) deleteTask(position focusPosition) {
 	m.storeTaskUpdate()
 }
 
-func (m *model) deleteCategory(position focusPosition) {
+func (m *model) deleteCategory(position selection.Position) {
 	catIndex := position.CategoryIndex
 	_ = m.project.RemoveCategory(catIndex)
 	m.rebuildAndClamp()
@@ -68,7 +70,7 @@ func (m *model) toggleSelectedTask() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusTask {
+	if !ok || position.Kind != selection.FocusTask {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
@@ -82,7 +84,7 @@ func (m *model) increasePriority() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusTask {
+	if !ok || position.Kind != selection.FocusTask {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
@@ -96,7 +98,7 @@ func (m *model) decreasePriority() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusTask {
+	if !ok || position.Kind != selection.FocusTask {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
@@ -110,12 +112,12 @@ func (m *model) openEstimatePicker() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind == focusProject {
+	if !ok || position.Kind == selection.FocusProject {
 		return
 	}
 
 	var currentEstimate int
-	if position.Kind == focusTask {
+	if position.Kind == selection.FocusTask {
 		currentEstimate = m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex].EstimateMinutes
 	} else {
 		currentEstimate = m.project.Categories[position.CategoryIndex].EstimateMinutes
@@ -127,11 +129,11 @@ func (m *model) openEstimatePicker() {
 
 func (m *model) selectEstimate(minutes int) {
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind == focusProject {
+	if !ok || position.Kind == selection.FocusProject {
 		return
 	}
 
-	if position.Kind == focusTask {
+	if position.Kind == selection.FocusTask {
 		task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 		task.SetEstimate(minutes)
 	} else {
@@ -146,7 +148,7 @@ func (m *model) moveTaskDown() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusTask {
+	if !ok || position.Kind != selection.FocusTask {
 		return
 	}
 	catIndex := position.CategoryIndex
@@ -167,7 +169,7 @@ func (m *model) moveTaskUp() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusTask {
+	if !ok || position.Kind != selection.FocusTask {
 		return
 	}
 	catIndex := position.CategoryIndex
@@ -188,7 +190,7 @@ func (m *model) moveCategoryDown() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusCategory {
+	if !ok || position.Kind != selection.FocusCategory {
 		return
 	}
 	catIndex := position.CategoryIndex
@@ -210,7 +212,7 @@ func (m *model) moveCategoryUp() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusCategory {
+	if !ok || position.Kind != selection.FocusCategory {
 		return
 	}
 	catIndex := position.CategoryIndex
@@ -329,7 +331,7 @@ func (m *model) sortTasksByStatusOrder(ascending bool) {
 
 	var selectedTaskID string
 	position, hasSelection := m.selectedPosition()
-	if hasSelection && position.Kind == focusTask {
+	if hasSelection && position.Kind == selection.FocusTask {
 		selectedTaskID = m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex].ID
 	}
 
@@ -358,8 +360,8 @@ func (m *model) cutSelectedTask() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != focusTask {
-		m.ui.StatusMsg = "Can only cut tasks"
+	if !ok || position.Kind != selection.FocusTask {
+		m.ui.Screen.StatusMsg = "Can only cut tasks"
 		return
 	}
 
@@ -375,18 +377,18 @@ func (m *model) cutSelectedTask() {
 	if len([]rune(title)) > 30 {
 		title = string([]rune(title)[:30]) + "..."
 	}
-	m.ui.StatusMsg = "Marked for cut: " + title
+	m.ui.Screen.StatusMsg = "Marked for cut: " + title
 }
 
 func (m *model) pasteTask() {
 	if m.ui.Clipboard.Task == nil {
-		m.ui.StatusMsg = "Nothing to paste"
+		m.ui.Screen.StatusMsg = "Nothing to paste"
 		return
 	}
 
 	newID, err := domain.NewID()
 	if err != nil {
-		m.ui.StatusMsg = "Failed to create task ID"
+		m.ui.Screen.StatusMsg = "Failed to create task ID"
 		return
 	}
 
@@ -405,18 +407,18 @@ func (m *model) pasteTask() {
 	var catIndex, taskIndex int
 
 	if !ok || len(m.project.Categories) == 0 {
-		m.ui.StatusMsg = "No category to paste into"
+		m.ui.Screen.StatusMsg = "No category to paste into"
 		return
 	}
 
 	switch position.Kind {
-	case focusProject:
+	case selection.FocusProject:
 		catIndex = 0
 		taskIndex = 0
-	case focusCategory:
+	case selection.FocusCategory:
 		catIndex = position.CategoryIndex
 		taskIndex = 0
-	case focusTask:
+	case selection.FocusTask:
 		catIndex = position.CategoryIndex
 		taskIndex = position.TaskIndex
 	}
@@ -442,7 +444,7 @@ func (m *model) pasteTask() {
 	})
 	m.ensureVisible()
 	m.storeTaskUpdate()
-	m.ui.StatusMsg = statusMsg
+	m.ui.Screen.StatusMsg = statusMsg
 }
 
 func (m *model) removeTaskByID(id string) {

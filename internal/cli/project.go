@@ -8,6 +8,7 @@ import (
 
 	"phasionary/internal/config"
 	"phasionary/internal/data"
+	"phasionary/internal/domain"
 )
 
 func newProjectsCmd() *cobra.Command {
@@ -53,19 +54,9 @@ func newProjectShowCmd() *cobra.Command {
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completeProjects,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			selector := viper.GetString("project")
-			if len(args) > 0 {
-				selector = args[0]
-			}
-			project, err := store.LoadProject(selector)
-			if err != nil {
-				return err
-			}
-			return writeProjectDetail(cmd.OutOrStdout(), project)
+			return viewProject(projectSelector(args), func(project domain.Project) error {
+				return writeProjectDetail(cmd.OutOrStdout(), project)
+			})
 		},
 	}
 	return cmd
@@ -107,25 +98,14 @@ func newProjectEditCmd() *cobra.Command {
 				return fmt.Errorf("--name is required")
 			}
 
-			store, err := storeFromViper()
+			err := withProject(projectSelector(args), func(_ *data.Store, project *domain.Project) error {
+				project.Name = name
+				return nil
+			})
 			if err != nil {
 				return err
 			}
-			selector := viper.GetString("project")
-			if len(args) > 0 {
-				selector = args[0]
-			}
-			project, err := store.LoadProject(selector)
-			if err != nil {
-				return err
-			}
-
-			project.Name = name
-			if err := store.SaveProject(project); err != nil {
-				return err
-			}
-
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Renamed project to: %s", project.Name))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Renamed project to: %s", name))
 			return nil
 		},
 	}
@@ -145,15 +125,7 @@ func newProjectDeleteCmd() *cobra.Command {
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completeProjects,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			selector := viper.GetString("project")
-			if len(args) > 0 {
-				selector = args[0]
-			}
-			project, err := store.LoadProject(selector)
+			store, project, err := loadStoreAndProject(projectSelector(args))
 			if err != nil {
 				return err
 			}

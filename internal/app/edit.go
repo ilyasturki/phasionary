@@ -15,17 +15,17 @@ func (m *model) startEditing() {
 		return
 	}
 	switch position.Kind {
-	case focusProject:
+	case selection.FocusProject:
 		m.ui.Modes.ToEdit()
-		m.ui.Edit = newEditState(m.project.Name, false, "", focusProject)
-	case focusTask:
+		m.ui.Edit = newEditState(m.project.Name, false, "", selection.FocusProject)
+	case selection.FocusTask:
 		task := m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 		m.ui.Modes.ToEdit()
-		m.ui.Edit = newEditState(task.Title, false, "", focusTask)
-	case focusCategory:
+		m.ui.Edit = newEditState(task.Title, false, "", selection.FocusTask)
+	case selection.FocusCategory:
 		category := m.project.Categories[position.CategoryIndex]
 		m.ui.Modes.ToEdit()
-		m.ui.Edit = newEditState(category.Name, false, "", focusCategory)
+		m.ui.Edit = newEditState(category.Name, false, "", selection.FocusCategory)
 	}
 }
 
@@ -58,7 +58,7 @@ func (m *model) startAddingTask() {
 		return p.Kind == selection.FocusTask && p.CategoryIndex == catIndex && p.TaskIndex == taskIndex
 	})
 	m.ui.Modes.ToEdit()
-	m.ui.Edit = newEditState("", true, newTask.ID, focusTask)
+	m.ui.Edit = newEditState("", true, newTask.ID, selection.FocusTask)
 	m.ensureVisible()
 }
 
@@ -78,7 +78,7 @@ func (m *model) startAddingCategory() {
 		return p.Kind == selection.FocusCategory && p.CategoryIndex == insertIndex
 	})
 	m.ui.Modes.ToEdit()
-	m.ui.Edit = newEditState("", true, newCat.ID, focusCategory)
+	m.ui.Edit = newEditState("", true, newCat.ID, selection.FocusCategory)
 	m.ensureVisible()
 }
 
@@ -131,11 +131,11 @@ func (m *model) finishEditing() {
 		return
 	}
 	switch position.Kind {
-	case focusProject:
+	case selection.FocusProject:
 		m.project.Name = trimmed
 		m.project.UpdatedAt = domain.NowTimestamp()
 		m.storeTaskUpdate()
-	case focusTask:
+	case selection.FocusTask:
 		task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 		if task.Title != trimmed || m.ui.Edit.isAdding {
 			task.Title = trimmed
@@ -155,7 +155,7 @@ func (m *model) finishEditing() {
 
 			m.storeTaskUpdate()
 		}
-	case focusCategory:
+	case selection.FocusCategory:
 		m.finishCategoryEditing(position, trimmed)
 	default:
 		m.cancelEditing()
@@ -165,26 +165,22 @@ func (m *model) finishEditing() {
 	m.ui.Edit.reset()
 }
 
-func (m *model) finishCategoryEditing(position focusPosition, name string) {
-	for i, cat := range m.project.Categories {
-		if i != position.CategoryIndex && strings.EqualFold(cat.Name, name) {
-			if m.ui.Edit.isAdding {
-				m.removeNewCategory()
-			}
-			return
+func (m *model) finishCategoryEditing(position selection.Position, name string) {
+	if err := m.project.RenameCategory(position.CategoryIndex, name); err != nil {
+		if m.ui.Edit.isAdding {
+			m.removeNewCategory()
 		}
+		return
 	}
-	m.project.Categories[position.CategoryIndex].Name = name
-	m.project.UpdatedAt = domain.NowTimestamp()
 	m.storeTaskUpdate()
 }
 
 func (m *model) cancelEditing() {
 	if m.ui.Edit.isAdding {
 		switch m.ui.Edit.itemType {
-		case focusTask:
+		case selection.FocusTask:
 			m.removeNewTask()
-		case focusCategory:
+		case selection.FocusCategory:
 			m.removeNewCategory()
 		}
 	}
@@ -223,4 +219,3 @@ func (m *model) removeNewTask() {
 	m.rebuildPositions()
 	m.ensureVisible()
 }
-

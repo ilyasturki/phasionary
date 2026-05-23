@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"phasionary/internal/data"
 	"phasionary/internal/domain"
 )
 
@@ -23,15 +24,6 @@ func newTasksCmd() *cobra.Command {
 		Aliases: []string{"ts"},
 		Short:   "List tasks",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
 			if status != "" {
 				if err := domain.ValidateStatus(status); err != nil {
 					return err
@@ -43,30 +35,32 @@ func newTasksCmd() *cobra.Command {
 				}
 			}
 
-			var tasks []TaskListItem
-			for _, cat := range project.Categories {
-				if category != "" && domain.NormalizeName(cat.Name) != domain.NormalizeName(category) {
-					continue
-				}
-				for _, task := range cat.Tasks {
-					if status != "" && task.Status != status {
+			return viewProject(viper.GetString("project"), func(project domain.Project) error {
+				var tasks []TaskListItem
+				for _, cat := range project.Categories {
+					if category != "" && domain.NormalizeName(cat.Name) != domain.NormalizeName(category) {
 						continue
 					}
-					if priority != "" && task.Priority != priority {
-						continue
+					for _, task := range cat.Tasks {
+						if status != "" && task.Status != status {
+							continue
+						}
+						if priority != "" && task.Priority != priority {
+							continue
+						}
+						tasks = append(tasks, TaskListItem{
+							ID:              task.ID,
+							Title:           task.Title,
+							Status:          task.Status,
+							Priority:        task.Priority,
+							Category:        cat.Name,
+							EstimateMinutes: task.EstimateMinutes,
+						})
 					}
-					tasks = append(tasks, TaskListItem{
-						ID:              task.ID,
-						Title:           task.Title,
-						Status:          task.Status,
-						Priority:        task.Priority,
-						Category:        cat.Name,
-						EstimateMinutes: task.EstimateMinutes,
-					})
 				}
-			}
 
-			return writeTaskList(cmd.OutOrStdout(), tasks)
+				return writeTaskList(cmd.OutOrStdout(), tasks)
+			})
 		},
 	}
 
@@ -106,21 +100,13 @@ func newTaskShowCmd() *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
-			task, catName, _, _, err := resolveTask(project, args[0])
-			if err != nil {
-				return fmt.Errorf("task %q not found", args[0])
-			}
-
-			return writeTaskDetail(cmd.OutOrStdout(), *task, catName)
+			return viewProject(viper.GetString("project"), func(project domain.Project) error {
+				ref, err := resolveTask(project, args[0])
+				if err != nil {
+					return fmt.Errorf("task %q not found", args[0])
+				}
+				return writeTaskDetail(cmd.OutOrStdout(), *ref.Task, ref.CategoryName)
+			})
 		},
 	}
 	return cmd
@@ -142,27 +128,17 @@ func newTaskAddCmd() *cobra.Command {
 			if strings.TrimSpace(categoryName) == "" {
 				return errors.New("--category is required")
 			}
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
 
 			task, err := domain.NewTask(args[0])
 			if err != nil {
 				return err
 			}
-
 			if priority != "" {
 				if err := domain.ValidatePriority(priority); err != nil {
 					return err
 				}
 				task.Priority = priority
 			}
-
 			if estimate != "" {
 				minutes, err := parseTimeEstimate(estimate)
 				if err != nil {
@@ -171,17 +147,17 @@ func newTaskAddCmd() *cobra.Command {
 				task.EstimateMinutes = minutes
 			}
 
-			cat, catIdx, err := resolveCategory(project, categoryName)
+			err = withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+				_, catIdx, err := resolveCategory(*project, categoryName)
+				if err != nil {
+					return fmt.Errorf("category %q not found", categoryName)
+				}
+				project.Categories[catIdx].AddTask(task)
+				return nil
+			})
 			if err != nil {
-				return fmt.Errorf("category %q not found", categoryName)
-			}
-
-			cat.Tasks = append(cat.Tasks, task)
-			project.Categories[catIdx] = *cat
-			if err := store.SaveProject(project); err != nil {
 				return err
 			}
-
 			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Created task: %s (%s)", task.Title, task.ID))
 			return nil
 		},
@@ -211,42 +187,36 @@ func newTaskEditCmd() *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
-			task, _, catIdx, taskIdx, err := resolveTask(project, args[0])
-			if err != nil {
-				return fmt.Errorf("task %q not found", args[0])
-			}
-
-			if title != "" {
-				task.Title = title
-			}
-			if priority != "" {
-				if err := task.SetPriority(priority); err != nil {
-					return err
-				}
-			}
-			if estimate != "" {
-				minutes, err := parseTimeEstimate(estimate)
+			var updatedTitle string
+			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+				ref, err := resolveTask(*project, args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("task %q not found", args[0])
 				}
-				task.SetEstimate(minutes)
-			}
 
-			project.Categories[catIdx].Tasks[taskIdx] = *task
-			if err := store.SaveProject(project); err != nil {
+				task := &project.Categories[ref.CategoryIndex].Tasks[ref.TaskIndex]
+				if title != "" {
+					task.Title = title
+				}
+				if priority != "" {
+					if err := task.SetPriority(priority); err != nil {
+						return err
+					}
+				}
+				if estimate != "" {
+					minutes, err := parseTimeEstimate(estimate)
+					if err != nil {
+						return err
+					}
+					task.SetEstimate(minutes)
+				}
+				updatedTitle = task.Title
+				return nil
+			})
+			if err != nil {
 				return err
 			}
-
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Updated task: %s", task.Title))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Updated task: %s", updatedTitle))
 			return nil
 		},
 	}
@@ -270,22 +240,18 @@ func newTaskDeleteCmd() *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := storeFromViper()
-			if err != nil {
-				return err
-			}
-			project, err := store.LoadProject(viper.GetString("project"))
+			store, project, err := loadStoreAndProject(viper.GetString("project"))
 			if err != nil {
 				return err
 			}
 
-			task, _, catIdx, taskIdx, err := resolveTask(project, args[0])
+			ref, err := resolveTask(project, args[0])
 			if err != nil {
 				return fmt.Errorf("task %q not found", args[0])
 			}
 
 			if !force {
-				fmt.Fprintf(cmd.OutOrStdout(), "Delete task %q? [y/N]: ", task.Title)
+				fmt.Fprintf(cmd.OutOrStdout(), "Delete task %q? [y/N]: ", ref.Task.Title)
 				var response string
 				if _, err := fmt.Fscanln(cmd.InOrStdin(), &response); err != nil {
 					return nil
@@ -296,14 +262,15 @@ func newTaskDeleteCmd() *cobra.Command {
 				}
 			}
 
-			if err := project.Categories[catIdx].RemoveTask(taskIdx); err != nil {
+			title := ref.Task.Title
+			if err := project.Categories[ref.CategoryIndex].RemoveTask(ref.TaskIndex); err != nil {
 				return err
 			}
 			if err := store.SaveProject(project); err != nil {
 				return err
 			}
 
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Deleted task: %s", task.Title))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Deleted task: %s", title))
 			return nil
 		},
 	}
@@ -333,30 +300,23 @@ func newTaskStatusCmd() *cobra.Command {
 				return err
 			}
 
-			store, err := storeFromViper()
+			var title string
+			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+				ref, err := resolveTask(*project, selector)
+				if err != nil {
+					return fmt.Errorf("task %q not found", selector)
+				}
+				task := &project.Categories[ref.CategoryIndex].Tasks[ref.TaskIndex]
+				if err := task.SetStatus(status); err != nil {
+					return err
+				}
+				title = task.Title
+				return nil
+			})
 			if err != nil {
 				return err
 			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
-			task, _, catIdx, taskIdx, err := resolveTask(project, selector)
-			if err != nil {
-				return fmt.Errorf("task %q not found", selector)
-			}
-
-			if err := task.SetStatus(status); err != nil {
-				return err
-			}
-
-			project.Categories[catIdx].Tasks[taskIdx] = *task
-			if err := store.SaveProject(project); err != nil {
-				return err
-			}
-
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Updated task %s to %s", task.Title, status))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Updated task %s to %s", title, status))
 			return nil
 		},
 	}
@@ -383,30 +343,23 @@ func newTaskPriorityCmd() *cobra.Command {
 				return err
 			}
 
-			store, err := storeFromViper()
+			var title string
+			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+				ref, err := resolveTask(*project, selector)
+				if err != nil {
+					return fmt.Errorf("task %q not found", selector)
+				}
+				task := &project.Categories[ref.CategoryIndex].Tasks[ref.TaskIndex]
+				if err := task.SetPriority(priority); err != nil {
+					return err
+				}
+				title = task.Title
+				return nil
+			})
 			if err != nil {
 				return err
 			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
-			task, _, catIdx, taskIdx, err := resolveTask(project, selector)
-			if err != nil {
-				return fmt.Errorf("task %q not found", selector)
-			}
-
-			if err := task.SetPriority(priority); err != nil {
-				return err
-			}
-
-			project.Categories[catIdx].Tasks[taskIdx] = *task
-			if err := store.SaveProject(project); err != nil {
-				return err
-			}
-
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Updated task %s priority to %s", task.Title, priority))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Updated task %s priority to %s", title, priority))
 			return nil
 		},
 	}
@@ -429,40 +382,30 @@ func newTaskMoveCmd() *cobra.Command {
 			selector := args[0]
 			targetCategory := args[1]
 
-			store, err := storeFromViper()
+			var title, destName string
+			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+				ref, err := resolveTask(*project, selector)
+				if err != nil {
+					return fmt.Errorf("task %q not found", selector)
+				}
+				_, dstCatIdx, err := resolveCategory(*project, targetCategory)
+				if err != nil {
+					return fmt.Errorf("category %q not found", targetCategory)
+				}
+				if ref.CategoryIndex == dstCatIdx {
+					return fmt.Errorf("task is already in category %q", targetCategory)
+				}
+				title = ref.Task.Title
+				if err := project.MoveTask(ref.CategoryIndex, ref.TaskIndex, dstCatIdx); err != nil {
+					return err
+				}
+				destName = project.Categories[dstCatIdx].Name
+				return nil
+			})
 			if err != nil {
 				return err
 			}
-			project, err := store.LoadProject(viper.GetString("project"))
-			if err != nil {
-				return err
-			}
-
-			task, _, srcCatIdx, taskIdx, err := resolveTask(project, selector)
-			if err != nil {
-				return fmt.Errorf("task %q not found", selector)
-			}
-
-			_, dstCatIdx, err := resolveCategory(project, targetCategory)
-			if err != nil {
-				return fmt.Errorf("category %q not found", targetCategory)
-			}
-
-			if srcCatIdx == dstCatIdx {
-				return fmt.Errorf("task is already in category %q", targetCategory)
-			}
-
-			taskCopy := *task
-			if err := project.Categories[srcCatIdx].RemoveTask(taskIdx); err != nil {
-				return err
-			}
-			project.Categories[dstCatIdx].AddTask(taskCopy)
-
-			if err := store.SaveProject(project); err != nil {
-				return err
-			}
-
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Moved task %s to %s", task.Title, project.Categories[dstCatIdx].Name))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Moved task %s to %s", title, destName))
 			return nil
 		},
 	}

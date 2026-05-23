@@ -14,7 +14,7 @@ const pickerVisibleItems = 10
 func (m *model) openProjectPicker() {
 	projects, err := m.deps.Store.ListProjects()
 	if err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Error loading projects: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Error loading projects: %v", err)
 		return
 	}
 
@@ -106,16 +106,19 @@ func (m *model) initiateProjectDelete() {
 		return
 	}
 	if len(m.ui.Picker.projects) <= 1 {
-		m.ui.StatusMsg = "Cannot delete the only project"
+		m.ui.Screen.StatusMsg = "Cannot delete the only project"
 		return
 	}
 	selectedProject := m.ui.Picker.projects[m.ui.Picker.selected]
-	m.ui.Picker.pendingDeleteID = selectedProject.ID
+	m.ui.ConfirmDelete = ConfirmDeleteState{
+		Kind:      ConfirmDeleteProject,
+		ProjectID: selectedProject.ID,
+	}
 	m.ui.Modes.ToConfirmDelete()
 }
 
 func (m *model) confirmDeleteProject() {
-	deleteID := m.ui.Picker.pendingDeleteID
+	deleteID := m.ui.ConfirmDelete.ProjectID
 	if deleteID == "" {
 		return
 	}
@@ -129,8 +132,8 @@ func (m *model) confirmDeleteProject() {
 	}
 
 	if err := m.deps.Store.DeleteProject(deleteID); err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Error deleting project: %v", err)
-		m.ui.Picker.pendingDeleteID = ""
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Error deleting project: %v", err)
+		m.ui.ConfirmDelete.reset()
 		m.ui.Modes.ToProjectPicker()
 		return
 	}
@@ -141,8 +144,8 @@ func (m *model) confirmDeleteProject() {
 	if m.project.ID == deleteID {
 		projects, err := m.deps.Store.ListProjects()
 		if err != nil {
-			m.ui.StatusMsg = fmt.Sprintf("Error loading projects: %v", err)
-			m.ui.Picker.pendingDeleteID = ""
+			m.ui.Screen.StatusMsg = fmt.Sprintf("Error loading projects: %v", err)
+			m.ui.ConfirmDelete.reset()
 			m.ui.Modes.ToProjectPicker()
 			return
 		}
@@ -153,15 +156,15 @@ func (m *model) confirmDeleteProject() {
 			m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(m.project.ID))
 			positions := rebuildPositions(m.project.Categories, &m.ui.Filter, &m.ui.Fold)
 			initialSelection := findFirstTaskIndex(positions)
-			m.ui.Selection.SetPositions(toSelectionPositions(positions))
+			m.ui.Selection.SetPositions(positions)
 			m.ui.Selection.SetSelected(initialSelection)
-			m.ui.ScrollOffset = 0
+			m.ui.Screen.ScrollOffset = 0
 		}
 	}
 
 	projects, err := m.deps.Store.ListProjects()
 	if err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Error reloading projects: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Error reloading projects: %v", err)
 	} else {
 		m.ui.Picker.projects = projects
 		if m.ui.Picker.selected >= len(projects) {
@@ -173,8 +176,8 @@ func (m *model) confirmDeleteProject() {
 		m.ui.Picker.ensureVisible()
 	}
 
-	m.ui.StatusMsg = fmt.Sprintf("Deleted project: %s", deletedProjectName)
-	m.ui.Picker.pendingDeleteID = ""
+	m.ui.Screen.StatusMsg = fmt.Sprintf("Deleted project: %s", deletedProjectName)
+	m.ui.ConfirmDelete.reset()
 	m.ui.Modes.ToProjectPicker()
 }
 
@@ -202,7 +205,7 @@ func (m *model) createProjectFromPicker() {
 
 	project, err := m.deps.Store.CreateProject(name)
 	if err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Error: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Error: %v", err)
 		return
 	}
 
@@ -216,12 +219,12 @@ func (m *model) createProjectFromPicker() {
 	m.ui.Fold = NewFoldState()
 	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold)
 	initialSelection := findFirstTaskIndex(positions)
-	m.ui.Selection.SetPositions(toSelectionPositions(positions))
+	m.ui.Selection.SetPositions(positions)
 	m.ui.Selection.SetSelected(initialSelection)
-	m.ui.ScrollOffset = 0
+	m.ui.Screen.ScrollOffset = 0
 
 	m.ensureVisible()
-	m.ui.StatusMsg = fmt.Sprintf("Created project: %s", project.Name)
+	m.ui.Screen.StatusMsg = fmt.Sprintf("Created project: %s", project.Name)
 	m.ui.Picker.reset()
 	m.ui.Modes.ToNormal()
 }
@@ -242,7 +245,7 @@ func (m *model) selectProject() {
 
 	project, err := m.deps.Store.LoadProject(selectedProject.ID)
 	if err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Error loading project: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Error loading project: %v", err)
 		m.ui.Picker.reset()
 		m.ui.Modes.ToNormal()
 		return
@@ -255,12 +258,12 @@ func (m *model) selectProject() {
 	m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(project.ID))
 	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold)
 	initialSelection := findFirstTaskIndex(positions)
-	m.ui.Selection.SetPositions(toSelectionPositions(positions))
+	m.ui.Selection.SetPositions(positions)
 	m.ui.Selection.SetSelected(initialSelection)
-	m.ui.ScrollOffset = 0
+	m.ui.Screen.ScrollOffset = 0
 
 	m.ensureVisible()
-	m.ui.StatusMsg = fmt.Sprintf("Switched to: %s", project.Name)
+	m.ui.Screen.StatusMsg = fmt.Sprintf("Switched to: %s", project.Name)
 	m.ui.Picker.reset()
 	m.ui.Modes.ToNormal()
 }

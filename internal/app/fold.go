@@ -1,5 +1,7 @@
 package app
 
+import "phasionary/internal/app/selection"
+
 func (m *model) toggleFold() {
 	pos, ok := m.selectedPosition()
 	if !ok {
@@ -8,9 +10,9 @@ func (m *model) toggleFold() {
 
 	var categoryID string
 	switch pos.Kind {
-	case focusCategory:
+	case selection.FocusCategory:
 		categoryID = m.project.Categories[pos.CategoryIndex].ID
-	case focusTask:
+	case selection.FocusTask:
 		categoryID = m.project.Categories[pos.CategoryIndex].ID
 		m.ui.Selection.SetSelected(m.findCategoryPositionIndex(pos.CategoryIndex))
 	default:
@@ -32,7 +34,7 @@ func (m *model) foldAll() {
 	m.saveFoldState()
 
 	pos, ok := m.selectedPosition()
-	if ok && pos.Kind == focusTask {
+	if ok && pos.Kind == selection.FocusTask {
 		m.ui.Selection.SetSelected(m.findCategoryPositionIndex(pos.CategoryIndex))
 	}
 
@@ -53,7 +55,7 @@ func (m *model) saveFoldState() {
 
 func (m *model) findCategoryPositionIndex(categoryIndex int) int {
 	for i, pos := range m.positions() {
-		if pos.Kind == focusCategory && pos.CategoryIndex == categoryIndex {
+		if pos.Kind == selection.FocusCategory && pos.CategoryIndex == categoryIndex {
 			return i
 		}
 	}

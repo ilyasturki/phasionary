@@ -15,43 +15,48 @@ type ClipboardState struct {
 	SourceID string
 }
 
+type Screen struct {
+	Width         int
+	Height        int
+	ScrollOffset  int
+	StatusMsg     string
+	PendingKey    rune
+	WindowFocused bool
+}
+
 type UIState struct {
-	Selection          *selection.Manager
-	Modes              *modes.Machine
-	Edit               EditState
-	Picker             ProjectPickerState
-	Options            OptionsState
-	Filter             FilterState
-	Fold               FoldState
-	ExternalEdit       ExternalEditState
-	EstimatePicker     components.EstimatePickerState
-	Clipboard          ClipboardState
-	StatusMsg          string
-	ScrollOffset       int
-	PendingKey         rune
-	Width              int
-	Height             int
-	LastSortAscending  *bool
-	WindowFocused      bool
+	Selection         *selection.Manager
+	Modes             *modes.Machine
+	Screen            Screen
+	Edit              EditState
+	Picker            ProjectPickerState
+	ConfirmDelete     ConfirmDeleteState
+	Options           OptionsState
+	Filter            FilterState
+	Fold              FoldState
+	ExternalEdit      ExternalEditState
+	EstimatePicker    components.EstimatePickerState
+	Clipboard         ClipboardState
+	LastSortAscending *bool
 }
 
 type Dependencies struct {
 	Store        data.ProjectRepository
-	CfgManager   *config.Manager
-	StateManager *data.StateManager
+	CfgManager   config.Reader
+	StateManager data.StateRepository
 }
 
 func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {
 	return &UIState{
-		Selection:     sel,
-		Modes:         modeMachine,
-		Filter:        NewFilterState(),
-		Fold:          NewFoldState(),
-		WindowFocused: true,
+		Selection: sel,
+		Modes:     modeMachine,
+		Screen:    Screen{WindowFocused: true},
+		Filter:    NewFilterState(),
+		Fold:      NewFoldState(),
 	}
 }
 
-func NewDependencies(store data.ProjectRepository, cfgManager *config.Manager, stateManager *data.StateManager) *Dependencies {
+func NewDependencies(store data.ProjectRepository, cfgManager config.Reader, stateManager data.StateRepository) *Dependencies {
 	return &Dependencies{
 		Store:        store,
 		CfgManager:   cfgManager,

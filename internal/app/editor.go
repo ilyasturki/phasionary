@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
 )
 
@@ -18,14 +20,14 @@ type editorFinishedMsg struct {
 
 type ExternalEditState struct {
 	TempFilePath  string
-	ItemType      focusKind
+	ItemType      selection.FocusKind
 	CategoryIndex int
 	TaskIndex     int
 }
 
 func (e *ExternalEditState) reset() {
 	e.TempFilePath = ""
-	e.ItemType = focusProject
+	e.ItemType = selection.FocusProject
 	e.CategoryIndex = -1
 	e.TaskIndex = -1
 }
@@ -60,24 +62,24 @@ func (m *model) startExternalEdit() tea.Cmd {
 
 	var content string
 	switch pos.Kind {
-	case focusProject:
+	case selection.FocusProject:
 		content = formatProjectForEdit(m.project)
-	case focusCategory:
+	case selection.FocusCategory:
 		content = formatCategoryForEdit(m.project.Categories[pos.CategoryIndex])
-	case focusTask:
+	case selection.FocusTask:
 		content = formatTaskForEdit(m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex])
 	}
 
 	tempFile, err := os.CreateTemp("", "phasionary-edit-*.txt")
 	if err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Failed to create temp file: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to create temp file: %v", err)
 		return nil
 	}
 
 	if _, err := tempFile.WriteString(content); err != nil {
 		tempFile.Close()
 		os.Remove(tempFile.Name())
-		m.ui.StatusMsg = fmt.Sprintf("Failed to write temp file: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to write temp file: %v", err)
 		return nil
 	}
 	tempFile.Close()
@@ -107,22 +109,22 @@ func (m *model) handleEditorFinished(msg editorFinishedMsg) {
 	}()
 
 	if msg.err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Editor error: %v", msg.err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Editor error: %v", msg.err)
 		return
 	}
 
 	content, err := os.ReadFile(msg.tempFile)
 	if err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Failed to read edited file: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to read edited file: %v", err)
 		return
 	}
 
 	switch m.ui.ExternalEdit.ItemType {
-	case focusProject:
+	case selection.FocusProject:
 		m.applyProjectEdit(string(content))
-	case focusCategory:
+	case selection.FocusCategory:
 		m.applyCategoryEdit(string(content))
-	case focusTask:
+	case selection.FocusTask:
 		m.applyTaskEdit(string(content))
 	}
 }
@@ -130,7 +132,7 @@ func (m *model) handleEditorFinished(msg editorFinishedMsg) {
 func (m *model) applyProjectEdit(content string) {
 	name := strings.TrimSpace(content)
 	if name == "" {
-		m.ui.StatusMsg = "Project name cannot be empty"
+		m.ui.Screen.StatusMsg = "Project name cannot be empty"
 		return
 	}
 
@@ -141,22 +143,22 @@ func (m *model) applyProjectEdit(content string) {
 	m.project.Name = name
 	m.project.UpdatedAt = domain.NowTimestamp()
 	if err := m.deps.Store.SaveProject(m.project); err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
 		return
 	}
-	m.ui.StatusMsg = "Project updated"
+	m.ui.Screen.StatusMsg = "Project updated"
 }
 
 func (m *model) applyCategoryEdit(content string) {
 	idx := m.ui.ExternalEdit.CategoryIndex
 	if idx < 0 || idx >= len(m.project.Categories) {
-		m.ui.StatusMsg = "Category no longer exists"
+		m.ui.Screen.StatusMsg = "Category no longer exists"
 		return
 	}
 
 	name := strings.TrimSpace(content)
 	if name == "" {
-		m.ui.StatusMsg = "Category name cannot be empty"
+		m.ui.Screen.StatusMsg = "Category name cannot be empty"
 		return
 	}
 
@@ -164,21 +166,19 @@ func (m *model) applyCategoryEdit(content string) {
 		return
 	}
 
-	normalizedNew := domain.NormalizeName(name)
-	for i, cat := range m.project.Categories {
-		if i != idx && domain.NormalizeName(cat.Name) == normalizedNew {
-			m.ui.StatusMsg = "A category with that name already exists"
+	if err := m.project.RenameCategory(idx, name); err != nil {
+		if errors.Is(err, domain.ErrDuplicateCategoryName) {
+			m.ui.Screen.StatusMsg = "A category with that name already exists"
 			return
 		}
-	}
-
-	m.project.Categories[idx].Name = name
-	m.project.UpdatedAt = domain.NowTimestamp()
-	if err := m.deps.Store.SaveProject(m.project); err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Rename failed: %v", err)
 		return
 	}
-	m.ui.StatusMsg = "Category updated"
+	if err := m.deps.Store.SaveProject(m.project); err != nil {
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
+		return
+	}
+	m.ui.Screen.StatusMsg = "Category updated"
 }
 
 func (m *model) applyTaskEdit(content string) {
@@ -186,17 +186,17 @@ func (m *model) applyTaskEdit(content string) {
 	taskIdx := m.ui.ExternalEdit.TaskIndex
 
 	if catIdx < 0 || catIdx >= len(m.project.Categories) {
-		m.ui.StatusMsg = "Category no longer exists"
+		m.ui.Screen.StatusMsg = "Category no longer exists"
 		return
 	}
 	if taskIdx < 0 || taskIdx >= len(m.project.Categories[catIdx].Tasks) {
-		m.ui.StatusMsg = "Task no longer exists"
+		m.ui.Screen.StatusMsg = "Task no longer exists"
 		return
 	}
 
 	title := strings.TrimSpace(content)
 	if title == "" {
-		m.ui.StatusMsg = "Task title cannot be empty"
+		m.ui.Screen.StatusMsg = "Task title cannot be empty"
 		return
 	}
 
@@ -207,8 +207,8 @@ func (m *model) applyTaskEdit(content string) {
 
 	task.Title = title
 	if err := m.deps.Store.SaveProject(m.project); err != nil {
-		m.ui.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
 		return
 	}
-	m.ui.StatusMsg = "Task updated"
+	m.ui.Screen.StatusMsg = "Task updated"
 }

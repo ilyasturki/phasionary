@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
 )
 
@@ -25,11 +26,11 @@ func TestComputeVisibility_ScrollOffsetZero_ProjectVisible(t *testing.T) {
 	}
 
 	// Build positions (mimicking what the app does)
-	positions := []focusPosition{
-		{Kind: focusProject, CategoryIndex: -1, TaskIndex: -1},
-		{Kind: focusCategory, CategoryIndex: 0, TaskIndex: -1},
-		{Kind: focusTask, CategoryIndex: 0, TaskIndex: 0},
-		{Kind: focusTask, CategoryIndex: 0, TaskIndex: 1},
+	positions := []selection.Position{
+		{Kind: selection.FocusProject, CategoryIndex: -1, TaskIndex: -1},
+		{Kind: selection.FocusCategory, CategoryIndex: 0, TaskIndex: -1},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 1},
 	}
 
 	// Build layout
@@ -66,10 +67,10 @@ func TestComputeVisibility_ZeroHeight_ProjectStillVisible(t *testing.T) {
 		},
 	}
 
-	positions := []focusPosition{
-		{Kind: focusProject, CategoryIndex: -1, TaskIndex: -1},
-		{Kind: focusCategory, CategoryIndex: 0, TaskIndex: -1},
-		{Kind: focusTask, CategoryIndex: 0, TaskIndex: 0},
+	positions := []selection.Position{
+		{Kind: selection.FocusProject, CategoryIndex: -1, TaskIndex: -1},
+		{Kind: selection.FocusCategory, CategoryIndex: 0, TaskIndex: -1},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0},
 	}
 
 	builder := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil, nil)
@@ -100,11 +101,11 @@ func TestComputeVisibility_ScrollOffsetNonZero(t *testing.T) {
 		},
 	}
 
-	positions := []focusPosition{
-		{Kind: focusProject, CategoryIndex: -1, TaskIndex: -1},
-		{Kind: focusCategory, CategoryIndex: 0, TaskIndex: -1},
-		{Kind: focusTask, CategoryIndex: 0, TaskIndex: 0},
-		{Kind: focusTask, CategoryIndex: 0, TaskIndex: 1},
+	positions := []selection.Position{
+		{Kind: selection.FocusProject, CategoryIndex: -1, TaskIndex: -1},
+		{Kind: selection.FocusCategory, CategoryIndex: 0, TaskIndex: -1},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 1},
 	}
 
 	builder := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil, nil)

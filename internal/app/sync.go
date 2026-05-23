@@ -1,26 +1,29 @@
 package app
 
-import "phasionary/internal/domain"
+import (
+	"phasionary/internal/app/selection"
+	"phasionary/internal/domain"
+)
 
 func (m *model) storeTaskUpdate() {
 	if m.deps.Store == nil {
 		return
 	}
 	if err := m.deps.Store.SaveProject(m.project); err != nil {
-		m.ui.StatusMsg = "Save failed: " + err.Error()
+		m.ui.Screen.StatusMsg = "Save failed: " + err.Error()
 	}
 }
 
-func rebuildPositions(categories []domain.Category, filter *FilterState, fold *FoldState) []focusPosition {
-	positions := make([]focusPosition, 0)
-	positions = append(positions, focusPosition{
-		Kind:          focusProject,
+func rebuildPositions(categories []domain.Category, filter *FilterState, fold *FoldState) []selection.Position {
+	positions := make([]selection.Position, 0)
+	positions = append(positions, selection.Position{
+		Kind:          selection.FocusProject,
 		CategoryIndex: -1,
 		TaskIndex:     -1,
 	})
 	for cIndex, category := range categories {
-		positions = append(positions, focusPosition{
-			Kind:          focusCategory,
+		positions = append(positions, selection.Position{
+			Kind:          selection.FocusCategory,
 			CategoryIndex: cIndex,
 			TaskIndex:     -1,
 		})
@@ -31,8 +34,8 @@ func rebuildPositions(categories []domain.Category, filter *FilterState, fold *F
 			if filter != nil && !filter.IsStatusVisible(task.Status) {
 				continue
 			}
-			positions = append(positions, focusPosition{
-				Kind:          focusTask,
+			positions = append(positions, selection.Position{
+				Kind:          selection.FocusTask,
 				CategoryIndex: cIndex,
 				TaskIndex:     tIndex,
 			})
@@ -43,5 +46,5 @@ func rebuildPositions(categories []domain.Category, filter *FilterState, fold *F
 
 func (m *model) rebuildPositions() {
 	positions := rebuildPositions(m.project.Categories, &m.ui.Filter, &m.ui.Fold)
-	m.ui.Selection.SetPositions(toSelectionPositions(positions))
+	m.ui.Selection.SetPositions(positions)
 }

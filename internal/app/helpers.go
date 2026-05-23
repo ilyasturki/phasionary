@@ -6,7 +6,21 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+
+	"phasionary/internal/app/selection"
 )
+
+func (m model) positions() []selection.Position {
+	return m.ui.Selection.Positions()
+}
+
+func (m model) selected() int {
+	return m.ui.Selection.Selected()
+}
+
+func (m model) selectedPosition() (selection.Position, bool) {
+	return m.ui.Selection.SelectedPosition()
+}
 
 const (
 	prefixWidth     = 2

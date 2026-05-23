@@ -9,11 +9,19 @@ import (
 	"path/filepath"
 )
 
+// Reader exposes read-only access to the active config. Implemented by *Manager.
+type Reader interface {
+	Get() Config
+	Update(fn func(*Config)) error
+}
+
 // Manager handles loading and saving configuration.
 type Manager struct {
 	path string
 	cfg  Config
 }
+
+var _ Reader = (*Manager)(nil)
 
 // NewManager creates a new config manager for the given config file path.
 func NewManager(configPath string) *Manager {
