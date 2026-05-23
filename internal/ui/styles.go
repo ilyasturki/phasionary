@@ -3,14 +3,14 @@ package ui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	// Adaptive colors that swap for light/dark terminal backgrounds
-	SelectionBg = lipgloss.AdaptiveColor{Light: "0", Dark: "15"}
-	SelectionFg = lipgloss.AdaptiveColor{Light: "15", Dark: "0"}
-
+	// Selection styles use Reverse so the terminal swaps fg/bg natively at
+	// render time — this tracks live light/dark theme changes, which
+	// lipgloss.AdaptiveColor cannot (background detection is cached once at
+	// startup via sync.Once and never re-queried).
 	HeaderStyle      = lipgloss.NewStyle().Bold(true)
 	MutedStyle       = lipgloss.NewStyle().Faint(true)
 	CategoryStyle    = lipgloss.NewStyle().Bold(true)
-	SelectedStyle    = lipgloss.NewStyle().Bold(true).Background(SelectionBg).Foreground(SelectionFg)
+	SelectedStyle    = lipgloss.NewStyle().Bold(true).Reverse(true)
 	StatusLineStyle  = lipgloss.NewStyle().Faint(true)
 	HelpDialogStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
 	DialogTitleStyle = lipgloss.NewStyle().Bold(true)
@@ -61,37 +61,12 @@ func PriorityIcon(priority string) string {
 	}
 }
 
-func SelectedPriorityStyle(priority string) lipgloss.Style {
-	base := lipgloss.NewStyle().Bold(true).Background(SelectionBg)
-	switch priority {
-	case "high":
-		return base.Foreground(lipgloss.Color("1"))
-	case "low":
-		return base.Foreground(lipgloss.Color("6"))
-	default:
-		return base.Foreground(SelectionFg)
-	}
-}
+// Unfocused selection style (dimmed reverse — same visual language as focused,
+// just quieter; lets the terminal swap fg/bg so it tracks light/dark themes).
+var UnfocusedSelectedStyle = lipgloss.NewStyle().Bold(true).Reverse(true).Faint(true)
 
-func SelectedStatusStyle(status string) lipgloss.Style {
-	base := lipgloss.NewStyle().Bold(true).Background(SelectionBg)
-	switch status {
-	case "in_progress":
-		return base.Foreground(lipgloss.Color("4"))
-	case "completed":
-		return base.Foreground(lipgloss.Color("8"))
-	case "cancelled":
-		return base.Foreground(lipgloss.Color("1"))
-	default:
-		return base.Foreground(lipgloss.Color("3"))
-	}
-}
-
-// Unfocused selection style (underline, no background - works in light/dark modes)
-var UnfocusedSelectedStyle = lipgloss.NewStyle().Bold(true).Underline(true)
-
-// Unfocused cursor style for edit mode (underline only)
-var UnfocusedCursorStyle = lipgloss.NewStyle().Underline(true)
+// Unfocused cursor style for edit mode (dimmed reverse)
+var UnfocusedCursorStyle = lipgloss.NewStyle().Reverse(true).Faint(true)
 
 func GetSelectedStyle(focused bool) lipgloss.Style {
 	if focused {
@@ -101,35 +76,11 @@ func GetSelectedStyle(focused bool) lipgloss.Style {
 }
 
 func GetSelectedStatusStyle(status string, focused bool) lipgloss.Style {
-	if focused {
-		return SelectedStatusStyle(status)
-	}
-	// Unfocused: use underline with status color
-	switch status {
-	case "in_progress":
-		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("4"))
-	case "completed":
-		return lipgloss.NewStyle().Bold(true).Underline(true).Faint(true)
-	case "cancelled":
-		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("1"))
-	default:
-		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("3"))
-	}
+	return GetSelectedStyle(focused)
 }
 
 func GetSelectedPriorityStyle(priority string, focused bool) lipgloss.Style {
-	if focused {
-		return SelectedPriorityStyle(priority)
-	}
-	// Unfocused: use underline with priority color
-	switch priority {
-	case "high":
-		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("1"))
-	case "low":
-		return lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("6"))
-	default:
-		return lipgloss.NewStyle().Bold(true).Underline(true)
-	}
+	return GetSelectedStyle(focused)
 }
 
 func GetCursorStyle(focused bool) lipgloss.Style {
