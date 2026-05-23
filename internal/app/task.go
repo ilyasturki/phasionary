@@ -154,12 +154,24 @@ func (m *model) moveTaskDown() {
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
 	tasks := m.project.Categories[catIndex].Tasks
-	if taskIndex >= len(tasks)-1 {
+	if taskIndex < len(tasks)-1 {
+		tasks[taskIndex], tasks[taskIndex+1] = tasks[taskIndex+1], tasks[taskIndex]
+		m.rebuildPositions()
+		m.ui.Selection.MoveBy(1)
+		m.ensureVisible()
+		m.storeTaskUpdate()
 		return
 	}
-	tasks[taskIndex], tasks[taskIndex+1] = tasks[taskIndex+1], tasks[taskIndex]
+	if catIndex >= len(m.project.Categories)-1 {
+		return
+	}
+	task := tasks[taskIndex]
+	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
+	dstCatIndex := catIndex + 1
+	m.project.Categories[dstCatIndex].InsertTask(0, task)
+	m.project.UpdatedAt = domain.NowTimestamp()
 	m.rebuildPositions()
-	m.ui.Selection.MoveBy(1)
+	m.selectTaskOrCategory(dstCatIndex, 0)
 	m.ensureVisible()
 	m.storeTaskUpdate()
 }
@@ -174,15 +186,36 @@ func (m *model) moveTaskUp() {
 	}
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
-	if taskIndex <= 0 {
+	if taskIndex > 0 {
+		tasks := m.project.Categories[catIndex].Tasks
+		tasks[taskIndex], tasks[taskIndex-1] = tasks[taskIndex-1], tasks[taskIndex]
+		m.rebuildPositions()
+		m.ui.Selection.MoveBy(-1)
+		m.ensureVisible()
+		m.storeTaskUpdate()
 		return
 	}
-	tasks := m.project.Categories[catIndex].Tasks
-	tasks[taskIndex], tasks[taskIndex-1] = tasks[taskIndex-1], tasks[taskIndex]
+	if catIndex <= 0 {
+		return
+	}
+	dstCatIndex := catIndex - 1
+	_ = m.project.MoveTask(catIndex, taskIndex, dstCatIndex)
+	dstTaskIndex := len(m.project.Categories[dstCatIndex].Tasks) - 1
 	m.rebuildPositions()
-	m.ui.Selection.MoveBy(-1)
+	m.selectTaskOrCategory(dstCatIndex, dstTaskIndex)
 	m.ensureVisible()
 	m.storeTaskUpdate()
+}
+
+func (m *model) selectTaskOrCategory(catIndex, taskIndex int) {
+	if m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusTask && p.CategoryIndex == catIndex && p.TaskIndex == taskIndex
+	}) {
+		return
+	}
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusCategory && p.CategoryIndex == catIndex
+	})
 }
 
 func (m *model) moveCategoryDown() {
