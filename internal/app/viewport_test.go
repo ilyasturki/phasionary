@@ -103,7 +103,7 @@ func TestView_FillsScreen_StatusOnProjectLine(t *testing.T) {
 					{ID: "t1", Title: "short1", Status: domain.StatusTodo},
 					{ID: "t2", Title: "short2", Status: domain.StatusTodo},
 					{ID: "t3", Title: "short3", Status: domain.StatusTodo},
-					{ID: "t4", Title: "a very long task title that will definitely wrap over multiple lines to occupy more vertical space than a single row", Status: domain.StatusTodo},
+					{ID: "t4", Title: "a very long task title that will definitely wrap over multiple lines to occupy more vertical space than a single row, with extra text appended so the row overflows regardless of whether status renders as text or as an icon", Status: domain.StatusTodo},
 				},
 			},
 		},

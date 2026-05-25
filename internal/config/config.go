@@ -27,7 +27,7 @@ type Config struct {
 // DefaultConfig returns a Config with default values.
 func DefaultConfig() Config {
 	return Config{
-		StatusDisplay: StatusDisplayText,
+		StatusDisplay: StatusDisplayIcons,
 		PriorityColor: PriorityColorFull,
 	}
 }
