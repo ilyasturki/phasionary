@@ -39,16 +39,6 @@
         default = self.packages.${system}.phasionary;
       };
 
-      devShells.${system}.default = pkgs.mkShell {
-        buildInputs = with pkgs; [
-          go
-          gopls
-          gotools
-          delve
-          just
-        ];
-      };
-
       apps.${system}.default = {
         type = "app";
         program = "${self.packages.${system}.phasionary}/bin/phasionary";
