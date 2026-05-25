@@ -44,15 +44,18 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 	if priorityIcon != "" {
 		icon = ui.TaskTitleStyle(task.Priority, task.Status).Render(priorityIcon) + " "
 	}
+	descMarker := r.formatDescriptionBadge(task.Description, false)
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, false)
+	suffix := descMarker + estimate
+	suffixText := r.descriptionBadgeText(task.Description) + r.estimateBadgeText(task.EstimateMinutes)
 	titleStyle := ui.TaskTitleStyle(task.Priority, task.Status)
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, status, icon)
 
 	if r.width <= 0 {
-		return prefixPart + titleStyle.Render(task.Title) + estimate
+		return prefixPart + titleStyle.Render(task.Title) + suffix
 	}
 
-	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, titleStyle, estimate, r.estimateBadgeText(task.EstimateMinutes))
+	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, titleStyle, suffix, suffixText)
 }
 
 func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon string) string {
@@ -68,19 +71,21 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 		iconText = priorityIcon + " "
 	}
 
+	descMarker := r.formatDescriptionBadge(task.Description, true)
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, true)
-	estimateText := r.estimateBadgeText(task.EstimateMinutes)
+	suffix := descMarker + estimate
+	suffixText := r.descriptionBadgeText(task.Description) + r.estimateBadgeText(task.EstimateMinutes)
 
 	prefixPart := selectedStyle.Render(prefix+"[") +
 		statusStyle.Render(statusText) +
 		selectedStyle.Render("] ") + icon
 
 	if r.width <= 0 {
-		return prefixPart + priorityStyle.Render(task.Title) + estimate
+		return prefixPart + priorityStyle.Render(task.Title) + suffix
 	}
 
 	overhead := ansi.StringWidth(prefix + "[" + statusText + "] " + iconText)
-	return r.wrapSelectedContentWithSuffix(task.Title, prefixPart, overhead, priorityStyle, estimate, estimateText)
+	return r.wrapSelectedContentWithSuffix(task.Title, prefixPart, overhead, priorityStyle, suffix, suffixText)
 }
 
 func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart string, titleStyle lipgloss.Style, suffix, suffixText string) string {
@@ -185,6 +190,24 @@ func (r *TaskLineRenderer) estimateBadgeText(minutes int) string {
 		return ""
 	}
 	return " ~" + formatEstimateShort(minutes)
+}
+
+func (r *TaskLineRenderer) formatDescriptionBadge(description string, selected bool) string {
+	text := r.descriptionBadgeText(description)
+	if text == "" {
+		return ""
+	}
+	if selected {
+		return ui.GetSelectedStyle(r.focused).Render(text)
+	}
+	return ui.MutedStyle.Render(text)
+}
+
+func (r *TaskLineRenderer) descriptionBadgeText(description string) string {
+	if description == "" {
+		return ""
+	}
+	return " ¶"
 }
 
 func formatEstimateShort(minutes int) string {

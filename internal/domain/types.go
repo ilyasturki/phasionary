@@ -50,6 +50,7 @@ type Task struct {
 	Priority        string `json:"priority,omitempty"`
 	CompletionDate  string `json:"completion_date,omitempty"`
 	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
+	Description     string `json:"description,omitempty"`
 }
 
 var EstimatePresets = []int{0, 15, 30, 60, 120, 240, 480, 960, 1440, 2400}

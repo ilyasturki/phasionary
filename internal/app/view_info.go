@@ -69,6 +69,21 @@ func (m model) taskInfoLines(catIdx, taskIdx int) []string {
 		lines = append(lines, fmt.Sprintf("Completed: %s", FormatDateWithRelative(task.CompletionDate)))
 	}
 
+	if task.Description != "" {
+		lines = append(lines, "", ui.DialogTitleStyle.Render("Description"), "")
+		descIndent := strings.Repeat(" ", 2)
+		for _, srcLine := range strings.Split(task.Description, "\n") {
+			if strings.TrimSpace(srcLine) == "" {
+				lines = append(lines, "")
+				continue
+			}
+			wrapped := ansi.Wrap(srcLine, infoMaxWidth-len(descIndent), "")
+			for _, wline := range strings.Split(wrapped, "\n") {
+				lines = append(lines, descIndent+wline)
+			}
+		}
+	}
+
 	return lines
 }
 

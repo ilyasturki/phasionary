@@ -43,7 +43,36 @@ func getEditorCmd() string {
 }
 
 func formatTaskForEdit(task domain.Task) string {
-	return task.Title
+	if task.Description == "" {
+		return task.Title
+	}
+	return task.Title + "\n\n" + task.Description
+}
+
+func parseTaskEdit(content string) (string, string) {
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	lines := strings.Split(content, "\n")
+
+	titleIdx := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			titleIdx = i
+			break
+		}
+	}
+	if titleIdx < 0 {
+		return "", ""
+	}
+	title := strings.TrimSpace(lines[titleIdx])
+
+	if titleIdx+1 >= len(lines) {
+		return title, ""
+	}
+	body := strings.Trim(strings.Join(lines[titleIdx+1:], "\n"), "\n")
+	if strings.TrimSpace(body) == "" {
+		return title, ""
+	}
+	return title, body
 }
 
 func formatCategoryForEdit(category domain.Category) string {
@@ -194,18 +223,20 @@ func (m *model) applyTaskEdit(content string) {
 		return
 	}
 
-	title := strings.TrimSpace(content)
+	title, description := parseTaskEdit(content)
 	if title == "" {
 		m.ui.Screen.StatusMsg = "Task title cannot be empty"
 		return
 	}
 
 	task := &m.project.Categories[catIdx].Tasks[taskIdx]
-	if title == task.Title {
+	if title == task.Title && description == task.Description {
 		return
 	}
 
 	task.Title = title
+	task.Description = description
+	task.UpdatedAt = domain.NowTimestamp()
 	if err := m.deps.Store.SaveProject(m.project); err != nil {
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
 		return

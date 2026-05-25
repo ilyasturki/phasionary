@@ -335,6 +335,95 @@ func TestRoundTrip(t *testing.T) {
 	})
 }
 
+func TestDescriptionRoundTrip(t *testing.T) {
+	t.Run("exports description as indented body", func(t *testing.T) {
+		project := domain.Project{
+			Name: "Desc",
+			Categories: []domain.Category{
+				{
+					Name: "Tasks",
+					Tasks: []domain.Task{
+						{Title: "With body", Status: domain.StatusTodo, Description: "Line one.\nLine two."},
+						{Title: "No body", Status: domain.StatusTodo},
+					},
+				},
+			},
+		}
+
+		var buf bytes.Buffer
+		require.NoError(t, ExportMarkdown(project, &buf))
+		output := buf.String()
+
+		assert.Contains(t, output, "- [ ] With body\n    Line one.\n    Line two.\n")
+		assert.Contains(t, output, "- [ ] No body\n")
+	})
+
+	t.Run("imports description from indented body", func(t *testing.T) {
+		md := `# Project
+
+## Tasks
+
+- [ ] First task
+    Description line one.
+    Description line two.
+- [x] Second task
+- [ ] Third task
+    Has its own body.
+`
+		project, err := ImportMarkdown(strings.NewReader(md), "")
+		require.NoError(t, err)
+		require.Len(t, project.Categories[0].Tasks, 3)
+
+		assert.Equal(t, "Description line one.\nDescription line two.", project.Categories[0].Tasks[0].Description)
+		assert.Empty(t, project.Categories[0].Tasks[1].Description)
+		assert.Equal(t, "Has its own body.", project.Categories[0].Tasks[2].Description)
+	})
+
+	t.Run("imports multi-paragraph description", func(t *testing.T) {
+		md := `# Project
+
+## Tasks
+
+- [ ] Task
+    Paragraph one.
+
+    Paragraph two.
+`
+		project, err := ImportMarkdown(strings.NewReader(md), "")
+		require.NoError(t, err)
+
+		assert.Equal(t, "Paragraph one.\n\nParagraph two.", project.Categories[0].Tasks[0].Description)
+	})
+
+	t.Run("round-trips descriptions", func(t *testing.T) {
+		original := domain.Project{
+			Name: "RT",
+			Categories: []domain.Category{
+				{
+					Name: "Cat",
+					Tasks: []domain.Task{
+						{Title: "Single line", Status: domain.StatusTodo, Description: "Just one line."},
+						{Title: "Multi line", Status: domain.StatusTodo, Description: "First.\nSecond."},
+						{Title: "Paragraphs", Status: domain.StatusTodo, Description: "Para A.\n\nPara B."},
+						{Title: "No desc", Status: domain.StatusTodo},
+					},
+				},
+			},
+		}
+
+		var buf bytes.Buffer
+		require.NoError(t, ExportMarkdown(original, &buf))
+
+		imported, err := ImportMarkdown(&buf, "")
+		require.NoError(t, err)
+		require.Len(t, imported.Categories[0].Tasks, 4)
+		for i, want := range original.Categories[0].Tasks {
+			assert.Equal(t, want.Description, imported.Categories[0].Tasks[i].Description,
+				"task %d (%s)", i, want.Title)
+		}
+	})
+}
+
 func TestStatusToMarker(t *testing.T) {
 	tests := []struct {
 		status   string

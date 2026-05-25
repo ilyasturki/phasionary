@@ -43,6 +43,8 @@ func markerToStatus(marker string) string {
 	}
 }
 
+const descriptionIndent = "    "
+
 func ExportCategoryMarkdown(cat domain.Category) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "## %s\n\n", cat.Name)
@@ -54,6 +56,17 @@ func ExportCategoryMarkdown(cat domain.Category) string {
 		}
 		sb.WriteString(line)
 		sb.WriteByte('\n')
+		if task.Description != "" {
+			for _, dline := range strings.Split(task.Description, "\n") {
+				if dline == "" {
+					sb.WriteByte('\n')
+					continue
+				}
+				sb.WriteString(descriptionIndent)
+				sb.WriteString(dline)
+				sb.WriteByte('\n')
+			}
+		}
 	}
 	return sb.String()
 }
@@ -77,15 +90,35 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 	var categories []categoryData
 	var currentCategory *categoryData
 
+	// Blank lines between description chunks are buffered so trailing blanks
+	// (which aren't part of the description) don't accidentally extend it.
+	var currentTask *taskData
+	var descBuf []string
+	var pendingBlanks int
+
+	flushDescription := func() {
+		if currentTask == nil {
+			return
+		}
+		if len(descBuf) > 0 {
+			currentTask.description = strings.Join(descBuf, "\n")
+		}
+		currentTask = nil
+		descBuf = nil
+		pendingBlanks = 0
+	}
+
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		if m := projectHeaderRe.FindStringSubmatch(line); m != nil {
+			flushDescription()
 			parsedName = strings.TrimSpace(m[1])
 			continue
 		}
 
 		if m := categoryHeaderRe.FindStringSubmatch(line); m != nil {
+			flushDescription()
 			if currentCategory != nil {
 				categories = append(categories, *currentCategory)
 			}
@@ -94,6 +127,7 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 		}
 
 		if m := taskLineRe.FindStringSubmatch(line); m != nil && currentCategory != nil {
+			flushDescription()
 			marker := m[1]
 			title := strings.TrimSpace(m[2])
 			var priority string
@@ -106,9 +140,27 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 				status:   markerToStatus(marker),
 				priority: priority,
 			})
+			currentTask = &currentCategory.tasks[len(currentCategory.tasks)-1]
 			continue
 		}
+
+		if currentTask != nil {
+			if strings.TrimSpace(line) == "" {
+				pendingBlanks++
+				continue
+			}
+			if strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "\t") {
+				for i := 0; i < pendingBlanks; i++ {
+					descBuf = append(descBuf, "")
+				}
+				pendingBlanks = 0
+				descBuf = append(descBuf, strings.TrimLeft(line, " \t"))
+				continue
+			}
+			flushDescription()
+		}
 	}
+	flushDescription()
 	if err := scanner.Err(); err != nil {
 		return domain.Project{}, err
 	}
@@ -147,6 +199,7 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 					return domain.Project{}, err
 				}
 			}
+			task.Description = td.description
 			cat.Tasks = append(cat.Tasks, task)
 		}
 		project.Categories = append(project.Categories, cat)
@@ -161,7 +214,8 @@ type categoryData struct {
 }
 
 type taskData struct {
-	title    string
-	status   string
-	priority string
+	title       string
+	status      string
+	priority    string
+	description string
 }
