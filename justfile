@@ -29,3 +29,7 @@ fmt:
 # Clean up go.mod/go.sum.
 tidy:
     go mod tidy
+
+# Bump version (X.Y.Z or major|minor|patch); updates VERSION, commits, tags.
+bump version:
+    ./scripts/bump.sh {{version}}

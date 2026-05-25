@@ -10,7 +10,9 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      version = "0.6.0";
+      version = pkgs.lib.fileContents ./VERSION;
+      commit = self.shortRev or self.dirtyShortRev or "none";
+      buildDate = self.lastModifiedDate or "unknown";
     in
     {
       packages.${system} = {
@@ -22,7 +24,9 @@
           ldflags = [
             "-s"
             "-w"
-            "-X phasionary/internal/version.Version=${version}"
+            "-X phasionary/internal/version.Version=v${version}"
+            "-X phasionary/internal/version.Commit=${commit}"
+            "-X phasionary/internal/version.BuildDate=${buildDate}"
           ];
 
           nativeBuildInputs = [ pkgs.installShellFiles ];
