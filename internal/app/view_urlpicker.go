@@ -9,6 +9,6 @@ func (m model) urlPickerView() string {
 		"Open URL",
 		m.ui.URLPicker.URLs,
 		m.ui.URLPicker.Selected,
-		"j/k navigate | enter open | esc cancel",
+		"enter open | esc cancel",
 	)
 }

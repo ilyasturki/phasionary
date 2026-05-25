@@ -22,6 +22,6 @@ func (m model) estimatePickerView() string {
 		"Time Estimate",
 		estimatePresetLabels,
 		m.ui.EstimatePicker.Selected,
-		"j/k navigate | enter select | esc cancel",
+		"enter select | esc cancel",
 	)
 }
