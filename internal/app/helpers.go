@@ -24,11 +24,19 @@ func (m model) selectedPosition() (selection.Position, bool) {
 
 const (
 	prefixWidth     = 2
-	footerHeight    = 3
+	footerHeight    = 0 // No bottom status area — status text appears on the project line.
 	blankAfterProj  = 1
 	blankBetweenCat = 1
 	blankAfterCat   = 1
 )
+
+func (m model) footerHeight() int {
+	return footerHeight
+}
+
+func (m model) layoutConfig() LayoutConfig {
+	return DefaultLayoutConfig()
+}
 
 func sanitizeInput(input *textinput.Model) {
 	val := input.Value()

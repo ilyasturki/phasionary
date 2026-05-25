@@ -1,7 +1,7 @@
 package app
 
 func (m model) availableHeight() int {
-	config := DefaultLayoutConfig()
+	config := m.layoutConfig()
 	if m.ui.Screen.Height <= config.FooterHeight {
 		return 1
 	}
@@ -15,7 +15,7 @@ func (m *model) ensureVisible() {
 	}
 
 	layout := m.buildLayout()
-	viewport := NewViewport(layout, m.ui.Screen.Height, DefaultLayoutConfig())
+	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
 	viewport.ScrollOffset = m.ui.Screen.ScrollOffset
 	m.ui.Screen.ScrollOffset = viewport.EnsureVisible(m.selected())
 }
@@ -26,7 +26,7 @@ func (m *model) centerOnSelected() {
 	}
 
 	layout := m.buildLayout()
-	viewport := NewViewport(layout, m.ui.Screen.Height, DefaultLayoutConfig())
+	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
 	m.ui.Screen.ScrollOffset = viewport.CenterOnPosition(m.selected())
 }
 
@@ -43,6 +43,6 @@ func (m *model) bottomOnSelected() {
 	}
 
 	layout := m.buildLayout()
-	viewport := NewViewport(layout, m.ui.Screen.Height, DefaultLayoutConfig())
+	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
 	m.ui.Screen.ScrollOffset = viewport.BottomOnPosition(m.selected())
 }

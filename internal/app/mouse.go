@@ -11,7 +11,7 @@ func (m model) computeRowMap() []int {
 	}
 
 	layout := m.buildLayout()
-	viewport := NewViewport(layout, m.ui.Screen.Height, DefaultLayoutConfig())
+	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
 	viewport.ComputeVisibility(m.ui.Screen.ScrollOffset)
 
 	for i := 0; i < m.ui.Screen.Height; i++ {

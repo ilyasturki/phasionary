@@ -16,6 +16,8 @@ type Viewport struct {
 	HasMoreAbove bool
 	HasMoreBelow bool
 
+	usedHeight   int   // Rows consumed by fully-visible layout items
+	availHeight  int   // Content rows available (excludes scroll indicators + footer)
 	itemRowStart []int // Starting row for each visible layout item
 }
 
@@ -99,6 +101,7 @@ func (v *Viewport) computeVisibleRange(reserveMoreBelow bool) {
 	v.HasMoreBelow = false
 	v.VisibleEnd = -1
 	v.itemRowStart = nil
+	v.availHeight = availHeight
 
 	startRow := 0
 	if v.HasMoreAbove {
@@ -119,10 +122,24 @@ func (v *Viewport) computeVisibleRange(reserveMoreBelow bool) {
 		v.VisibleEnd = i + 1
 	}
 
+	v.usedHeight = usedHeight
+
 	// Check if there are more items beyond what we rendered
 	if v.VisibleEnd < len(v.Layout.Items) {
 		v.HasMoreBelow = true
 	}
+}
+
+// RemainingContentHeight returns the number of unused content rows after fully
+// visible items. When > 0 and there is a next layout item, callers can render
+// a partial slice of that item to fill the bottom of the screen instead of
+// leaving it blank.
+func (v *Viewport) RemainingContentHeight() int {
+	remaining := v.availHeight - v.usedHeight
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
 }
 
 func (v *Viewport) EnsureVisible(posIndex int) int {
@@ -178,7 +195,7 @@ func (v *Viewport) EnsureVisible(posIndex int) int {
 }
 
 func (v *Viewport) RowToPosition(row int) int {
-	if v.Layout == nil || v.VisibleStart < 0 || v.VisibleEnd <= v.VisibleStart {
+	if v.Layout == nil || v.VisibleStart < 0 {
 		return -1
 	}
 
@@ -194,6 +211,25 @@ func (v *Viewport) RowToPosition(row int) int {
 
 		if row >= itemStart && row < itemEnd {
 			return item.PositionIndex
+		}
+	}
+
+	// Resolve clicks on the partial-truncated bottom row (rendered when there
+	// is a next layout item and RemainingContentHeight() > 0).
+	if v.VisibleEnd >= 0 && v.VisibleEnd < len(v.Layout.Items) {
+		remaining := v.RemainingContentHeight()
+		if remaining > 0 {
+			partialStart := v.usedHeight
+			if v.HasMoreAbove {
+				partialStart++
+			}
+			partialEnd := partialStart + remaining
+			if row >= partialStart && row < partialEnd {
+				pidx := v.Layout.Items[v.VisibleEnd].PositionIndex
+				if pidx >= 0 {
+					return pidx
+				}
+			}
 		}
 	}
 

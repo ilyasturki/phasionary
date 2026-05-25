@@ -94,6 +94,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEstimatePickerKey(msg), nil
 	case modes.ModeURLPicker:
 		return m.handleURLPickerKey(msg)
+	case modes.ModeVisual:
+		return m.handleVisualKey(msg)
 	case modes.ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
@@ -142,6 +144,8 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
 		switch m.ui.ConfirmDelete.Kind {
 		case ConfirmDeleteProject:
 			m.confirmDeleteProject()
+		case ConfirmDeleteVisualRange:
+			m.confirmDeleteVisualRange()
 		default:
 			m.confirmDeleteAction()
 		}
@@ -159,13 +163,18 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
 }
 
 func (m model) handleOptionsKey(msg tea.KeyMsg) model {
+	const optionCount = 2
 	switch msg.String() {
 	case "q", "esc", "enter":
 		m.ui.Modes.ToNormal()
 	case "j", "down":
-		// Ready for more options
+		if m.ui.Options.selectedOption < optionCount-1 {
+			m.ui.Options.selectedOption++
+		}
 	case "k", "up":
-		// Ready for more options
+		if m.ui.Options.selectedOption > 0 {
+			m.ui.Options.selectedOption--
+		}
 	case " ", "tab", "h", "l":
 		m.toggleSelectedOption()
 	}
@@ -272,6 +281,22 @@ func (m *model) toggleSelectedOption() {
 		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
 			cfg.StatusDisplay = newValue
 		})
+	case 1: // PriorityColor
+		newValue := nextPriorityColor(m.deps.CfgManager.Get().PriorityColor)
+		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
+			cfg.PriorityColor = newValue
+		})
+	}
+}
+
+func nextPriorityColor(current string) string {
+	switch current {
+	case config.PriorityColorFull:
+		return config.PriorityColorIcon
+	case config.PriorityColorIcon:
+		return config.PriorityColorNone
+	default:
+		return config.PriorityColorFull
 	}
 }
 
@@ -323,7 +348,7 @@ func (m model) View() string {
 	}
 
 	layout := m.buildLayout()
-	viewport := NewViewport(layout, m.ui.Screen.Height, DefaultLayoutConfig())
+	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
 	viewport.ComputeVisibility(m.ui.Screen.ScrollOffset)
 
 	var lines []string
@@ -336,14 +361,17 @@ func (m model) View() string {
 		lines = append(lines, m.renderLayoutItem(layout.Items[i]))
 	}
 
+	if viewport.HasMoreBelow && viewport.VisibleEnd < len(layout.Items) {
+		if partial := m.renderLayoutItemTruncated(layout.Items[viewport.VisibleEnd], viewport.RemainingContentHeight()); partial != "" {
+			lines = append(lines, partial)
+		}
+	}
+
 	if viewport.HasMoreBelow {
 		lines = append(lines, ui.MutedStyle.Render(scrollMoreBelow))
 	}
 
-	body := strings.Join(lines, "\n")
-
-	statusLine := m.statusLine()
-	content := body + "\n\n" + statusLine
+	content := strings.Join(lines, "\n")
 	modal := components.NewModal(m.ui.Screen.Width, m.ui.Screen.Height)
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:
@@ -368,6 +396,11 @@ func (m model) View() string {
 
 func (m model) renderLayoutItem(item LayoutItem) string {
 	isSelected := item.PositionIndex >= 0 && item.PositionIndex == m.selected()
+	inVisualRange := item.PositionIndex >= 0 && m.isInVisualRange(item.PositionIndex)
+	if inVisualRange {
+		isSelected = true
+	}
+	visualMode := m.ui.Modes.IsVisual()
 	focused := m.ui.Screen.WindowFocused
 
 	switch item.Kind {
@@ -375,7 +408,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditProjectLine()
 		}
-		return renderProjectLine(m.project.Name, isSelected, focused, m.ui.Filter.HasActiveFilter())
+		return renderProjectLine(m.project.Name, isSelected, focused, m.ui.Filter.HasActiveFilter(), visualMode, m.statusText(), m.ui.Screen.Width)
 
 	case LayoutCategory:
 		category := m.project.Categories[item.CategoryIndex]
@@ -383,14 +416,14 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 			return m.renderEditCategoryLine()
 		}
 		folded := m.ui.Fold.IsFolded(category.ID)
-		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Screen.Width, focused)
+		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Screen.Width, focused, inVisualRange)
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditTaskLine(task)
 		}
-		return m.renderTaskLine(task, isSelected, m.ui.Screen.Width, focused)
+		return m.renderTaskLine(task, isSelected, m.ui.Screen.Width, focused, inVisualRange)
 
 	case LayoutEmptyCategory:
 		return ui.MutedStyle.Render("    (no tasks)")
@@ -403,6 +436,21 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 	}
 
 	return ""
+}
+
+func (m model) renderLayoutItemTruncated(item LayoutItem, maxRows int) string {
+	if maxRows <= 0 {
+		return ""
+	}
+	full := m.renderLayoutItem(item)
+	if full == "" {
+		return ""
+	}
+	rendered := strings.Split(full, "\n")
+	if len(rendered) <= maxRows {
+		return full
+	}
+	return strings.Join(rendered[:maxRows], "\n")
 }
 
 func Run(dataDir string, projectSelector string, cfgManager config.Reader, workingDir string) error {
