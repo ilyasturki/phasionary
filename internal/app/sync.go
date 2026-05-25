@@ -14,6 +14,94 @@ func (m *model) storeTaskUpdate() {
 	}
 }
 
+func (m *model) reloadProject() {
+	if m.deps.Store == nil {
+		return
+	}
+
+	var (
+		prevKind   selection.FocusKind
+		prevCatID  string
+		prevTaskID string
+		hadSel     bool
+	)
+	if pos, ok := m.selectedPosition(); ok {
+		hadSel = true
+		prevKind = pos.Kind
+		if pos.Kind == selection.FocusCategory || pos.Kind == selection.FocusTask {
+			if pos.CategoryIndex >= 0 && pos.CategoryIndex < len(m.project.Categories) {
+				cat := m.project.Categories[pos.CategoryIndex]
+				prevCatID = cat.ID
+				if pos.Kind == selection.FocusTask && pos.TaskIndex >= 0 && pos.TaskIndex < len(cat.Tasks) {
+					prevTaskID = cat.Tasks[pos.TaskIndex].ID
+				}
+			}
+		}
+	}
+
+	project, err := m.deps.Store.LoadProject(m.project.ID)
+	if err != nil {
+		m.ui.Screen.StatusMsg = "Reload failed: " + err.Error()
+		return
+	}
+
+	m.project = project
+	m.rebuildPositions()
+
+	if hadSel {
+		restored := m.restoreSelection(prevKind, prevCatID, prevTaskID)
+		if !restored {
+			idx := findFirstTaskIndex(m.ui.Selection.Positions())
+			m.ui.Selection.SetSelected(idx)
+		}
+	}
+
+	m.ensureVisible()
+	m.ui.Screen.StatusMsg = "Reloaded from disk"
+}
+
+func (m *model) restoreSelection(kind selection.FocusKind, catID, taskID string) bool {
+	categories := m.project.Categories
+	switch kind {
+	case selection.FocusProject:
+		return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			return p.Kind == selection.FocusProject
+		})
+	case selection.FocusCategory:
+		if catID == "" {
+			return false
+		}
+		return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			return p.Kind == selection.FocusCategory &&
+				p.CategoryIndex >= 0 && p.CategoryIndex < len(categories) &&
+				categories[p.CategoryIndex].ID == catID
+		})
+	case selection.FocusTask:
+		if taskID != "" {
+			if m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+				if p.Kind != selection.FocusTask {
+					return false
+				}
+				if p.CategoryIndex < 0 || p.CategoryIndex >= len(categories) {
+					return false
+				}
+				cat := categories[p.CategoryIndex]
+				return p.TaskIndex >= 0 && p.TaskIndex < len(cat.Tasks) && cat.Tasks[p.TaskIndex].ID == taskID
+			}) {
+				return true
+			}
+		}
+		if catID != "" {
+			return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+				return p.Kind == selection.FocusCategory &&
+					p.CategoryIndex >= 0 && p.CategoryIndex < len(categories) &&
+					categories[p.CategoryIndex].ID == catID
+			})
+		}
+	}
+	return false
+}
+
 func rebuildPositions(categories []domain.Category, filter *FilterState, fold *FoldState, expandDescriptions bool) []selection.Position {
 	positions := make([]selection.Position, 0)
 	positions = append(positions, selection.Position{
