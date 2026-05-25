@@ -275,7 +275,7 @@ func (m model) View() string {
 	var lines []string
 
 	if viewport.HasMoreAbove {
-		lines = append(lines, ui.MutedStyle.Render("  ↑ more above"))
+		lines = append(lines, ui.MutedStyle.Render(scrollMoreAbove))
 	}
 
 	for i := viewport.VisibleStart; i < viewport.VisibleEnd; i++ {
@@ -283,7 +283,7 @@ func (m model) View() string {
 	}
 
 	if viewport.HasMoreBelow {
-		lines = append(lines, ui.MutedStyle.Render("  ↓ more below"))
+		lines = append(lines, ui.MutedStyle.Render(scrollMoreBelow))
 	}
 
 	body := strings.Join(lines, "\n")

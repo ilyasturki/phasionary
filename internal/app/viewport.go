@@ -1,5 +1,10 @@
 package app
 
+const (
+	scrollMoreAbove = "  ↑ more above"
+	scrollMoreBelow = "  ↓ more below"
+)
+
 type Viewport struct {
 	Layout       *Layout
 	Config       LayoutConfig
