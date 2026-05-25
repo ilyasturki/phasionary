@@ -66,6 +66,44 @@ func TestTaskLineRenderer_Render(t *testing.T) {
 	})
 }
 
+func TestTaskLineRenderer_RenderDescription(t *testing.T) {
+	t.Run("renders description with given indent", func(t *testing.T) {
+		renderer := NewTaskLineRenderer(80, "text", "full", true)
+		result := renderer.RenderDescription("Some details about the task", 9, false)
+		assert.Contains(t, result, "Some details about the task")
+		// Each line should start with 9 spaces of indent.
+		for _, line := range strings.Split(result, "\n") {
+			assert.True(t, strings.HasPrefix(line, "         "), "line %q lacks 9-col indent", line)
+		}
+	})
+
+	t.Run("empty description renders nothing", func(t *testing.T) {
+		renderer := NewTaskLineRenderer(80, "text", "full", true)
+		assert.Equal(t, "", renderer.RenderDescription("", 9, false))
+	})
+
+	t.Run("preserves paragraph breaks", func(t *testing.T) {
+		renderer := NewTaskLineRenderer(80, "text", "full", true)
+		result := renderer.RenderDescription("First paragraph\n\nSecond paragraph", 9, false)
+		assert.Contains(t, result, "First paragraph")
+		assert.Contains(t, result, "Second paragraph")
+		// first para + blank + second para = 3 lines
+		assert.Equal(t, 3, len(strings.Split(result, "\n")))
+	})
+
+	t.Run("Render no longer appends description to task line", func(t *testing.T) {
+		renderer := NewTaskLineRenderer(80, "text", "full", true)
+		task := domain.Task{
+			Title:       "Test task",
+			Status:      domain.StatusTodo,
+			Description: "Some details",
+		}
+		result := renderer.Render(task, false)
+		assert.NotContains(t, result, "Some details",
+			"task-line render should not embed description; that's a separate row now")
+	})
+}
+
 func TestTaskLineRenderer_StatusLabel(t *testing.T) {
 	t.Run("returns text labels when not icons mode", func(t *testing.T) {
 		renderer := NewTaskLineRenderer(0, "text", "full", true)

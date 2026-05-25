@@ -199,3 +199,66 @@ func TestComputeVisibility_ScrollOffsetNonZero(t *testing.T) {
 	// VisibleStart should point to the first item that has PositionIndex >= scrollOffset
 	assert.Greater(t, viewport.VisibleStart, 0, "VisibleStart should be > 0 when scrollOffset is 1")
 }
+
+func TestLayoutBuilder_ExpandedDescriptions_AddsSeparateRow(t *testing.T) {
+	project := domain.Project{
+		Name: "P",
+		Categories: []domain.Category{{
+			Name: "C",
+			Tasks: []domain.Task{
+				{Title: "Task A", Status: domain.StatusTodo, Description: "Line one\nLine two"},
+				{Title: "Task B", Status: domain.StatusTodo}, // no description
+			},
+		}},
+	}
+	// Positions for the expanded case: project, cat, task A, desc A, task B.
+	expandedPositions := []selection.Position{
+		{Kind: selection.FocusProject, CategoryIndex: -1, TaskIndex: -1},
+		{Kind: selection.FocusCategory, CategoryIndex: 0, TaskIndex: -1},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0},
+		{Kind: selection.FocusDescription, CategoryIndex: 0, TaskIndex: 0},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 1},
+	}
+	basePositions := []selection.Position{
+		{Kind: selection.FocusProject, CategoryIndex: -1, TaskIndex: -1},
+		{Kind: selection.FocusCategory, CategoryIndex: 0, TaskIndex: -1},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0},
+		{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 1},
+	}
+
+	base := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil, nil).Build(project, basePositions)
+	expanded := NewLayoutBuilder(DefaultLayoutConfig(), 80, "icons", nil, nil).
+		WithExpandedDescriptions(true).
+		Build(project, expandedPositions)
+
+	assert.Equal(t, base.TotalHeight+2, expanded.TotalHeight,
+		"two description lines should add exactly 2 rows to total height")
+
+	// LayoutDescription must be present, focusable, and 2 rows tall.
+	var descItem *LayoutItem
+	for i, it := range expanded.Items {
+		if it.Kind == LayoutDescription {
+			descItem = &expanded.Items[i]
+			break
+		}
+	}
+	assert.NotNil(t, descItem, "expected a LayoutDescription item")
+	if descItem != nil {
+		assert.Equal(t, 2, descItem.Height)
+		assert.GreaterOrEqual(t, descItem.PositionIndex, 0, "description row must be focusable")
+	}
+
+	// Task A's own row height should be unchanged (description is now separate).
+	var baseA, expA int
+	for _, it := range base.Items {
+		if it.Kind == LayoutTask && it.TaskIndex == 0 {
+			baseA = it.Height
+		}
+	}
+	for _, it := range expanded.Items {
+		if it.Kind == LayoutTask && it.TaskIndex == 0 {
+			expA = it.Height
+		}
+	}
+	assert.Equal(t, baseA, expA, "task row height should not change when expanding descriptions")
+}

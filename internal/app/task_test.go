@@ -245,6 +245,78 @@ func TestDeleteTask_RemovesAndCopiesToClipboard(t *testing.T) {
 	assert.False(t, m.ui.Clipboard.IsCut)
 }
 
+func TestEditOrFocusDescription_TaskWithDescription_JumpsToDescriptionRow(t *testing.T) {
+	p := sampleProject()
+	p.Categories[0].Tasks[0].Description = "Some details"
+	m := newTestModel(t, p)
+	m.ui.Screen.ExpandDescriptions = true
+	m.rebuildPositions()
+	// Select t1 (Alpha) — index after expansion still places task before its description.
+	m.ui.Selection.SelectByPredicate(func(pp selection.Position) bool {
+		return pp.Kind == selection.FocusTask && pp.CategoryIndex == 0 && pp.TaskIndex == 0
+	})
+
+	cmd := m.editOrFocusDescription()
+	assert.Nil(t, cmd, "should not launch editor when description already exists")
+
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusDescription, pos.Kind, "selection should land on description row")
+	assert.Equal(t, 0, pos.CategoryIndex)
+	assert.Equal(t, 0, pos.TaskIndex)
+}
+
+func TestEditOrFocusDescription_TaskWithoutDescription_OpensEditor(t *testing.T) {
+	// t1 has no description here; shift+enter should produce a non-nil tea.Cmd
+	// (the external editor launch) instead of a focus jump.
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+
+	cmd := m.editOrFocusDescription()
+	assert.NotNil(t, cmd, "should launch editor when description is empty")
+	// Selection unchanged.
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusTask, pos.Kind)
+}
+
+func TestClearDescription_FocusDescription_ClearsAndReselectsTask(t *testing.T) {
+	p := sampleProject()
+	p.Categories[0].Tasks[0].Description = "Some details"
+	m := newTestModel(t, p)
+	m.ui.Screen.ExpandDescriptions = true
+	m.rebuildPositions()
+	m.ui.Selection.SelectByPredicate(func(pp selection.Position) bool {
+		return pp.Kind == selection.FocusDescription && pp.CategoryIndex == 0 && pp.TaskIndex == 0
+	})
+
+	m.clearDescription(selection.Position{Kind: selection.FocusDescription, CategoryIndex: 0, TaskIndex: 0})
+
+	assert.Equal(t, "", m.project.Categories[0].Tasks[0].Description)
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusTask, pos.Kind, "selection should snap back to parent task")
+	assert.Equal(t, "t1", m.project.Categories[0].Tasks[pos.TaskIndex].ID)
+	assert.Equal(t, "Description cleared", m.ui.Screen.StatusMsg)
+}
+
+func TestRebuildPositions_ExpandedDescriptions_AddsRowOnlyForNonEmptyDesc(t *testing.T) {
+	p := sampleProject()
+	p.Categories[0].Tasks[0].Description = "Some details"
+
+	positions := rebuildPositions(p.Categories, nil, nil, true)
+
+	descCount := 0
+	for _, pos := range positions {
+		if pos.Kind == selection.FocusDescription {
+			descCount++
+			assert.Equal(t, 0, pos.CategoryIndex)
+			assert.Equal(t, 0, pos.TaskIndex, "only t1 has a description")
+		}
+	}
+	assert.Equal(t, 1, descCount)
+}
+
 func TestDeleteCategory_RemovesEntireCategory(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	pos := selection.Position{Kind: selection.FocusCategory, CategoryIndex: 0}

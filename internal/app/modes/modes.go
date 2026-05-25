@@ -15,6 +15,7 @@ const (
 	ModeEstimatePicker
 	ModeURLPicker
 	ModeVisual
+	ModeDescriptionEdit
 )
 
 type Action int
@@ -121,6 +122,8 @@ func (m *Machine) canTransition(target Mode) bool {
 		return target == ModeNormal
 	case ModeVisual:
 		return target == ModeNormal
+	case ModeDescriptionEdit:
+		return target == ModeNormal
 	}
 	return false
 }
@@ -221,4 +224,12 @@ func (m *Machine) IsVisual() bool {
 
 func (m *Machine) ToVisual() bool {
 	return m.TransitionTo(ModeVisual)
+}
+
+func (m *Machine) IsDescriptionEdit() bool {
+	return m.current == ModeDescriptionEdit
+}
+
+func (m *Machine) ToDescriptionEdit() bool {
+	return m.TransitionTo(ModeDescriptionEdit)
 }

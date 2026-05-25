@@ -6,6 +6,7 @@ const (
 	FocusProject FocusKind = iota
 	FocusCategory
 	FocusTask
+	FocusDescription
 )
 
 type Position struct {

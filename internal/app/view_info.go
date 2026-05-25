@@ -23,7 +23,7 @@ func (m model) infoView() string {
 		lines = m.projectInfoLines()
 	case selection.FocusCategory:
 		lines = m.categoryInfoLines(pos.CategoryIndex)
-	case selection.FocusTask:
+	case selection.FocusTask, selection.FocusDescription:
 		lines = m.taskInfoLines(pos.CategoryIndex, pos.TaskIndex)
 	}
 

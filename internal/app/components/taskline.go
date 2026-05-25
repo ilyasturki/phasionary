@@ -53,6 +53,59 @@ func (r *TaskLineRenderer) Render(task domain.Task, selected bool) string {
 	return r.renderUnselected(task, prefix, priorityIcon)
 }
 
+// RenderDescription renders a task description as a standalone, focusable block
+// indented to `indent` columns. When `selected`, the block uses the row-selection
+// style; otherwise it renders muted to read as secondary text.
+func (r *TaskLineRenderer) RenderDescription(description string, indent int, selected bool) string {
+	if description == "" {
+		return ""
+	}
+	indentStr := strings.Repeat(" ", indent)
+	available := 0
+	if r.width > 0 {
+		available = r.width - indent
+		if available < 1 {
+			available = 0
+		}
+	}
+	style := ui.MutedStyle
+	if selected {
+		style = r.selectedStyle()
+	}
+
+	// When selected, every visual line gets padded to the full row width so the
+	// highlight rectangle is uniform — otherwise blank-line indents and short
+	// paragraph tails produce a ragged selection band.
+	shouldPad := selected && r.width > 0
+
+	var out []string
+	for _, paragraph := range strings.Split(description, "\n") {
+		if paragraph == "" {
+			out = append(out, style.Render(padDescriptionLine(indentStr, r.width, shouldPad)))
+			continue
+		}
+		text := paragraph
+		if available > 0 {
+			text = ansi.Wrap(paragraph, available, "")
+		}
+		for _, l := range strings.Split(text, "\n") {
+			out = append(out, style.Render(padDescriptionLine(indentStr+l, r.width, shouldPad)))
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func padDescriptionLine(s string, width int, pad bool) string {
+	if !pad {
+		return s
+	}
+	gap := width - ansi.StringWidth(s)
+	if gap <= 0 {
+		return s
+	}
+	return s + strings.Repeat(" ", gap)
+}
+
 func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIcon string) string {
 	status := r.formatStatus(task.Status, false)
 	icon := ""

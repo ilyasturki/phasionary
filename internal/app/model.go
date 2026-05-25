@@ -1,6 +1,8 @@
 package app
 
 import (
+	"github.com/charmbracelet/bubbles/textarea"
+
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
@@ -8,6 +10,14 @@ import (
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
 )
+
+type DescriptionEditState struct {
+	textarea      textarea.Model
+	categoryIndex int
+	taskIndex     int
+	original      string
+	creating      bool // true when the task had no description before this edit
+}
 
 type ClipboardState struct {
 	Task     *domain.Task
@@ -28,12 +38,13 @@ type VisualState struct {
 }
 
 type Screen struct {
-	Width         int
-	Height        int
-	ScrollOffset  int
-	StatusMsg     string
-	PendingKey    rune
-	WindowFocused bool
+	Width              int
+	Height             int
+	ScrollOffset       int
+	StatusMsg          string
+	PendingKey         rune
+	WindowFocused      bool
+	ExpandDescriptions bool
 }
 
 type HelpState struct {
@@ -57,6 +68,7 @@ type UIState struct {
 	Help              HelpState
 	Clipboard         ClipboardState
 	Visual            VisualState
+	DescriptionEdit   DescriptionEditState
 }
 
 type Dependencies struct {

@@ -145,8 +145,27 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 
 func (m model) renderTaskLine(task domain.Task, selected bool, width int, focused bool, visualMode bool) string {
 	cfg := m.deps.CfgManager.Get()
-	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).WithVisualMode(visualMode)
+	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).
+		WithVisualMode(visualMode)
 	return renderer.Render(task, selected)
+}
+
+func (m model) renderTaskDescription(task domain.Task, selected bool, width int, focused bool) string {
+	cfg := m.deps.CfgManager.Get()
+	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused)
+	indent := taskDescriptionIndent(task, cfg.StatusDisplay)
+	return renderer.RenderDescription(task.Description, indent, selected)
+}
+
+func taskDescriptionIndent(task domain.Task, statusDisplay string) int {
+	prefix := "  "
+	priorityIcon := ui.PriorityIcon(task.Priority)
+	iconText := ""
+	if priorityIcon != "" {
+		iconText = priorityIcon + " "
+	}
+	statusText := statusLabel(task.Status, statusDisplay)
+	return ansi.StringWidth(prefix+"["+statusText+"] "+iconText) + 2
 }
 
 func statusLabel(status, displayMode string) string {

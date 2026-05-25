@@ -49,6 +49,40 @@ func (m *model) unfoldAll() {
 	m.ensureVisible()
 }
 
+func (m *model) toggleExpandDescriptions() {
+	// If we're collapsing while focused on a description row, that row is about
+	// to disappear — remember the parent task so we can land back on it instead
+	// of wherever the index happens to fall.
+	var (
+		wasOnDescription bool
+		parentTaskID     string
+	)
+	if pos, ok := m.selectedPosition(); ok && pos.Kind == selection.FocusDescription {
+		if pos.CategoryIndex >= 0 && pos.CategoryIndex < len(m.project.Categories) {
+			cat := m.project.Categories[pos.CategoryIndex]
+			if pos.TaskIndex >= 0 && pos.TaskIndex < len(cat.Tasks) {
+				wasOnDescription = true
+				parentTaskID = cat.Tasks[pos.TaskIndex].ID
+			}
+		}
+	}
+
+	m.ui.Screen.ExpandDescriptions = !m.ui.Screen.ExpandDescriptions
+	m.rebuildPositions()
+
+	if wasOnDescription && !m.ui.Screen.ExpandDescriptions && parentTaskID != "" {
+		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			if p.Kind != selection.FocusTask || p.CategoryIndex < 0 || p.CategoryIndex >= len(m.project.Categories) {
+				return false
+			}
+			c := m.project.Categories[p.CategoryIndex]
+			return p.TaskIndex >= 0 && p.TaskIndex < len(c.Tasks) && c.Tasks[p.TaskIndex].ID == parentTaskID
+		})
+	}
+
+	m.ensureVisible()
+}
+
 func (m *model) saveFoldState() {
 	_ = m.deps.StateManager.SetFoldedCategories(m.project.ID, m.ui.Fold.FoldedIDs())
 }

@@ -9,6 +9,41 @@ import (
 	"phasionary/internal/domain"
 )
 
+// editOrFocusDescription is the shift+enter handler. From a task with a
+// description, it jumps the selection to the description row. From a task
+// without one, it opens the external editor to create the description. From
+// the description row itself it just opens the editor.
+func (m *model) editOrFocusDescription() tea.Cmd {
+	pos, ok := m.selectedPosition()
+	if !ok {
+		return nil
+	}
+	switch pos.Kind {
+	case selection.FocusDescription:
+		return m.startDescriptionInlineEdit(pos.CategoryIndex, pos.TaskIndex)
+	case selection.FocusTask:
+		task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
+		if task.Description == "" {
+			return m.startDescriptionInlineEdit(pos.CategoryIndex, pos.TaskIndex)
+		}
+		if !m.ui.Screen.ExpandDescriptions {
+			m.ui.Screen.ExpandDescriptions = true
+			m.rebuildPositions()
+		}
+		taskID := task.ID
+		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			if p.Kind != selection.FocusDescription || p.CategoryIndex != pos.CategoryIndex {
+				return false
+			}
+			cat := m.project.Categories[p.CategoryIndex]
+			return p.TaskIndex >= 0 && p.TaskIndex < len(cat.Tasks) && cat.Tasks[p.TaskIndex].ID == taskID
+		})
+		m.ensureVisible()
+		return nil
+	}
+	return nil
+}
+
 func (m *model) startEditing() {
 	position, ok := m.selectedPosition()
 	if !ok {

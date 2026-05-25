@@ -89,6 +89,7 @@ func (m *model) startExternalEdit() tea.Cmd {
 		return nil
 	}
 
+	itemType := pos.Kind
 	var content string
 	switch pos.Kind {
 	case selection.FocusProject:
@@ -97,6 +98,11 @@ func (m *model) startExternalEdit() tea.Cmd {
 		content = formatCategoryForEdit(m.project.Categories[pos.CategoryIndex])
 	case selection.FocusTask:
 		content = formatTaskForEdit(m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex])
+	case selection.FocusDescription:
+		// `e` from a description row edits the whole task externally
+		// (title + description), matching the user-facing intent.
+		content = formatTaskForEdit(m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex])
+		itemType = selection.FocusTask
 	}
 
 	tempFile, err := os.CreateTemp("", "phasionary-edit-*.txt")
@@ -115,7 +121,7 @@ func (m *model) startExternalEdit() tea.Cmd {
 
 	m.ui.ExternalEdit = ExternalEditState{
 		TempFilePath:  tempFile.Name(),
-		ItemType:      pos.Kind,
+		ItemType:      itemType,
 		CategoryIndex: pos.CategoryIndex,
 		TaskIndex:     pos.TaskIndex,
 	}

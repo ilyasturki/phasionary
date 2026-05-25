@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/x/ansi"
 
 	"phasionary/internal/app/selection"
@@ -14,6 +16,7 @@ const (
 	LayoutProject LayoutItemKind = iota
 	LayoutCategory
 	LayoutTask
+	LayoutDescription   // Inline description block for the task above it (own focusable row)
 	LayoutEmptyCategory // "(no tasks)" placeholder
 	LayoutFolded        // "(folded)" placeholder
 	LayoutSpacing       // Blank lines between elements
@@ -49,11 +52,12 @@ func DefaultLayoutConfig() LayoutConfig {
 }
 
 type LayoutBuilder struct {
-	config        LayoutConfig
-	width         int
-	statusDisplay string
-	filter        *FilterState
-	fold          *FoldState
+	config             LayoutConfig
+	width              int
+	statusDisplay      string
+	filter             *FilterState
+	fold               *FoldState
+	expandDescriptions bool
 }
 
 func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filter *FilterState, fold *FoldState) *LayoutBuilder {
@@ -64,6 +68,11 @@ func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filt
 		filter:        filter,
 		fold:          fold,
 	}
+}
+
+func (b *LayoutBuilder) WithExpandedDescriptions(v bool) *LayoutBuilder {
+	b.expandDescriptions = v
+	return b
 }
 
 func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Position) Layout {
@@ -184,6 +193,20 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Posi
 			})
 			totalHeight += taskHeight
 			posIndex++
+
+			if b.expandDescriptions && task.Description != "" {
+				descIndent := b.descriptionIndentFor(task)
+				descHeight := countDescriptionLines(task.Description, b.width, descIndent)
+				items = append(items, LayoutItem{
+					Kind:          LayoutDescription,
+					Height:        descHeight,
+					PositionIndex: posIndex,
+					CategoryIndex: catIdx,
+					TaskIndex:     taskIdx,
+				})
+				totalHeight += descHeight
+				posIndex++
+			}
 		}
 	}
 
@@ -208,8 +231,46 @@ func (b *LayoutBuilder) countTaskLines(task domain.Task) int {
 	return countWrappedLines(task.Title, b.width, overhead)
 }
 
+func countDescriptionLines(description string, width, indent int) int {
+	if description == "" {
+		return 0
+	}
+	available := width - indent
+	if width <= 0 || available < 1 {
+		// Falls back to no wrapping; each \n-separated paragraph is one line.
+		return strings.Count(description, "\n") + 1
+	}
+	total := 0
+	for _, paragraph := range strings.Split(description, "\n") {
+		if paragraph == "" {
+			total++
+			continue
+		}
+		wrapped := ansi.Wrap(paragraph, available, "")
+		total += strings.Count(wrapped, "\n") + 1
+	}
+	return total
+}
+
+// descriptionNestStep is how much further than the task title the description block is indented.
+const descriptionNestStep = 2
+
+// descriptionIndentFor returns the column where the description block begins,
+// aligned under the task title start and then nested one level deeper.
+func (b *LayoutBuilder) descriptionIndentFor(task domain.Task) int {
+	prefix := "  "
+	priorityIcon := ui.PriorityIcon(task.Priority)
+	statusText := statusLabel(task.Status, b.statusDisplay)
+	iconText := ""
+	if priorityIcon != "" {
+		iconText = priorityIcon + " "
+	}
+	return ansi.StringWidth(prefix+"["+statusText+"] "+iconText) + descriptionNestStep
+}
+
 func (m *model) buildLayout() *Layout {
-	builder := NewLayoutBuilder(m.layoutConfig(), m.ui.Screen.Width, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold)
+	builder := NewLayoutBuilder(m.layoutConfig(), m.ui.Screen.Width, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold).
+		WithExpandedDescriptions(m.ui.Screen.ExpandDescriptions)
 	layout := builder.Build(m.project, m.positions())
 	return &layout
 }

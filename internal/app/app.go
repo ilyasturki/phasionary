@@ -99,6 +99,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case modes.ModeEdit:
 		cmd := m.handleEditKey(msg)
 		return m, cmd
+	case modes.ModeDescriptionEdit:
+		return m.handleDescriptionEditKey(msg)
 	case modes.ModeExternalEdit:
 		return m, nil
 	default:
@@ -390,6 +392,8 @@ func (m model) View() string {
 		return modal.Render(content, m.estimatePickerView())
 	case modes.ModeURLPicker:
 		return modal.Render(content, m.urlPickerView())
+	case modes.ModeDescriptionEdit:
+		return modal.Render(content, m.descriptionEditView())
 	}
 	return content
 }
@@ -424,6 +428,10 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 			return m.renderEditTaskLine(task)
 		}
 		return m.renderTaskLine(task, isSelected, m.ui.Screen.Width, focused, inVisualRange)
+
+	case LayoutDescription:
+		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
+		return m.renderTaskDescription(task, isSelected, m.ui.Screen.Width, focused)
 
 	case LayoutEmptyCategory:
 		return ui.MutedStyle.Render("    (no tasks)")
@@ -503,7 +511,7 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 	}
 
 	foldState := NewFoldStateFrom(stateManager.GetFoldedCategories(project.ID))
-	positions := rebuildPositions(project.Categories, nil, &foldState)
+	positions := rebuildPositions(project.Categories, nil, &foldState, false)
 	initialSelection := findFirstTaskIndex(positions)
 	selMgr := selection.NewManager(positions, initialSelection)
 	modeMachine := modes.NewMachine(startMode)

@@ -23,5 +23,24 @@ Screenshot "/tmp/phas-vt/vhs-out/08_description_info.png"
 Type "q"
 Sleep 300ms
 
+Type "zd"
+Sleep 500ms
+Screenshot "/tmp/phas-vt/vhs-out/08_description_inline_on.png"
+
+Type "j"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/08_description_focused.png"
+
+Enter
+Sleep 600ms
+Screenshot "/tmp/phas-vt/vhs-out/08_description_inapp_editor.png"
+
+Escape
+Sleep 400ms
+
+Type "zd"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/08_description_inline_off.png"
+
 Hide
 Type "q"

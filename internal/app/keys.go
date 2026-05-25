@@ -65,6 +65,8 @@ var normalBindings = []keyBinding{
 		action: void((*model).foldAll)},
 	{keys: []string{"o"}, prefix: 'z', display: "zo", desc: "unfold all categories", section: sectionNavigation,
 		action: void((*model).unfoldAll)},
+	{keys: []string{"d"}, prefix: 'z', display: "zd", desc: "toggle inline descriptions", section: sectionNavigation,
+		action: void((*model).toggleExpandDescriptions)},
 	{keys: []string{"P"}, desc: "switch project", section: sectionNavigation,
 		action: void((*model).openProjectPicker)},
 
@@ -74,8 +76,16 @@ var normalBindings = []keyBinding{
 	{keys: []string{"A"}, desc: "add new category", section: sectionActions,
 		action: void((*model).startAddingCategory)},
 	{keys: []string{"enter"}, desc: "edit selected item", section: sectionActions,
-		action: void((*model).startEditing)},
-	{keys: []string{"e"}, desc: "edit in external editor", section: sectionActions,
+		action: func(m *model) tea.Cmd {
+			if pos, ok := m.selectedPosition(); ok && pos.Kind == selection.FocusDescription {
+				return m.startDescriptionInlineEdit(pos.CategoryIndex, pos.TaskIndex)
+			}
+			m.startEditing()
+			return nil
+		}},
+	{keys: []string{"shift+enter"}, desc: "edit/jump to task description", section: sectionActions,
+		action: func(m *model) tea.Cmd { return m.editOrFocusDescription() }},
+	{keys: []string{"e"}, desc: "edit in external editor (whole task)", section: sectionActions,
 		action: func(m *model) tea.Cmd { return m.startExternalEdit() }},
 	{keys: []string{" "}, display: "space", desc: "toggle task status", section: sectionActions,
 		action: void((*model).toggleSelectedTask)},

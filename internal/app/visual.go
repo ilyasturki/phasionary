@@ -16,7 +16,7 @@ func (m *model) enterVisualMode() {
 		return
 	}
 	pos, ok := m.selectedPosition()
-	if !ok || pos.Kind == selection.FocusProject {
+	if !ok || pos.Kind == selection.FocusProject || pos.Kind == selection.FocusDescription {
 		m.ui.Screen.StatusMsg = "Visual mode only works on tasks or categories"
 		return
 	}
