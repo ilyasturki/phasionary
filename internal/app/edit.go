@@ -43,15 +43,13 @@ func (m *model) startAddingTask() {
 		return
 	}
 
-	insertAtTop := m.ui.LastSortAscending == nil || *m.ui.LastSortAscending
 	var taskIndex int
-	if insertAtTop {
-		m.project.Categories[catIndex].InsertTask(0, newTask)
-		taskIndex = 0
+	if position.Kind == selection.FocusTask {
+		taskIndex = position.TaskIndex + 1
 	} else {
-		m.project.Categories[catIndex].AddTask(newTask)
-		taskIndex = len(m.project.Categories[catIndex].Tasks) - 1
+		taskIndex = 0
 	}
+	m.project.Categories[catIndex].InsertTask(taskIndex, newTask)
 
 	m.rebuildPositions()
 	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
@@ -140,19 +138,6 @@ func (m *model) finishEditing() {
 		if task.Title != trimmed || m.ui.Edit.isAdding {
 			task.Title = trimmed
 			task.UpdatedAt = domain.NowTimestamp()
-
-			if m.ui.Edit.isAdding {
-				taskID := task.ID
-				ascending := m.ui.LastSortAscending == nil || *m.ui.LastSortAscending
-				sortCategoryTasks(m.project.Categories[position.CategoryIndex].Tasks, ascending)
-				m.rebuildPositions()
-				m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-					return p.Kind == selection.FocusTask &&
-						p.CategoryIndex == position.CategoryIndex &&
-						m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == taskID
-				})
-			}
-
 			m.storeTaskUpdate()
 		}
 	case selection.FocusCategory:

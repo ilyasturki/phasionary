@@ -14,6 +14,7 @@ const (
 	ModeInfo
 	ModeEstimatePicker
 	ModeURLPicker
+	ModeVisual
 )
 
 type Action int
@@ -28,7 +29,6 @@ const (
 	ActionChangePriority
 	ActionChangeEstimate
 	ActionMoveItem
-	ActionSort
 	ActionCopy
 	ActionOpenPicker
 	ActionOpenOptions
@@ -119,6 +119,8 @@ func (m *Machine) canTransition(target Mode) bool {
 		return target == ModeNormal
 	case ModeURLPicker:
 		return target == ModeNormal
+	case ModeVisual:
+		return target == ModeNormal
 	}
 	return false
 }
@@ -143,6 +145,8 @@ func (m *Machine) CanPerformAction(action Action) bool {
 		return false
 	case ModeURLPicker:
 		return false
+	case ModeVisual:
+		return action == ActionNavigate || action == ActionCopy
 	}
 	return false
 }
@@ -209,4 +213,12 @@ func (m *Machine) IsURLPicker() bool {
 
 func (m *Machine) ToURLPicker() bool {
 	return m.TransitionTo(ModeURLPicker)
+}
+
+func (m *Machine) IsVisual() bool {
+	return m.current == ModeVisual
+}
+
+func (m *Machine) ToVisual() bool {
+	return m.TransitionTo(ModeVisual)
 }

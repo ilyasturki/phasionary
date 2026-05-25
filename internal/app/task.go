@@ -1,8 +1,6 @@
 package app
 
 import (
-	"sort"
-
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
@@ -42,11 +40,9 @@ func (m *model) deleteTask(position selection.Position) {
 
 	task := m.project.Categories[catIndex].Tasks[taskIndex]
 	taskCopy := task
-	m.ui.Clipboard = ClipboardState{
-		Task:     &taskCopy,
-		IsCut:    false,
-		SourceID: "",
-	}
+	m.ui.Clipboard.Task = &taskCopy
+	m.ui.Clipboard.IsCut = false
+	m.ui.Clipboard.SourceID = ""
 
 	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
 	m.rebuildAndClamp()
@@ -262,132 +258,6 @@ func (m *model) moveCategoryUp() {
 	m.storeTaskUpdate()
 }
 
-func statusOrder(status string) int {
-	switch status {
-	case domain.StatusTodo:
-		return 0
-	case domain.StatusInProgress:
-		return 1
-	case domain.StatusCompleted:
-		return 2
-	case domain.StatusCancelled:
-		return 3
-	default:
-		return 0
-	}
-}
-
-func priorityOrder(priority string) int {
-	switch priority {
-	case domain.PriorityHigh:
-		return 0
-	case domain.PriorityMedium, "":
-		return 1
-	case domain.PriorityLow:
-		return 2
-	default:
-		return 3
-	}
-}
-
-func getTaskSortDate(task domain.Task) string {
-	if task.UpdatedAt != "" {
-		return task.UpdatedAt
-	}
-	return task.CreatedAt
-}
-
-func estimateOrder(estimate int) int {
-	if estimate == 0 {
-		return 1
-	}
-	return 0
-}
-
-func sortCategoryTasks(tasks []domain.Task, ascending bool) {
-	sort.SliceStable(tasks, func(i, j int) bool {
-		orderI := statusOrder(tasks[i].Status)
-		orderJ := statusOrder(tasks[j].Status)
-		if orderI != orderJ {
-			if ascending {
-				return orderI < orderJ
-			}
-			return orderI > orderJ
-		}
-		prioI := priorityOrder(tasks[i].Priority)
-		prioJ := priorityOrder(tasks[j].Priority)
-		if prioI != prioJ {
-			if ascending {
-				return prioI < prioJ
-			}
-			return prioI > prioJ
-		}
-		estOrderI := estimateOrder(tasks[i].EstimateMinutes)
-		estOrderJ := estimateOrder(tasks[j].EstimateMinutes)
-		if estOrderI != estOrderJ {
-			if ascending {
-				return estOrderI < estOrderJ
-			}
-			return estOrderI > estOrderJ
-		}
-		if tasks[i].EstimateMinutes != tasks[j].EstimateMinutes {
-			if ascending {
-				return tasks[i].EstimateMinutes < tasks[j].EstimateMinutes
-			}
-			return tasks[i].EstimateMinutes > tasks[j].EstimateMinutes
-		}
-		dateI := getTaskSortDate(tasks[i])
-		dateJ := getTaskSortDate(tasks[j])
-		if ascending {
-			return dateI > dateJ // Ascending: newest first
-		}
-		return dateI < dateJ // Descending: oldest first
-	})
-}
-
-func (m *model) sortTasksByStatus() {
-	ascending := true
-	m.ui.LastSortAscending = &ascending
-	m.sortTasksByStatusOrder(true)
-}
-
-func (m *model) sortTasksByStatusReverse() {
-	ascending := false
-	m.ui.LastSortAscending = &ascending
-	m.sortTasksByStatusOrder(false)
-}
-
-func (m *model) sortTasksByStatusOrder(ascending bool) {
-	if !m.ui.Modes.CanPerformAction(modes.ActionSort) {
-		return
-	}
-
-	var selectedTaskID string
-	position, hasSelection := m.selectedPosition()
-	if hasSelection && position.Kind == selection.FocusTask {
-		selectedTaskID = m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex].ID
-	}
-
-	for i := range m.project.Categories {
-		sortCategoryTasks(m.project.Categories[i].Tasks, ascending)
-	}
-
-	m.rebuildPositions()
-
-	if selectedTaskID != "" {
-		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-			if p.Kind != selection.FocusTask {
-				return false
-			}
-			task := m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex]
-			return task.ID == selectedTaskID
-		})
-	}
-
-	m.ensureVisible()
-	m.storeTaskUpdate()
-}
-
 func (m *model) cutSelectedTask() {
 	if !m.ui.Modes.CanPerformAction(modes.ActionDeleteItem) {
 		return
@@ -400,17 +270,22 @@ func (m *model) cutSelectedTask() {
 
 	task := m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 	taskCopy := task
-	m.ui.Clipboard = ClipboardState{
-		Task:     &taskCopy,
-		IsCut:    true,
-		SourceID: task.ID,
-	}
+	m.ui.Clipboard.Task = &taskCopy
+	m.ui.Clipboard.IsCut = true
+	m.ui.Clipboard.SourceID = task.ID
 
 	title := task.Title
 	if len([]rune(title)) > 30 {
 		title = string([]rune(title)[:30]) + "..."
 	}
 	m.ui.Screen.StatusMsg = "Marked for cut: " + title
+}
+
+func (m *model) pasteFromClipboard() {
+	if m.pasteMulti() {
+		return
+	}
+	m.pasteTask()
 }
 
 func (m *model) pasteTask() {
@@ -434,6 +309,7 @@ func (m *model) pasteTask() {
 		Priority:        m.ui.Clipboard.Task.Priority,
 		CompletionDate:  m.ui.Clipboard.Task.CompletionDate,
 		EstimateMinutes: m.ui.Clipboard.Task.EstimateMinutes,
+		Description:     m.ui.Clipboard.Task.Description,
 	}
 
 	position, ok := m.selectedPosition()
@@ -453,11 +329,19 @@ func (m *model) pasteTask() {
 		taskIndex = 0
 	case selection.FocusTask:
 		catIndex = position.CategoryIndex
-		taskIndex = position.TaskIndex
+		taskIndex = position.TaskIndex + 1
 	}
 
 	if m.ui.Clipboard.IsCut {
+		srcCat, srcIdx := m.findTaskByID(m.ui.Clipboard.SourceID)
+		if srcCat == catIndex && srcIdx >= 0 && srcIdx < taskIndex {
+			taskIndex--
+		}
 		m.removeTaskByID(m.ui.Clipboard.SourceID)
+	}
+
+	if taskIndex > len(m.project.Categories[catIndex].Tasks) {
+		taskIndex = len(m.project.Categories[catIndex].Tasks)
 	}
 
 	m.project.Categories[catIndex].InsertTask(taskIndex, newTask)
@@ -489,4 +373,15 @@ func (m *model) removeTaskByID(id string) {
 			}
 		}
 	}
+}
+
+func (m *model) findTaskByID(id string) (int, int) {
+	for catIdx := range m.project.Categories {
+		for taskIdx, task := range m.project.Categories[catIdx].Tasks {
+			if task.ID == id {
+				return catIdx, taskIdx
+			}
+		}
+	}
+	return -1, -1
 }

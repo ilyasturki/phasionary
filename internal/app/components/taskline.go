@@ -14,15 +14,30 @@ import (
 type TaskLineRenderer struct {
 	width         int
 	statusDisplay string
+	priorityColor string
 	focused       bool
+	visualMode    bool
 }
 
-func NewTaskLineRenderer(width int, statusDisplay string, focused bool) *TaskLineRenderer {
+func NewTaskLineRenderer(width int, statusDisplay, priorityColor string, focused bool) *TaskLineRenderer {
 	return &TaskLineRenderer{
 		width:         width,
 		statusDisplay: statusDisplay,
+		priorityColor: priorityColor,
 		focused:       focused,
 	}
+}
+
+func (r *TaskLineRenderer) WithVisualMode(v bool) *TaskLineRenderer {
+	r.visualMode = v
+	return r
+}
+
+func (r *TaskLineRenderer) selectedStyle() lipgloss.Style {
+	if r.visualMode {
+		return ui.GetVisualSelectedStyle(r.focused)
+	}
+	return ui.GetSelectedStyle(r.focused)
 }
 
 func (r *TaskLineRenderer) Render(task domain.Task, selected bool) string {
@@ -42,13 +57,17 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 	status := r.formatStatus(task.Status, false)
 	icon := ""
 	if priorityIcon != "" {
-		icon = ui.TaskTitleStyle(task.Priority, task.Status).Render(priorityIcon) + " "
+		iconStyle := ui.PriorityIconStyle(task.Priority, r.priorityColor)
+		if task.Status == domain.StatusCompleted || task.Status == domain.StatusCancelled {
+			iconStyle = iconStyle.Faint(true)
+		}
+		icon = iconStyle.Render(priorityIcon) + " "
 	}
 	descMarker := r.formatDescriptionBadge(task.Description, false)
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, false)
 	suffix := descMarker + estimate
 	suffixText := r.descriptionBadgeText(task.Description) + r.estimateBadgeText(task.EstimateMinutes)
-	titleStyle := ui.TaskTitleStyle(task.Priority, task.Status)
+	titleStyle := ui.TaskTitleStyle(task.Priority, task.Status, r.priorityColor)
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, status, icon)
 
 	if r.width <= 0 {
@@ -60,9 +79,9 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 
 func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon string) string {
 	statusText := r.statusLabel(task.Status)
-	priorityStyle := ui.GetSelectedPriorityStyle(task.Priority, r.focused)
-	statusStyle := ui.GetSelectedStatusStyle(task.Status, r.focused)
-	selectedStyle := ui.GetSelectedStyle(r.focused)
+	selectedStyle := r.selectedStyle()
+	priorityStyle := selectedStyle
+	statusStyle := selectedStyle
 
 	icon := ""
 	iconText := ""
@@ -114,7 +133,7 @@ func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart strin
 	wrapped := ansi.Wrap(title, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
-	selectedStyle := ui.GetSelectedStyle(r.focused)
+	selectedStyle := r.selectedStyle()
 
 	var result []string
 	for i, line := range wrapLines {
@@ -180,7 +199,7 @@ func (r *TaskLineRenderer) formatEstimateBadge(minutes int, selected bool) strin
 		return ""
 	}
 	if selected {
-		return ui.GetSelectedStyle(r.focused).Render(text)
+		return r.selectedStyle().Render(text)
 	}
 	return ui.MutedStyle.Render(text)
 }
@@ -198,7 +217,7 @@ func (r *TaskLineRenderer) formatDescriptionBadge(description string, selected b
 		return ""
 	}
 	if selected {
-		return ui.GetSelectedStyle(r.focused).Render(text)
+		return r.selectedStyle().Render(text)
 	}
 	return ui.MutedStyle.Render(text)
 }

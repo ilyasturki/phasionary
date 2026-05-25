@@ -17,7 +17,21 @@ var (
 	DialogHintStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 	SuccessStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	FilterTagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true)
+	VisualTagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3")).Bold(true)
+
+	// VisualSelectedStyle highlights rows that are part of an active visual
+	// range. Distinct from the reverse-based cursor style so the user can
+	// tell at a glance they're in visual mode.
+	VisualSelectedStyle         = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3"))
+	UnfocusedVisualSelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3")).Faint(true)
 )
+
+func GetVisualSelectedStyle(focused bool) lipgloss.Style {
+	if focused {
+		return VisualSelectedStyle
+	}
+	return UnfocusedVisualSelectedStyle
+}
 
 func StatusStyle(status string) lipgloss.Style {
 	switch status {
@@ -32,19 +46,50 @@ func StatusStyle(status string) lipgloss.Style {
 	}
 }
 
-func PriorityStyle(priority string) lipgloss.Style {
+func priorityColor(priority string) (lipgloss.Color, bool) {
 	switch priority {
 	case "high":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+		return lipgloss.Color("1"), true
 	case "low":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+		return lipgloss.Color("6"), true
 	default:
-		return lipgloss.NewStyle()
+		return "", false
 	}
 }
 
-func TaskTitleStyle(priority, status string) lipgloss.Style {
-	base := PriorityStyle(priority)
+// PriorityStyle returns the text style for a task title with the given
+// priority. Color is applied only when colorMode is "full" (or empty, which
+// is treated as the default "full").
+func PriorityStyle(priority, colorMode string) lipgloss.Style {
+	if colorMode == "" {
+		colorMode = "full"
+	}
+	if colorMode != "full" {
+		return lipgloss.NewStyle()
+	}
+	if c, ok := priorityColor(priority); ok {
+		return lipgloss.NewStyle().Foreground(c)
+	}
+	return lipgloss.NewStyle()
+}
+
+// PriorityIconStyle returns the style for the priority icon. Color is applied
+// when colorMode is "full" or "icon" (empty defaults to "full").
+func PriorityIconStyle(priority, colorMode string) lipgloss.Style {
+	if colorMode == "" {
+		colorMode = "full"
+	}
+	if colorMode != "full" && colorMode != "icon" {
+		return lipgloss.NewStyle()
+	}
+	if c, ok := priorityColor(priority); ok {
+		return lipgloss.NewStyle().Foreground(c)
+	}
+	return lipgloss.NewStyle()
+}
+
+func TaskTitleStyle(priority, status, colorMode string) lipgloss.Style {
+	base := PriorityStyle(priority, colorMode)
 	if status == "completed" || status == "cancelled" {
 		return base.Faint(true)
 	}

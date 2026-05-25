@@ -66,6 +66,15 @@ func computeHelpRows() ([]helpRow, []int) {
 		helpRow{text: "  ctrl+w        delete word backward"},
 		helpRow{text: "  ctrl+k/u      delete to end/start"},
 		helpRow{text: "  ctrl+←/→      word navigation"},
+		helpRow{},
+		helpRow{text: ui.DialogTitleStyle.Render("Visual mode:")},
+		helpRow{text: "  v             enter visual mode (anchor at cursor)"},
+		helpRow{text: "  j/k           extend range (skips category rows)"},
+		helpRow{text: "  y             copy titles (newline-joined)"},
+		helpRow{text: "  Y             copy as markdown checklist"},
+		helpRow{text: "  x             cut range (then p to paste)"},
+		helpRow{text: "  d             delete range (with confirmation)"},
+		helpRow{text: "  esc           exit visual mode"},
 	)
 	return rows, focusables
 }

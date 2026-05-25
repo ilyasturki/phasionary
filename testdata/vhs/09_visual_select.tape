@@ -1,0 +1,67 @@
+Output "/tmp/phas-vt/vhs-out/09_visual_select.gif"
+Set Shell "bash"
+Set Width 1200
+Set Height 700
+Set FontSize 16
+Env PHASIONARY_DATA_PATH "/tmp/phas-vt/data"
+Env PHASIONARY_CONFIG_PATH "/tmp/phas-vt/cfg"
+
+Hide
+Type "clear && ./phasionary -p Default"
+Enter
+Sleep 800ms
+Show
+
+# Start visual mode on the first task and extend down 2 rows
+Type "v"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_visual_enter.png"
+
+Type "j"
+Sleep 200ms
+Type "j"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_visual_range.png"
+
+# Cut the range, then move down into the "Fix" category and paste
+Type "x"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_after_cut.png"
+
+Type "}"
+Sleep 300ms
+Type "p"
+Sleep 500ms
+Screenshot "/tmp/phas-vt/vhs-out/09_after_paste.png"
+
+# Now yank-then-paste: visual select two tasks, y to yank, move, paste.
+# Sources should remain in place, with copies inserted at the new cursor.
+Type "v"
+Sleep 200ms
+Type "j"
+Sleep 200ms
+Type "y"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_after_yank.png"
+
+Type "}"
+Sleep 200ms
+Type "p"
+Sleep 500ms
+Screenshot "/tmp/phas-vt/vhs-out/09_after_yank_paste.png"
+
+# Visual delete: select two tasks, press d, confirm.
+Type "v"
+Sleep 200ms
+Type "j"
+Sleep 200ms
+Type "d"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_delete_confirm.png"
+
+Type "y"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_after_delete.png"
+
+Hide
+Type "q"

@@ -9,8 +9,11 @@ import (
 )
 
 func (m model) confirmDeleteView() string {
-	if m.ui.ConfirmDelete.Kind == ConfirmDeleteProject {
+	switch m.ui.ConfirmDelete.Kind {
+	case ConfirmDeleteProject:
 		return m.confirmDeleteProjectView()
+	case ConfirmDeleteVisualRange:
+		return m.confirmDeleteVisualRangeView()
 	}
 
 	position, ok := m.selectedPosition()
@@ -24,6 +27,32 @@ func (m model) confirmDeleteView() string {
 	} else {
 		cat := m.project.Categories[position.CategoryIndex]
 		message = fmt.Sprintf("Delete category %q and %d tasks?", truncateText(cat.Name, 30), len(cat.Tasks))
+	}
+	lines := []string{
+		message,
+		"",
+		ui.DialogHintStyle.Render("y/enter confirm | n/esc cancel"),
+	}
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (m model) confirmDeleteVisualRangeView() string {
+	var message string
+	if n := len(m.ui.ConfirmDelete.CategoryIDs); n > 0 {
+		nested := 0
+		idSet := make(map[string]struct{}, n)
+		for _, id := range m.ui.ConfirmDelete.CategoryIDs {
+			idSet[id] = struct{}{}
+		}
+		for _, c := range m.project.Categories {
+			if _, drop := idSet[c.ID]; drop {
+				nested += len(c.Tasks)
+			}
+		}
+		message = fmt.Sprintf("Delete %d categor%s and %d task(s)?", n, plural(n, "y", "ies"), nested)
+	} else {
+		n := len(m.ui.ConfirmDelete.TaskIDs)
+		message = fmt.Sprintf("Delete %d task(s)?", n)
 	}
 	lines := []string{
 		message,

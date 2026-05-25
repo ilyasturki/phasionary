@@ -7,24 +7,38 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"phasionary/internal/app/components"
+	"phasionary/internal/app/selection"
 	"phasionary/internal/config"
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
 )
 
-func renderProjectLine(name string, selected, focused, filtered bool) string {
+func renderProjectLine(name string, selected, focused, filtered, visualMode bool, statusText string, width int) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
 	line := fmt.Sprintf("%s■ %s", prefix, name)
 	if selected {
-		line = ui.GetSelectedStyle(focused).Render(line)
+		if visualMode {
+			line = ui.GetVisualSelectedStyle(focused).Render(line)
+		} else {
+			line = ui.GetSelectedStyle(focused).Render(line)
+		}
 	} else {
 		line = ui.HeaderStyle.Render(line)
 	}
 	if filtered {
 		line += " " + ui.FilterTagStyle.Render("[filtered]")
+	}
+	if visualMode {
+		line += " " + ui.VisualTagStyle.Render("[visual]")
+	}
+	if statusText != "" {
+		line += " " + ui.StatusLineStyle.Render(statusText)
+	}
+	if width > 0 {
+		line = ansi.Truncate(line, width, "")
 	}
 	return line
 }
@@ -44,14 +58,18 @@ func (m model) renderEditProjectLine() string {
 	)
 }
 
-func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string, selected bool, folded bool, width int, focused bool) string {
+func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string, selected bool, folded bool, width int, focused bool, visualMode bool) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
 	style := ui.CategoryStyle
 	if selected {
-		style = ui.GetSelectedStyle(focused)
+		if visualMode {
+			style = ui.GetVisualSelectedStyle(focused)
+		} else {
+			style = ui.GetSelectedStyle(focused)
+		}
 	}
 
 	foldIndicator := "▼ "
@@ -63,9 +81,12 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 	statusBadgeText := ""
 	if aggregateStatus != "" {
 		statusBadgeText = " [" + statusIcon(aggregateStatus) + "]"
-		if selected {
+		switch {
+		case selected && visualMode:
+			statusBadge = ui.GetVisualSelectedStyle(focused).Render(statusBadgeText)
+		case selected:
 			statusBadge = ui.GetSelectedStatusStyle(aggregateStatus, focused).Render(statusBadgeText)
-		} else {
+		default:
 			statusBadge = ui.StatusStyle(aggregateStatus).Render(statusBadgeText)
 		}
 	}
@@ -74,9 +95,12 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 	estimateBadgeText := ""
 	if estimateMinutes > 0 {
 		estimateBadgeText = " ~" + FormatEstimate(estimateMinutes)
-		if selected {
+		switch {
+		case selected && visualMode:
+			estimateBadge = ui.GetVisualSelectedStyle(focused).Render(estimateBadgeText)
+		case selected:
 			estimateBadge = ui.GetSelectedStyle(focused).Render(estimateBadgeText)
-		} else {
+		default:
 			estimateBadge = ui.MutedStyle.Render(estimateBadgeText)
 		}
 	}
@@ -106,8 +130,9 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 	return strings.Join(result, "\n")
 }
 
-func (m model) renderTaskLine(task domain.Task, selected bool, width int, focused bool) string {
-	renderer := components.NewTaskLineRenderer(width, m.deps.CfgManager.Get().StatusDisplay, focused)
+func (m model) renderTaskLine(task domain.Task, selected bool, width int, focused bool, visualMode bool) string {
+	cfg := m.deps.CfgManager.Get()
+	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).WithVisualMode(visualMode)
 	return renderer.Render(task, selected)
 }
 
@@ -161,17 +186,19 @@ func (m model) renderEditCategoryLine() string {
 
 func (m model) renderEditTaskLine(task domain.Task) string {
 	prefix := "> "
-	statusText := formatStatus(task.Status, m.deps.CfgManager.Get().StatusDisplay)
-	titleStyle := ui.PriorityStyle(task.Priority)
+	cfg := m.deps.CfgManager.Get()
+	statusText := formatStatus(task.Status, cfg.StatusDisplay)
+	titleStyle := ui.PriorityStyle(task.Priority, cfg.PriorityColor)
+	iconStyle := ui.PriorityIconStyle(task.Priority, cfg.PriorityColor)
 	icon := ui.PriorityIcon(task.Priority)
 	iconPrefix := ""
 	iconPlain := ""
 	if icon != "" {
-		iconPrefix = titleStyle.Render(icon) + " "
+		iconPrefix = iconStyle.Render(icon) + " "
 		iconPlain = icon + " "
 	}
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, statusText, iconPrefix)
-	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, m.deps.CfgManager.Get().StatusDisplay) + "] " + iconPlain)
+	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, cfg.StatusDisplay) + "] " + iconPlain)
 	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
 	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
 		placeholder := ui.MutedStyle.Render("Enter task title...")
@@ -199,9 +226,17 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	return renderCursorLine(edited, m.ui.Edit.input.Position(), m.ui.Screen.Width, overhead, prefixPart, titleStyle, cursorStyle)
 }
 
-func (m model) statusLine() string {
+func (m model) statusText() string {
 	if m.ui.Screen.StatusMsg != "" {
-		return ui.StatusLineStyle.Render(m.ui.Screen.StatusMsg)
+		return m.ui.Screen.StatusMsg
+	}
+	if m.ui.Modes.IsVisual() {
+		count := len(m.visualSelectedPositions())
+		noun := plural(count, "task", "tasks")
+		if m.ui.Visual.Kind == selection.FocusCategory {
+			noun = plural(count, "category", "categories")
+		}
+		return fmt.Sprintf("-- VISUAL -- %d %s selected", count, noun)
 	}
 	return ""
 }

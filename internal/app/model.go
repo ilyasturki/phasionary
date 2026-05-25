@@ -13,6 +13,18 @@ type ClipboardState struct {
 	Task     *domain.Task
 	IsCut    bool
 	SourceID string
+
+	Tasks       []domain.Task
+	TaskIDs     []string
+	Categories  []domain.Category
+	CategoryIDs []string
+}
+
+type VisualState struct {
+	Active           bool
+	Kind             selection.FocusKind
+	AnchorCategoryID string
+	AnchorTaskID     string
 }
 
 type Screen struct {
@@ -44,7 +56,7 @@ type UIState struct {
 	URLPicker         components.URLPickerState
 	Help              HelpState
 	Clipboard         ClipboardState
-	LastSortAscending *bool
+	Visual            VisualState
 }
 
 type Dependencies struct {

@@ -217,16 +217,21 @@ type ConfirmDeleteKind int
 const (
 	ConfirmDeleteSelection ConfirmDeleteKind = iota
 	ConfirmDeleteProject
+	ConfirmDeleteVisualRange
 )
 
 type ConfirmDeleteState struct {
-	Kind      ConfirmDeleteKind
-	ProjectID string
+	Kind        ConfirmDeleteKind
+	ProjectID   string
+	TaskIDs     []string
+	CategoryIDs []string
 }
 
 func (c *ConfirmDeleteState) reset() {
 	c.Kind = ConfirmDeleteSelection
 	c.ProjectID = ""
+	c.TaskIDs = nil
+	c.CategoryIDs = nil
 }
 
 func (p *ProjectPickerState) totalItems() int {
