@@ -139,7 +139,7 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Posi
 
 		visibleTaskCount := 0
 		for _, task := range category.Tasks {
-			if b.filter == nil || b.filter.IsStatusVisible(task.Status) {
+			if b.filter == nil || b.filter.TaskVisible(task, category.ID) {
 				visibleTaskCount++
 			}
 		}
@@ -171,7 +171,7 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Posi
 
 		// Tasks (consecutive tasks have no blank lines between them)
 		for taskIdx, task := range category.Tasks {
-			if b.filter != nil && !b.filter.IsStatusVisible(task.Status) {
+			if b.filter != nil && !b.filter.TaskVisible(task, category.ID) {
 				continue
 			}
 			taskHeight := b.countTaskLines(task)

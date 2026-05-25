@@ -22,7 +22,35 @@ Screenshot "/tmp/phas-vt/vhs-out/04_after_toggle.png"
 
 Type "f"
 Sleep 500ms
-Screenshot "/tmp/phas-vt/vhs-out/04_filter_open.png"
+Screenshot "/tmp/phas-vt/vhs-out/04_filter_hub.png"
+
+# Drill into Status, toggle Todo, return to hub
+Enter
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/04_filter_status.png"
+Type " "
+Sleep 300ms
+Escape
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/04_filter_hub_with_status.png"
+
+# Drill into Priority
+Type "j"
+Sleep 200ms
+Enter
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/04_filter_priority.png"
+Type " "
+Sleep 300ms
+Escape
+Sleep 300ms
+
+# Clear all (from Priority row, j twice -> Clear all)
+Type "jj"
+Sleep 200ms
+Enter
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/04_filter_after_clear.png"
 
 Escape
 Sleep 300ms

@@ -16,6 +16,7 @@ var (
 	DialogTitleStyle = lipgloss.NewStyle().Bold(true)
 	DialogHintStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 	SuccessStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	FilterTagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true)
 )
 
 func StatusStyle(status string) lipgloss.Style {

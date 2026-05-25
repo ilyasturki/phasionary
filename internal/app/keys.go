@@ -83,7 +83,7 @@ var normalBindings = []keyBinding{
 		action: void((*model).sortTasksByStatus)},
 	{keys: []string{"S"}, section: sectionActions,
 		action: void((*model).sortTasksByStatusReverse)},
-	{keys: []string{"f"}, desc: "filter tasks by status", section: sectionActions,
+	{keys: []string{"f"}, desc: "filter tasks", section: sectionActions,
 		action: func(m *model) tea.Cmd { m.ui.Modes.ToFilter(); return nil }},
 	{keys: []string{"h"}, display: "h/l", desc: "change priority", section: sectionActions,
 		action: void((*model).decreasePriority)},

@@ -173,18 +173,48 @@ func (m model) handleOptionsKey(msg tea.KeyMsg) model {
 }
 
 func (m model) handleFilterKey(msg tea.KeyMsg) model {
+	catCount := len(m.project.Categories)
 	switch msg.String() {
-	case "q", "esc", "f":
+	case "q", "f":
+		m.ui.Filter.ResetToHub()
 		m.ui.Modes.ToNormal()
 		m.rebuildPositions()
+	case "esc":
+		if m.ui.Filter.View() == FilterViewHub {
+			m.ui.Modes.ToNormal()
+			m.rebuildPositions()
+		} else {
+			m.ui.Filter.SetView(FilterViewHub)
+		}
 	case "j", "down":
-		m.ui.Filter.MoveDown()
+		m.ui.Filter.MoveDown(catCount)
 	case "k", "up":
 		m.ui.Filter.MoveUp()
-	case " ":
-		m.ui.Filter.ToggleSelected()
+	case "enter", " ":
+		if m.ui.Filter.View() == FilterViewHub {
+			m.openFilterHubSelection()
+		} else {
+			m.ui.Filter.ToggleSelected(m.project.Categories)
+			m.rebuildPositions()
+		}
 	}
 	return m
+}
+
+func (m *model) openFilterHubSelection() {
+	switch m.ui.Filter.HubSelected() {
+	case FilterHubStatus:
+		m.ui.Filter.SetView(FilterViewStatus)
+	case FilterHubPriority:
+		m.ui.Filter.SetView(FilterViewPriority)
+	case FilterHubCategory:
+		m.ui.Filter.SetView(FilterViewCategory)
+	case FilterHubClearAll:
+		if m.ui.Filter.HasActiveFilter() {
+			m.ui.Filter.ClearAll()
+			m.rebuildPositions()
+		}
+	}
 }
 
 func (m model) handleInfoKey(msg tea.KeyMsg) model {
@@ -345,7 +375,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		if m.ui.Modes.IsEdit() && isSelected {
 			return m.renderEditProjectLine()
 		}
-		return renderProjectLine(m.project.Name, isSelected, focused)
+		return renderProjectLine(m.project.Name, isSelected, focused, m.ui.Filter.HasActiveFilter())
 
 	case LayoutCategory:
 		category := m.project.Categories[item.CategoryIndex]

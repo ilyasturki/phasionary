@@ -7,22 +7,26 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"phasionary/internal/app/components"
-	"phasionary/internal/app/selection"
 	"phasionary/internal/config"
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
 )
 
-func renderProjectLine(name string, selected bool, focused bool) string {
+func renderProjectLine(name string, selected, focused, filtered bool) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
 	line := fmt.Sprintf("%s■ %s", prefix, name)
 	if selected {
-		return ui.GetSelectedStyle(focused).Render(line)
+		line = ui.GetSelectedStyle(focused).Render(line)
+	} else {
+		line = ui.HeaderStyle.Render(line)
 	}
-	return ui.HeaderStyle.Render(line)
+	if filtered {
+		line += " " + ui.FilterTagStyle.Render("[filtered]")
+	}
+	return line
 }
 
 func (m model) renderEditProjectLine() string {
@@ -196,29 +200,10 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 }
 
 func (m model) statusLine() string {
-	filterIndicator := ""
-	if m.ui.Filter.HasActiveFilter() {
-		filterIndicator = " [filtered]"
-	}
 	if m.ui.Screen.StatusMsg != "" {
-		return ui.StatusLineStyle.Render(m.ui.Screen.StatusMsg + filterIndicator)
+		return ui.StatusLineStyle.Render(m.ui.Screen.StatusMsg)
 	}
-	position, ok := m.selectedPosition()
-	if !ok {
-		return ui.StatusLineStyle.Render("No items to display." + filterIndicator)
-	}
-	if position.Kind == selection.FocusProject {
-		summary := fmt.Sprintf("Project: %s%s", m.project.Name, filterIndicator)
-		return ui.StatusLineStyle.Render(summary)
-	}
-	category := m.project.Categories[position.CategoryIndex]
-	if position.Kind == selection.FocusCategory {
-		summary := fmt.Sprintf("Category: %s (%d tasks)%s", category.Name, len(category.Tasks), filterIndicator)
-		return ui.StatusLineStyle.Render(summary)
-	}
-	task := category.Tasks[position.TaskIndex]
-	summary := fmt.Sprintf("Selected: %s / %s (%s)%s", category.Name, task.Title, task.Status, filterIndicator)
-	return ui.StatusLineStyle.Render(summary)
+	return ""
 }
 
 func truncateText(s string, max int) string {

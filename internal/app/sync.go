@@ -31,7 +31,7 @@ func rebuildPositions(categories []domain.Category, filter *FilterState, fold *F
 			continue
 		}
 		for tIndex, task := range category.Tasks {
-			if filter != nil && !filter.IsStatusVisible(task.Status) {
+			if filter != nil && !filter.TaskVisible(task, category.ID) {
 				continue
 			}
 			positions = append(positions, selection.Position{

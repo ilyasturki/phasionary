@@ -14,61 +14,182 @@ var filterStatuses = []string{
 	domain.StatusCancelled,
 }
 
+var filterPriorities = []string{
+	domain.PriorityHigh,
+	domain.PriorityMedium,
+	domain.PriorityLow,
+	"",
+}
+
+type FilterView int
+
+const (
+	FilterViewHub FilterView = iota
+	FilterViewStatus
+	FilterViewPriority
+	FilterViewCategory
+)
+
+const (
+	FilterHubStatus int = iota
+	FilterHubPriority
+	FilterHubCategory
+	FilterHubClearAll
+)
+
+const filterHubCount = 4
+
 type FilterState struct {
-	selected int
-	enabled  map[string]bool
+	view             FilterView
+	hubSelected      int
+	statusSelected   int
+	prioritySelected int
+	categorySelected int
+	statuses         map[string]bool
+	priorities       map[string]bool
+	categories       map[string]bool
 }
 
 func NewFilterState() FilterState {
 	return FilterState{
-		selected: 0,
-		enabled:  make(map[string]bool),
+		view:       FilterViewHub,
+		statuses:   make(map[string]bool),
+		priorities: make(map[string]bool),
+		categories: make(map[string]bool),
 	}
 }
 
-func (f *FilterState) IsStatusVisible(status string) bool {
-	if len(f.enabled) == 0 {
-		return true
-	}
-	return f.enabled[status]
+func (f *FilterState) View() FilterView {
+	return f.view
 }
 
-func (f *FilterState) Toggle(status string) {
-	if f.enabled[status] {
-		delete(f.enabled, status)
-	} else {
-		f.enabled[status] = true
-	}
+func (f *FilterState) SetView(v FilterView) {
+	f.view = v
 }
 
-func (f *FilterState) HasActiveFilter() bool {
-	return len(f.enabled) > 0
+func (f *FilterState) ResetToHub() {
+	f.view = FilterViewHub
 }
 
-func (f *FilterState) MoveUp() {
-	if f.selected > 0 {
-		f.selected--
-	}
-}
-
-func (f *FilterState) MoveDown() {
-	if f.selected < len(filterStatuses)-1 {
-		f.selected++
-	}
-}
-
-func (f *FilterState) ToggleSelected() {
-	if f.selected >= 0 && f.selected < len(filterStatuses) {
-		f.Toggle(filterStatuses[f.selected])
-	}
+func (f *FilterState) HubSelected() int {
+	return f.hubSelected
 }
 
 func (f *FilterState) Selected() int {
-	return f.selected
+	switch f.view {
+	case FilterViewStatus:
+		return f.statusSelected
+	case FilterViewPriority:
+		return f.prioritySelected
+	case FilterViewCategory:
+		return f.categorySelected
+	default:
+		return f.hubSelected
+	}
 }
 
-func (f *FilterState) IsEnabled(status string) bool {
-	return f.enabled[status]
+func (f *FilterState) MoveUp() {
+	switch f.view {
+	case FilterViewHub:
+		if f.hubSelected > 0 {
+			f.hubSelected--
+		}
+	case FilterViewStatus:
+		if f.statusSelected > 0 {
+			f.statusSelected--
+		}
+	case FilterViewPriority:
+		if f.prioritySelected > 0 {
+			f.prioritySelected--
+		}
+	case FilterViewCategory:
+		if f.categorySelected > 0 {
+			f.categorySelected--
+		}
+	}
+}
+
+func (f *FilterState) MoveDown(catCount int) {
+	switch f.view {
+	case FilterViewHub:
+		if f.hubSelected < filterHubCount-1 {
+			f.hubSelected++
+		}
+	case FilterViewStatus:
+		if f.statusSelected < len(filterStatuses)-1 {
+			f.statusSelected++
+		}
+	case FilterViewPriority:
+		if f.prioritySelected < len(filterPriorities)-1 {
+			f.prioritySelected++
+		}
+	case FilterViewCategory:
+		if catCount > 0 && f.categorySelected < catCount-1 {
+			f.categorySelected++
+		}
+	}
+}
+
+func (f *FilterState) ToggleSelected(categories []domain.Category) {
+	switch f.view {
+	case FilterViewStatus:
+		if f.statusSelected >= 0 && f.statusSelected < len(filterStatuses) {
+			toggleSetMember(f.statuses, filterStatuses[f.statusSelected])
+		}
+	case FilterViewPriority:
+		if f.prioritySelected >= 0 && f.prioritySelected < len(filterPriorities) {
+			toggleSetMember(f.priorities, filterPriorities[f.prioritySelected])
+		}
+	case FilterViewCategory:
+		if f.categorySelected >= 0 && f.categorySelected < len(categories) {
+			toggleSetMember(f.categories, categories[f.categorySelected].ID)
+		}
+	}
+}
+
+func toggleSetMember(set map[string]bool, key string) {
+	if set[key] {
+		delete(set, key)
+	} else {
+		set[key] = true
+	}
+}
+
+func (f *FilterState) IsStatusEnabled(status string) bool       { return f.statuses[status] }
+func (f *FilterState) IsPriorityEnabled(priority string) bool   { return f.priorities[priority] }
+func (f *FilterState) IsCategoryEnabled(categoryID string) bool { return f.categories[categoryID] }
+
+func (f *FilterState) StatusCount() int   { return len(f.statuses) }
+func (f *FilterState) PriorityCount() int { return len(f.priorities) }
+func (f *FilterState) CategoryCount() int { return len(f.categories) }
+
+func (f *FilterState) HasActiveFilter() bool {
+	return len(f.statuses) > 0 || len(f.priorities) > 0 || len(f.categories) > 0
+}
+
+func (f *FilterState) TaskVisible(task domain.Task, categoryID string) bool {
+	if !f.HasActiveFilter() {
+		return true
+	}
+	if len(f.statuses) > 0 && !f.statuses[task.Status] {
+		return false
+	}
+	if len(f.priorities) > 0 && !f.priorities[task.Priority] {
+		return false
+	}
+	if len(f.categories) > 0 && !f.categories[categoryID] {
+		return false
+	}
+	return true
+}
+
+func (f *FilterState) ClearAll() {
+	f.statuses = make(map[string]bool)
+	f.priorities = make(map[string]bool)
+	f.categories = make(map[string]bool)
+	f.statusSelected = 0
+	f.prioritySelected = 0
+	f.categorySelected = 0
 }
 
 type OptionsState struct {
