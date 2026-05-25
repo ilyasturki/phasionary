@@ -11,17 +11,25 @@ const (
 
 	StatusDisplayText  = "text"
 	StatusDisplayIcons = "icons"
+
+	PriorityColorFull = "full"
+	PriorityColorIcon = "icon"
+	PriorityColorNone = "none"
 )
 
 // Config holds user preferences.
 type Config struct {
 	StatusDisplay  string `json:"status_display,omitempty"`
+	PriorityColor  string `json:"priority_color,omitempty"`
 	DefaultProject string `json:"default_project,omitempty"`
 }
 
 // DefaultConfig returns a Config with default values.
 func DefaultConfig() Config {
-	return Config{StatusDisplay: StatusDisplayText}
+	return Config{
+		StatusDisplay: StatusDisplayText,
+		PriorityColor: PriorityColorFull,
+	}
 }
 
 func ResolveDataDir(input string) (string, error) {

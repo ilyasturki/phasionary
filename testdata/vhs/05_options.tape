@@ -12,10 +12,40 @@ Enter
 Sleep 800ms
 Show
 
-Type "o"
+Type ","
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/05_options_open.png"
 
+Type "j"
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_full.png"
+
+Type " "
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_icon.png"
+
+Escape
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_tasks_icon_only.png"
+
+Type ","
+Sleep 300ms
+Type "j"
+Sleep 200ms
+Type " "
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_none.png"
+
+Escape
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_tasks_no_color.png"
+
+Type ","
+Sleep 300ms
+Type "j"
+Sleep 200ms
+Type " "
+Sleep 300ms
 Escape
 Sleep 300ms
 
