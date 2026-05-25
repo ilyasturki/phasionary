@@ -29,3 +29,20 @@ func (m *model) centerOnSelected() {
 	viewport := NewViewport(layout, m.ui.Screen.Height, DefaultLayoutConfig())
 	m.ui.Screen.ScrollOffset = viewport.CenterOnPosition(m.selected())
 }
+
+func (m *model) topOnSelected() {
+	if m.ui.Selection.IsEmpty() || m.selected() < 0 {
+		return
+	}
+	m.ui.Screen.ScrollOffset = m.selected()
+}
+
+func (m *model) bottomOnSelected() {
+	if m.ui.Selection.IsEmpty() || m.selected() < 0 {
+		return
+	}
+
+	layout := m.buildLayout()
+	viewport := NewViewport(layout, m.ui.Screen.Height, DefaultLayoutConfig())
+	m.ui.Screen.ScrollOffset = viewport.BottomOnPosition(m.selected())
+}

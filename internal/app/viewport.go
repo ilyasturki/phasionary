@@ -200,6 +200,31 @@ func (v *Viewport) RowToPosition(row int) int {
 	return -1
 }
 
+func (v *Viewport) BottomOnPosition(posIndex int) int {
+	if v.Layout == nil || len(v.Layout.Items) == 0 || posIndex < 0 {
+		return 0
+	}
+
+	scrollOffset := posIndex
+	for candidate := scrollOffset - 1; candidate >= 0; candidate-- {
+		v.ComputeVisibility(candidate)
+		if !v.positionVisible(posIndex) {
+			break
+		}
+		scrollOffset = candidate
+	}
+	return scrollOffset
+}
+
+func (v *Viewport) positionVisible(posIndex int) bool {
+	for i := v.VisibleStart; i < v.VisibleEnd; i++ {
+		if v.Layout.Items[i].PositionIndex == posIndex {
+			return true
+		}
+	}
+	return false
+}
+
 func (v *Viewport) CenterOnPosition(posIndex int) int {
 	if v.Layout == nil || len(v.Layout.Items) == 0 || posIndex < 0 {
 		return 0
