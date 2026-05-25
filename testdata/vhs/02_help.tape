@@ -16,9 +16,31 @@ Type "?"
 Sleep 600ms
 Screenshot "/tmp/phas-vt/vhs-out/02_help_open.png"
 
+Type "jjjjj"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/02_help_focus_moved.png"
+
+Ctrl+D
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/02_help_scrolled.png"
+
+Ctrl+U
+Sleep 300ms
+Type "k"
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/02_help_focus_back.png"
+
 Type "?"
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/02_help_closed.png"
+
+Type "?"
+Sleep 400ms
+Type "jj"
+Sleep 200ms
+Enter
+Sleep 600ms
+Screenshot "/tmp/phas-vt/vhs-out/02_help_enter_dispatches.png"
 
 Hide
 Type "q"

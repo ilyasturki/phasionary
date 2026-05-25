@@ -24,6 +24,11 @@ type Screen struct {
 	WindowFocused bool
 }
 
+type HelpState struct {
+	Focused      int
+	ScrollOffset int
+}
+
 type UIState struct {
 	Selection         *selection.Manager
 	Modes             *modes.Machine
@@ -37,6 +42,7 @@ type UIState struct {
 	ExternalEdit      ExternalEditState
 	EstimatePicker    components.EstimatePickerState
 	URLPicker         components.URLPickerState
+	Help              HelpState
 	Clipboard         ClipboardState
 	LastSortAscending *bool
 }

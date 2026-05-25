@@ -112,7 +112,13 @@ var normalBindings = []keyBinding{
 			return nil
 		}},
 	{keys: []string{"?"}, desc: "toggle help", section: sectionActions,
-		action: func(m *model) tea.Cmd { m.ui.Modes.ToggleHelp(); return nil }},
+		action: func(m *model) tea.Cmd {
+			m.ui.Modes.ToggleHelp()
+			if m.ui.Modes.IsHelp() {
+				m.ui.Help = HelpState{}
+			}
+			return nil
+		}},
 	{keys: []string{"q", "ctrl+c"}, desc: "quit", section: sectionActions,
 		action: func(m *model) tea.Cmd { return tea.Quit }},
 }

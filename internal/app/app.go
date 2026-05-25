@@ -79,7 +79,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:
-		return m.handleHelpKey(msg), nil
+		return m.handleHelpKey(msg)
 	case modes.ModeConfirmDelete:
 		return m.handleConfirmDeleteKey(msg), nil
 	case modes.ModeOptions:
@@ -104,12 +104,36 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m model) handleHelpKey(msg tea.KeyMsg) model {
+func (m model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc", "?":
 		m.ui.Modes.ToNormal()
+		return m, nil
+	case "j", "down":
+		m.moveHelpFocus(1)
+	case "k", "up":
+		m.moveHelpFocus(-1)
+	case "ctrl+d":
+		m.moveHelpFocus(m.helpViewportHeight() / 2)
+	case "ctrl+u":
+		m.moveHelpFocus(-m.helpViewportHeight() / 2)
+	case "enter":
+		if len(helpFocusables) == 0 {
+			return m, nil
+		}
+		idx := m.ui.Help.Focused
+		if idx < 0 || idx >= len(helpFocusables) {
+			return m, nil
+		}
+		row := helpRows[helpFocusables[idx]]
+		if row.disabled {
+			return m, nil
+		}
+		b := normalBindings[row.bindingIndex]
+		m.ui.Modes.ToNormal()
+		return m, b.action(&m)
 	}
-	return m
+	return m, nil
 }
 
 func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
