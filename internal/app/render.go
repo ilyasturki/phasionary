@@ -34,13 +34,26 @@ func renderProjectLine(name string, selected, focused, filtered, visualMode bool
 	if visualMode {
 		line += " " + ui.VisualTagStyle.Render("[visual]")
 	}
-	if statusText != "" {
-		line += " " + ui.StatusLineStyle.Render(statusText)
+
+	if statusText == "" {
+		if width > 0 {
+			line = ansi.Truncate(line, width, "")
+		}
+		return line
 	}
-	if width > 0 {
-		line = ansi.Truncate(line, width, "")
+
+	suffix := ui.StatusLineStyle.Render(statusText)
+	if width <= 0 {
+		return line + " " + suffix
 	}
-	return line
+
+	leftW := ansi.StringWidth(line)
+	suffixW := ansi.StringWidth(suffix)
+	if leftW+1+suffixW > width {
+		return ansi.Truncate(line+" "+suffix, width, "")
+	}
+	padding := width - leftW - suffixW
+	return line + strings.Repeat(" ", padding) + suffix
 }
 
 func (m model) renderEditProjectLine() string {
