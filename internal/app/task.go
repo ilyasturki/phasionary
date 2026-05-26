@@ -35,6 +35,7 @@ func (m *model) clearDescription(pos selection.Position) {
 	if task.Description == "" {
 		return
 	}
+	m.recordHistory()
 	taskID := task.ID
 	task.Description = ""
 	task.UpdatedAt = domain.NowTimestamp()
@@ -76,6 +77,7 @@ func (m *model) deleteTask(position selection.Position) {
 	m.ui.Clipboard.IsCut = false
 	m.ui.Clipboard.SourceID = ""
 
+	m.recordHistory()
 	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
@@ -83,6 +85,7 @@ func (m *model) deleteTask(position selection.Position) {
 
 func (m *model) deleteCategory(position selection.Position) {
 	catIndex := position.CategoryIndex
+	m.recordHistory()
 	_ = m.project.RemoveCategory(catIndex)
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
@@ -102,9 +105,12 @@ func (m *model) toggleSelectedTask() {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+	m.recordHistory()
 	if task.CycleStatus() {
 		m.storeTaskUpdate()
+		return
 	}
+	m.discardLastHistory()
 }
 
 func (m *model) increasePriority() {
@@ -116,9 +122,12 @@ func (m *model) increasePriority() {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+	m.recordHistory()
 	if task.IncreasePriority() {
 		m.storeTaskUpdate()
+		return
 	}
+	m.discardLastHistory()
 }
 
 func (m *model) decreasePriority() {
@@ -130,9 +139,12 @@ func (m *model) decreasePriority() {
 		return
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+	m.recordHistory()
 	if task.DecreasePriority() {
 		m.storeTaskUpdate()
+		return
 	}
+	m.discardLastHistory()
 }
 
 func (m *model) openEstimatePicker() {
@@ -161,6 +173,17 @@ func (m *model) selectEstimate(minutes int) {
 		return
 	}
 
+	var prev int
+	if position.Kind == selection.FocusTask {
+		prev = m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex].EstimateMinutes
+	} else {
+		prev = m.project.Categories[position.CategoryIndex].EstimateMinutes
+	}
+	if prev == minutes {
+		return
+	}
+
+	m.recordHistory()
 	if position.Kind == selection.FocusTask {
 		task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 		task.SetEstimate(minutes)
@@ -183,6 +206,7 @@ func (m *model) moveTaskDown() {
 	taskIndex := position.TaskIndex
 	tasks := m.project.Categories[catIndex].Tasks
 	if taskIndex < len(tasks)-1 {
+		m.recordHistory()
 		tasks[taskIndex], tasks[taskIndex+1] = tasks[taskIndex+1], tasks[taskIndex]
 		m.rebuildPositions()
 		m.ui.Selection.MoveBy(1)
@@ -193,6 +217,7 @@ func (m *model) moveTaskDown() {
 	if catIndex >= len(m.project.Categories)-1 {
 		return
 	}
+	m.recordHistory()
 	task := tasks[taskIndex]
 	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
 	dstCatIndex := catIndex + 1
@@ -215,6 +240,7 @@ func (m *model) moveTaskUp() {
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
 	if taskIndex > 0 {
+		m.recordHistory()
 		tasks := m.project.Categories[catIndex].Tasks
 		tasks[taskIndex], tasks[taskIndex-1] = tasks[taskIndex-1], tasks[taskIndex]
 		m.rebuildPositions()
@@ -226,6 +252,7 @@ func (m *model) moveTaskUp() {
 	if catIndex <= 0 {
 		return
 	}
+	m.recordHistory()
 	dstCatIndex := catIndex - 1
 	_ = m.project.MoveTask(catIndex, taskIndex, dstCatIndex)
 	dstTaskIndex := len(m.project.Categories[dstCatIndex].Tasks) - 1
@@ -258,6 +285,7 @@ func (m *model) moveCategoryDown() {
 	if catIndex >= len(m.project.Categories)-1 {
 		return
 	}
+	m.recordHistory()
 	m.project.Categories[catIndex], m.project.Categories[catIndex+1] =
 		m.project.Categories[catIndex+1], m.project.Categories[catIndex]
 	m.rebuildPositions()
@@ -280,6 +308,7 @@ func (m *model) moveCategoryUp() {
 	if catIndex <= 0 {
 		return
 	}
+	m.recordHistory()
 	m.project.Categories[catIndex], m.project.Categories[catIndex-1] =
 		m.project.Categories[catIndex-1], m.project.Categories[catIndex]
 	m.rebuildPositions()
@@ -363,6 +392,8 @@ func (m *model) pasteTask() {
 		catIndex = position.CategoryIndex
 		taskIndex = position.TaskIndex + 1
 	}
+
+	m.recordHistory()
 
 	if m.ui.Clipboard.IsCut {
 		srcCat, srcIdx := m.findTaskByID(m.ui.Clipboard.SourceID)

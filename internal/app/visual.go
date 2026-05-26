@@ -264,6 +264,7 @@ func (m *model) confirmDeleteVisualRange() {
 	m.ui.ConfirmDelete.reset()
 	m.ui.Modes.ToNormal()
 
+	m.recordHistory()
 	deleted := 0
 	for _, id := range taskIDs {
 		if m.removeTaskByIDIfExists(id) {
@@ -288,6 +289,7 @@ func (m *model) confirmDeleteVisualRange() {
 	}
 
 	if deleted == 0 {
+		m.discardLastHistory()
 		return
 	}
 	m.rebuildAndClamp()
@@ -372,6 +374,8 @@ func (m *model) pasteMultiTasks() {
 		dstCatIndex = pos.CategoryIndex
 		dstInsertIndex = pos.TaskIndex + 1
 	}
+
+	m.recordHistory()
 
 	if m.ui.Clipboard.IsCut {
 		if dstCatIndex >= 0 && dstCatIndex < len(m.project.Categories) {
@@ -460,6 +464,8 @@ func (m *model) pasteMultiCategories() {
 	case selection.FocusTask:
 		dstIndex = pos.CategoryIndex
 	}
+
+	m.recordHistory()
 
 	cutIDs := make(map[string]struct{}, len(m.ui.Clipboard.CategoryIDs))
 	for _, id := range m.ui.Clipboard.CategoryIDs {

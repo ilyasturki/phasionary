@@ -84,6 +84,7 @@ func (m *model) startAddingTask() {
 	} else {
 		taskIndex = 0
 	}
+	m.recordHistory()
 	m.project.Categories[catIndex].InsertTask(taskIndex, newTask)
 
 	m.rebuildPositions()
@@ -105,6 +106,7 @@ func (m *model) startAddingCategory() {
 	if err != nil {
 		return
 	}
+	m.recordHistory()
 	m.project.InsertCategory(insertIndex, newCat)
 	m.rebuildPositions()
 	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
@@ -165,12 +167,18 @@ func (m *model) finishEditing() {
 	}
 	switch position.Kind {
 	case selection.FocusProject:
-		m.project.Name = trimmed
-		m.project.UpdatedAt = domain.NowTimestamp()
-		m.storeTaskUpdate()
+		if m.project.Name != trimmed {
+			m.recordHistory()
+			m.project.Name = trimmed
+			m.project.UpdatedAt = domain.NowTimestamp()
+			m.storeTaskUpdate()
+		}
 	case selection.FocusTask:
 		task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 		if task.Title != trimmed || m.ui.Edit.isAdding {
+			if !m.ui.Edit.isAdding {
+				m.recordHistory()
+			}
 			task.Title = trimmed
 			task.UpdatedAt = domain.NowTimestamp()
 			m.storeTaskUpdate()
@@ -186,10 +194,20 @@ func (m *model) finishEditing() {
 }
 
 func (m *model) finishCategoryEditing(position selection.Position, name string) {
+	currentName := m.project.Categories[position.CategoryIndex].Name
+	if !m.ui.Edit.isAdding && currentName == name {
+		return
+	}
+	if !m.ui.Edit.isAdding {
+		m.recordHistory()
+	}
 	if err := m.project.RenameCategory(position.CategoryIndex, name); err != nil {
 		if m.ui.Edit.isAdding {
 			m.removeNewCategory()
 		}
+		// Drop the snapshot recorded for either the rename or the addition since
+		// the rename failed (e.g. duplicate name).
+		m.discardLastHistory()
 		return
 	}
 	m.storeTaskUpdate()
@@ -203,6 +221,9 @@ func (m *model) cancelEditing() {
 		case selection.FocusCategory:
 			m.removeNewCategory()
 		}
+		// startAddingTask/startAddingCategory pushed a history entry; the cancel
+		// rolls back the addition, so drop that snapshot to avoid a no-op undo.
+		m.discardLastHistory()
 	}
 	m.ui.Modes.ToNormal()
 	m.ui.Edit.reset()

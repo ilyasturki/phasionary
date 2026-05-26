@@ -115,6 +115,7 @@ func (m *model) finishDescriptionEdit() {
 	}
 
 	if newDesc != state.original {
+		m.recordHistory()
 		task.Description = newDesc
 		task.UpdatedAt = domain.NowTimestamp()
 		m.storeTaskUpdate()

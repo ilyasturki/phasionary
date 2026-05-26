@@ -175,6 +175,7 @@ func (m *model) applyProjectEdit(content string) {
 		return
 	}
 
+	m.recordHistory()
 	m.project.Name = name
 	m.project.UpdatedAt = domain.NowTimestamp()
 	if err := m.deps.Store.SaveProject(m.project); err != nil {
@@ -201,7 +202,9 @@ func (m *model) applyCategoryEdit(content string) {
 		return
 	}
 
+	m.recordHistory()
 	if err := m.project.RenameCategory(idx, name); err != nil {
+		m.discardLastHistory()
 		if errors.Is(err, domain.ErrDuplicateCategoryName) {
 			m.ui.Screen.StatusMsg = "A category with that name already exists"
 			return
@@ -240,6 +243,7 @@ func (m *model) applyTaskEdit(content string) {
 		return
 	}
 
+	m.recordHistory()
 	task.Title = title
 	task.Description = description
 	task.UpdatedAt = domain.NowTimestamp()

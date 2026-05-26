@@ -69,6 +69,7 @@ type UIState struct {
 	Clipboard         ClipboardState
 	Visual            VisualState
 	DescriptionEdit   DescriptionEditState
+	History           HistoryState
 }
 
 type Dependencies struct {
@@ -84,6 +85,7 @@ func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {
 		Screen:    Screen{WindowFocused: true},
 		Filter:    NewFilterState(),
 		Fold:      NewFoldState(),
+		History:   NewHistoryState(),
 	}
 }
 

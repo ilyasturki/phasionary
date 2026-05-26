@@ -154,6 +154,7 @@ func (m *model) confirmDeleteProject() {
 			_ = m.deps.StateManager.SetLastProjectID(m.project.ID)
 			m.ui.Filter = NewFilterState()
 			m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(m.project.ID))
+			m.ui.History.Reset()
 			positions := rebuildPositions(m.project.Categories, &m.ui.Filter, &m.ui.Fold, m.ui.Screen.ExpandDescriptions)
 			initialSelection := findFirstTaskIndex(positions)
 			m.ui.Selection.SetPositions(positions)
@@ -217,6 +218,7 @@ func (m *model) createProjectFromPicker() {
 	m.project = project
 	m.ui.Filter = NewFilterState()
 	m.ui.Fold = NewFoldState()
+	m.ui.History.Reset()
 	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold, m.ui.Screen.ExpandDescriptions)
 	initialSelection := findFirstTaskIndex(positions)
 	m.ui.Selection.SetPositions(positions)
@@ -256,6 +258,7 @@ func (m *model) selectProject() {
 	m.project = project
 	m.ui.Filter = NewFilterState()
 	m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(project.ID))
+	m.ui.History.Reset()
 	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold, m.ui.Screen.ExpandDescriptions)
 	initialSelection := findFirstTaskIndex(positions)
 	m.ui.Selection.SetPositions(positions)

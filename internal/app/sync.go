@@ -46,6 +46,7 @@ func (m *model) reloadProject() {
 	}
 
 	m.project = project
+	m.ui.History.Reset()
 	m.rebuildPositions()
 
 	if hadSel {
