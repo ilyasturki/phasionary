@@ -356,6 +356,77 @@ func TestUndoRedo_PriorityThenMove_UndoMoveOnlyRevertsMove(t *testing.T) {
 	assert.Equal(t, domain.PriorityMedium, m.project.Categories[0].Tasks[1].Priority)
 }
 
+// Regression: a record-then-discard sequence (e.g. cancelling an add) must
+// NOT destroy the redo stack that the user built up via undo.
+func TestDiscardLastHistory_PreservesRedoStack(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+
+	// Build a redo entry: mutate, then undo.
+	m.toggleSelectedTask()
+	m.undo()
+	require.True(t, m.ui.History.CanRedo(), "precondition: redo should hold the undone toggle")
+
+	// Now perform a no-op: start adding a task and immediately cancel.
+	m.startAddingTask()
+	require.True(t, m.ui.Modes.IsEdit())
+	m.cancelEditing()
+
+	// The cancel must have rolled back, AND the redo stack must still be intact.
+	require.Len(t, m.project.Categories[0].Tasks, 3, "blank add should have been rolled back")
+	assert.True(t, m.ui.History.CanRedo(),
+		"cancelled add must not destroy the redo stack (record-then-discard bug)")
+
+	// Sanity: redo restores the original toggle.
+	m.redo()
+	assert.Equal(t, domain.StatusInProgress, m.project.Categories[0].Tasks[0].Status)
+}
+
+// Regression: deleting a task stashes it in the clipboard. After undo restores
+// the task, the clipboard must NOT still be primed with the deleted copy —
+// otherwise `p` would insert a duplicate.
+func TestUndo_DeleteThenPasteDoesNotDuplicate(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.deleteTask(selection.Position{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0})
+	require.Len(t, m.project.Categories[0].Tasks, 2)
+	require.NotNil(t, m.ui.Clipboard.Task, "delete stages the task in clipboard")
+
+	m.undo()
+	require.Len(t, m.project.Categories[0].Tasks, 3, "task is restored by undo")
+	assert.Nil(t, m.ui.Clipboard.Task,
+		"clipboard must be restored to its pre-delete state (nil) by undo, "+
+			"otherwise paste would duplicate the just-restored task")
+
+	// pasteFromClipboard should be a no-op now.
+	m.pasteFromClipboard()
+	assert.Len(t, m.project.Categories[0].Tasks, 3, "no paste should happen with empty clipboard")
+}
+
+// Regression: pasting on a description row used to fall through the switch
+// and land the new task in category 0 at index 0.
+func TestPaste_FocusDescriptionTargetsParentTaskCategory(t *testing.T) {
+	p := sampleProject()
+	p.Categories[1].Tasks[0].Description = "has desc"
+	m := newTestModel(t, p)
+	m.ui.Screen.ExpandDescriptions = true
+	m.rebuildPositions()
+	// Park the cursor on the description row of c2/t4.
+	require.True(t, m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusDescription && p.CategoryIndex == 1 && p.TaskIndex == 0
+	}), "expected to land on the description row")
+
+	src := m.project.Categories[0].Tasks[0]
+	m.ui.Clipboard = ClipboardState{Task: &src, IsCut: false}
+	m.pasteFromClipboard()
+
+	// The new task must be inserted in c2 right after t4 — not in c1 at index 0.
+	require.Len(t, m.project.Categories[1].Tasks, 3, "c2 should have grown by one")
+	assert.Equal(t, "Alpha", m.project.Categories[1].Tasks[1].Title,
+		"new task should sit at c2 index 1 (after the parent task), not in c1")
+	assert.Len(t, m.project.Categories[0].Tasks, 3, "c1 must be unchanged")
+}
+
 func TestUndoRedo_MultipleStepsInOrder(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(2) // t1

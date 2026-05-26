@@ -71,13 +71,18 @@ func (m *model) deleteTask(position selection.Position) {
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
 
+	// Snapshot BEFORE stashing the task in the clipboard, so that undo
+	// restores both the project (task back) AND the clipboard (back to its
+	// pre-delete contents). Otherwise `d`→`u`→`p` would paste a duplicate of
+	// the just-restored task.
+	m.recordHistory()
+
 	task := m.project.Categories[catIndex].Tasks[taskIndex]
 	taskCopy := task
 	m.ui.Clipboard.Task = &taskCopy
 	m.ui.Clipboard.IsCut = false
 	m.ui.Clipboard.SourceID = ""
 
-	m.recordHistory()
 	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
@@ -402,7 +407,7 @@ func (m *model) pasteTask() {
 	case selection.FocusCategory:
 		catIndex = position.CategoryIndex
 		taskIndex = 0
-	case selection.FocusTask:
+	case selection.FocusTask, selection.FocusDescription:
 		catIndex = position.CategoryIndex
 		taskIndex = position.TaskIndex + 1
 	}

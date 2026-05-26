@@ -405,9 +405,23 @@ func (m *model) pasteMultiTasks() {
 	case selection.FocusCategory:
 		dstCatIndex = pos.CategoryIndex
 		dstInsertIndex = 0
-	case selection.FocusTask:
+	case selection.FocusTask, selection.FocusDescription:
 		dstCatIndex = pos.CategoryIndex
 		dstInsertIndex = pos.TaskIndex + 1
+	}
+
+	// Pre-allocate every new ID before mutating the project so a mid-loop
+	// NewID() failure cannot leave a half-pasted/half-cut project (sources
+	// removed, only some destinations inserted) — pasteMulti is otherwise
+	// non-atomic across the source removal and the insertion loop.
+	newIDs := make([]string, len(m.ui.Clipboard.Tasks))
+	for i := range newIDs {
+		id, err := domain.NewID()
+		if err != nil {
+			m.ui.Screen.StatusMsg = "Failed to create task ID"
+			return
+		}
+		newIDs[i] = id
 	}
 
 	m.recordHistory()
@@ -442,13 +456,8 @@ func (m *model) pasteMultiTasks() {
 
 	var firstNewID string
 	for i, src := range m.ui.Clipboard.Tasks {
-		newID, err := domain.NewID()
-		if err != nil {
-			m.ui.Screen.StatusMsg = "Failed to create task ID"
-			return
-		}
 		newTask := domain.Task{
-			ID:              newID,
+			ID:              newIDs[i],
 			Title:           src.Title,
 			Status:          src.Status,
 			CreatedAt:       src.CreatedAt,
@@ -460,7 +469,7 @@ func (m *model) pasteMultiTasks() {
 		}
 		m.project.Categories[dstCatIndex].InsertTask(dstInsertIndex+i, newTask)
 		if i == 0 {
-			firstNewID = newID
+			firstNewID = newIDs[i]
 		}
 	}
 
@@ -496,16 +505,52 @@ func (m *model) pasteMultiCategories() {
 		dstIndex = 0
 	case selection.FocusCategory:
 		dstIndex = pos.CategoryIndex
-	case selection.FocusTask:
+	case selection.FocusTask, selection.FocusDescription:
 		dstIndex = pos.CategoryIndex
 	}
 
-	m.recordHistory()
-
+	// Pre-allocate every new ID (category + tasks for the yank path, only
+	// missing-category IDs for the cut path) before mutating the project, so
+	// a mid-loop NewID failure cannot leave a half-pasted state.
+	type catIDs struct {
+		cat   string
+		tasks []string
+	}
+	preIDs := make([]catIDs, len(m.ui.Clipboard.Categories))
 	cutIDs := make(map[string]struct{}, len(m.ui.Clipboard.CategoryIDs))
 	for _, id := range m.ui.Clipboard.CategoryIDs {
 		cutIDs[id] = struct{}{}
 	}
+	for i, src := range m.ui.Clipboard.Categories {
+		if m.ui.Clipboard.IsCut {
+			if _, present := cutIDs[src.ID]; !present {
+				id, err := domain.NewID()
+				if err != nil {
+					m.ui.Screen.StatusMsg = "Failed to create category ID"
+					return
+				}
+				preIDs[i].cat = id
+			}
+		} else {
+			id, err := domain.NewID()
+			if err != nil {
+				m.ui.Screen.StatusMsg = "Failed to create category ID"
+				return
+			}
+			preIDs[i].cat = id
+			preIDs[i].tasks = make([]string, len(src.Tasks))
+			for j := range src.Tasks {
+				tid, err := domain.NewID()
+				if err != nil {
+					m.ui.Screen.StatusMsg = "Failed to create task ID"
+					return
+				}
+				preIDs[i].tasks[j] = tid
+			}
+		}
+	}
+
+	m.recordHistory()
 
 	if m.ui.Clipboard.IsCut {
 		// Anchor on the first surviving neighbor at or after the cursor; if
@@ -560,29 +605,12 @@ func (m *model) pasteMultiCategories() {
 		// category and every task so the project never holds duplicate IDs.
 		newTasks := make([]domain.Task, len(src.Tasks))
 		copy(newTasks, src.Tasks)
-		if m.ui.Clipboard.IsCut {
-			if _, present := cutIDs[src.ID]; !present {
-				newID, err := domain.NewID()
-				if err != nil {
-					m.ui.Screen.StatusMsg = "Failed to create category ID"
-					return
-				}
-				newCat.ID = newID
-			}
-		} else {
-			newID, err := domain.NewID()
-			if err != nil {
-				m.ui.Screen.StatusMsg = "Failed to create category ID"
-				return
-			}
-			newCat.ID = newID
+		if preIDs[i].cat != "" {
+			newCat.ID = preIDs[i].cat
+		}
+		if !m.ui.Clipboard.IsCut {
 			for j := range newTasks {
-				taskID, err := domain.NewID()
-				if err != nil {
-					m.ui.Screen.StatusMsg = "Failed to create task ID"
-					return
-				}
-				newTasks[j].ID = taskID
+				newTasks[j].ID = preIDs[i].tasks[j]
 			}
 		}
 		newCat.Tasks = newTasks
