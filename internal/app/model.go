@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/charmbracelet/bubbles/textarea"
+	"charm.land/bubbles/v2/textarea"
 
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"

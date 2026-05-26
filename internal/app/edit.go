@@ -3,7 +3,7 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -134,7 +134,7 @@ func (m *model) removeNewCategory() {
 	m.ensureVisible()
 }
 
-func (m *model) handleEditKey(msg tea.KeyMsg) tea.Cmd {
+func (m *model) handleEditKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case "enter":
 		m.finishEditing()

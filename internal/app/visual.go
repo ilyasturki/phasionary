@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -569,7 +569,7 @@ func (m *model) pasteMultiCategories() {
 	m.ui.Screen.StatusMsg = fmt.Sprintf("%s %d categor%s", verb, count, plural(count, "y", "ies"))
 }
 
-func (m model) handleVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "v", "q":
 		m.exitVisualMode()

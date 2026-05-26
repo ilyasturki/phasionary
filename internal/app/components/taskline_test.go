@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 
 	"phasionary/internal/domain"
@@ -71,9 +72,10 @@ func TestTaskLineRenderer_RenderDescription(t *testing.T) {
 		renderer := NewTaskLineRenderer(80, "text", "full", true)
 		result := renderer.RenderDescription("Some details about the task", 9, false)
 		assert.Contains(t, result, "Some details about the task")
-		// Each line should start with 9 spaces of indent.
+		// Each line should start with 9 spaces of indent (after stripping styles).
 		for _, line := range strings.Split(result, "\n") {
-			assert.True(t, strings.HasPrefix(line, "         "), "line %q lacks 9-col indent", line)
+			plain := ansi.Strip(line)
+			assert.True(t, strings.HasPrefix(plain, "         "), "line %q lacks 9-col indent", line)
 		}
 	})
 

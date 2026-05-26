@@ -3,8 +3,8 @@ package app
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -62,7 +62,7 @@ func descriptionEditorVisibleHeight(screenHeight int) int {
 	}
 }
 
-func (m *model) handleDescriptionEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) handleDescriptionEditKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.cancelDescriptionEdit()

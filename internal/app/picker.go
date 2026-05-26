@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"phasionary/internal/domain"
 )
 
@@ -70,7 +70,7 @@ func orderProjects(projects []domain.Project, order []string) []domain.Project {
 	return append(ordered, remaining...)
 }
 
-func (m model) handleProjectPickerKey(msg tea.KeyMsg) (model, tea.Cmd) {
+func (m model) handleProjectPickerKey(msg tea.KeyPressMsg) (model, tea.Cmd) {
 	if m.ui.Picker.isAdding {
 		return m.handlePickerAddKey(msg)
 	}
@@ -181,7 +181,7 @@ func (m *model) confirmDeleteProject() {
 	m.ui.Modes.ToProjectPicker()
 }
 
-func (m model) handlePickerAddKey(msg tea.KeyMsg) (model, tea.Cmd) {
+func (m model) handlePickerAddKey(msg tea.KeyPressMsg) (model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.createProjectFromPicker()

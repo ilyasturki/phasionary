@@ -114,7 +114,7 @@ func TestView_FillsScreen_StatusOnProjectLine(t *testing.T) {
 	for _, h := range []int{10, 12, 14} {
 		m.ui.Screen.Height = h
 		m.ui.Screen.StatusMsg = ""
-		view := m.View()
+		view := m.View().Content
 		got := strings.Count(view, "\n") + 1
 		assert.Equal(t, h, got, "View should use exactly %d rows for screen height %d when content overflows", h, h)
 		assert.Contains(t, view, "more below", "scroll indicator should still be shown when content overflows")
@@ -122,7 +122,7 @@ func TestView_FillsScreen_StatusOnProjectLine(t *testing.T) {
 
 	m.ui.Screen.Height = 14
 	m.ui.Screen.StatusMsg = "Copied!"
-	view := m.View()
+	view := m.View().Content
 	got := strings.Count(view, "\n") + 1
 	assert.Equal(t, 14, got, "View should still fill all rows when a status message is present")
 	assert.Contains(t, view, "Copied!", "status message should be rendered")

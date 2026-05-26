@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -75,7 +75,7 @@ func TestHandleDescriptionEditKey_EscCancels(t *testing.T) {
 	_ = m.startDescriptionInlineEdit(0, 0)
 	m.ui.DescriptionEdit.textarea.SetValue("typed but not saved")
 
-	_, _ = m.handleDescriptionEditKey(tea.KeyMsg{Type: tea.KeyEsc})
+	_, _ = m.handleDescriptionEditKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	assert.True(t, m.ui.Modes.IsNormal())
 	assert.Equal(t, "", m.project.Categories[0].Tasks[0].Description)
@@ -86,7 +86,7 @@ func TestHandleDescriptionEditKey_CtrlSSaves(t *testing.T) {
 	_ = m.startDescriptionInlineEdit(0, 0)
 	m.ui.DescriptionEdit.textarea.SetValue("saved via ctrl+s")
 
-	_, _ = m.handleDescriptionEditKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	_, _ = m.handleDescriptionEditKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 
 	assert.True(t, m.ui.Modes.IsNormal())
 	assert.Equal(t, "saved via ctrl+s", m.project.Categories[0].Tasks[0].Description)

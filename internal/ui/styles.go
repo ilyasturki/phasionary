@@ -1,6 +1,10 @@
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"image/color"
+
+	"charm.land/lipgloss/v2"
+)
 
 var (
 	// Selection styles use Reverse so the terminal swaps fg/bg natively at
@@ -46,14 +50,14 @@ func StatusStyle(status string) lipgloss.Style {
 	}
 }
 
-func priorityColor(priority string) (lipgloss.Color, bool) {
+func priorityColor(priority string) (color.Color, bool) {
 	switch priority {
 	case "high":
 		return lipgloss.Color("1"), true
 	case "low":
 		return lipgloss.Color("6"), true
 	default:
-		return "", false
+		return nil, false
 	}
 }
 

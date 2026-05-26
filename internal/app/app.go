@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
@@ -52,22 +52,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ui.Screen.WindowFocused = true
 	case tea.BlurMsg:
 		m.ui.Screen.WindowFocused = false
-	case tea.MouseMsg:
+	case tea.MouseClickMsg:
 		if !m.ui.Modes.IsNormal() {
 			break
 		}
-		if msg.Button != tea.MouseButtonLeft || msg.Action != tea.MouseActionPress {
+		if msg.Button != tea.MouseLeft {
 			break
 		}
+		mouse := msg.Mouse()
 		rowMap := m.computeRowMap()
-		if msg.Y >= 0 && msg.Y < len(rowMap) {
-			pos := rowMap[msg.Y]
+		if mouse.Y >= 0 && mouse.Y < len(rowMap) {
+			pos := rowMap[mouse.Y]
 			if pos >= 0 && pos < m.ui.Selection.Count() {
 				m.ui.Selection.SetSelected(pos)
 				m.ensureVisible()
 			}
 		}
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		m.ui.Screen.StatusMsg = ""
 		return m.handleKeyMsg(msg)
 	default:
@@ -76,7 +77,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:
 		return m.handleHelpKey(msg)
@@ -108,7 +109,7 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc", "?":
 		m.ui.Modes.ToNormal()
@@ -140,7 +141,7 @@ func (m model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
+func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) model {
 	switch msg.String() {
 	case "y", "enter":
 		switch m.ui.ConfirmDelete.Kind {
@@ -164,7 +165,7 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyMsg) model {
 	return m
 }
 
-func (m model) handleOptionsKey(msg tea.KeyMsg) model {
+func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
 	const optionCount = 2
 	switch msg.String() {
 	case "q", "esc", "enter":
@@ -183,7 +184,7 @@ func (m model) handleOptionsKey(msg tea.KeyMsg) model {
 	return m
 }
 
-func (m model) handleFilterKey(msg tea.KeyMsg) model {
+func (m model) handleFilterKey(msg tea.KeyPressMsg) model {
 	catCount := len(m.project.Categories)
 	switch msg.String() {
 	case "q", "f":
@@ -228,7 +229,7 @@ func (m *model) openFilterHubSelection() {
 	}
 }
 
-func (m model) handleInfoKey(msg tea.KeyMsg) model {
+func (m model) handleInfoKey(msg tea.KeyPressMsg) model {
 	switch msg.String() {
 	case "i", "q", "esc":
 		m.ui.Modes.ToNormal()
@@ -236,7 +237,7 @@ func (m model) handleInfoKey(msg tea.KeyMsg) model {
 	return m
 }
 
-func (m model) handleEstimatePickerKey(msg tea.KeyMsg) model {
+func (m model) handleEstimatePickerKey(msg tea.KeyPressMsg) model {
 	switch msg.String() {
 	case "q", "esc":
 		m.ui.Modes.ToNormal()
@@ -251,7 +252,7 @@ func (m model) handleEstimatePickerKey(msg tea.KeyMsg) model {
 	return m
 }
 
-func (m model) handleURLPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleURLPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc":
 		m.ui.Modes.ToNormal()
@@ -302,7 +303,7 @@ func nextPriorityColor(current string) string {
 	}
 }
 
-func (m model) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	cmd := m.dispatchNormalKey(msg.String())
 	return m, cmd
 }
@@ -344,7 +345,15 @@ func (m *model) copyCategoryContent() tea.Cmd {
 	}
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
+	v := tea.NewView(m.renderView())
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	v.ReportFocus = true
+	return v
+}
+
+func (m model) renderView() string {
 	if m.ui.Screen.Height == 0 {
 		return ""
 	}
@@ -531,7 +540,7 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 		}
 	}
 
-	program := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
+	program := tea.NewProgram(m)
 	_, err = program.Run()
 	return err
 }

@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
