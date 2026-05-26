@@ -16,9 +16,8 @@ type Viewport struct {
 	HasMoreAbove bool
 	HasMoreBelow bool
 
-	usedHeight   int   // Rows consumed by fully-visible layout items
-	availHeight  int   // Content rows available (excludes scroll indicators + footer)
-	itemRowStart []int // Starting row for each visible layout item
+	usedHeight  int // Rows consumed by fully-visible layout items
+	availHeight int // Content rows available (excludes scroll indicators + footer)
 }
 
 func NewViewport(layout *Layout, screenHeight int, config LayoutConfig) *Viewport {
@@ -56,7 +55,6 @@ func (v *Viewport) ComputeVisibility(scrollOffset int) {
 	v.HasMoreBelow = false
 	v.VisibleStart = -1
 	v.VisibleEnd = -1
-	v.itemRowStart = nil
 
 	if v.Layout == nil || len(v.Layout.Items) == 0 {
 		return
@@ -100,13 +98,7 @@ func (v *Viewport) computeVisibleRange(reserveMoreBelow bool) {
 
 	v.HasMoreBelow = false
 	v.VisibleEnd = -1
-	v.itemRowStart = nil
 	v.availHeight = availHeight
-
-	startRow := 0
-	if v.HasMoreAbove {
-		startRow = 1
-	}
 
 	for i := v.VisibleStart; i < len(v.Layout.Items); i++ {
 		item := v.Layout.Items[i]
@@ -117,7 +109,6 @@ func (v *Viewport) computeVisibleRange(reserveMoreBelow bool) {
 			break
 		}
 
-		v.itemRowStart = append(v.itemRowStart, startRow+usedHeight)
 		usedHeight += item.Height
 		v.VisibleEnd = i + 1
 	}
@@ -192,48 +183,6 @@ func (v *Viewport) EnsureVisible(posIndex int) int {
 	}
 
 	return scrollOffset
-}
-
-func (v *Viewport) RowToPosition(row int) int {
-	if v.Layout == nil || v.VisibleStart < 0 {
-		return -1
-	}
-
-	for i := 0; i < len(v.itemRowStart); i++ {
-		itemIdx := v.VisibleStart + i
-		if itemIdx >= len(v.Layout.Items) {
-			break
-		}
-
-		item := v.Layout.Items[itemIdx]
-		itemStart := v.itemRowStart[i]
-		itemEnd := itemStart + item.Height
-
-		if row >= itemStart && row < itemEnd {
-			return item.PositionIndex
-		}
-	}
-
-	// Resolve clicks on the partial-truncated bottom row (rendered when there
-	// is a next layout item and RemainingContentHeight() > 0).
-	if v.VisibleEnd >= 0 && v.VisibleEnd < len(v.Layout.Items) {
-		remaining := v.RemainingContentHeight()
-		if remaining > 0 {
-			partialStart := v.usedHeight
-			if v.HasMoreAbove {
-				partialStart++
-			}
-			partialEnd := partialStart + remaining
-			if row >= partialStart && row < partialEnd {
-				pidx := v.Layout.Items[v.VisibleEnd].PositionIndex
-				if pidx >= 0 {
-					return pidx
-				}
-			}
-		}
-	}
-
-	return -1
 }
 
 func (v *Viewport) BottomOnPosition(posIndex int) int {

@@ -52,22 +52,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ui.Screen.WindowFocused = true
 	case tea.BlurMsg:
 		m.ui.Screen.WindowFocused = false
-	case tea.MouseClickMsg:
-		if !m.ui.Modes.IsNormal() {
-			break
-		}
-		if msg.Button != tea.MouseLeft {
-			break
-		}
-		mouse := msg.Mouse()
-		rowMap := m.computeRowMap()
-		if mouse.Y >= 0 && mouse.Y < len(rowMap) {
-			pos := rowMap[mouse.Y]
-			if pos >= 0 && pos < m.ui.Selection.Count() {
-				m.ui.Selection.SetSelected(pos)
-				m.ensureVisible()
-			}
-		}
 	case tea.KeyPressMsg:
 		m.ui.Screen.StatusMsg = ""
 		return m.handleKeyMsg(msg)
@@ -348,7 +332,7 @@ func (m *model) copyCategoryContent() tea.Cmd {
 func (m model) View() tea.View {
 	v := tea.NewView(m.renderView())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
+	v.MouseMode = tea.MouseModeNone
 	v.ReportFocus = true
 	return v
 }
