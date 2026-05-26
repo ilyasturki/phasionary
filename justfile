@@ -21,6 +21,7 @@ run-nix:
 # Run all tests.
 test:
     go test ./...
+    nix build
 
 # Format Go files.
 fmt:

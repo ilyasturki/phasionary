@@ -20,7 +20,7 @@
           pname = "phasionary";
           inherit version;
           src = ./.;
-          vendorHash = "sha256-tndx/Cjoc5Wm09xKiFR4LBFwQJONEhZkhyKPzsAYYbI=";
+          vendorHash = "sha256-OYfe+TmHVgA1tJb7Wa57aHObeQPuASKu7PxN7tLe9eU=";
           ldflags = [
             "-s"
             "-w"

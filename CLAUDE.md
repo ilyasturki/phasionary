@@ -4,14 +4,14 @@ This file provides guidance to Codex CLI and Claude Code (claude.ai/code) when w
 
 ## Project Overview
 
-Phasionary is a terminal-first, single-user project planning tool. Local-only, offline by default, keyboard-driven. The implementation targets Go with Bubble Tea for TUI.
+Phasionary is a terminal-first, single-user project planning tool. Local-only, offline by default, keyboard-driven. The implementation targets Go with Bubble Tea for TUI. The app should look well on dark and light mode.
 
 ## Build Commands
 
 ```bash
 go build -o phasionary ./cmd/phasionary
-go test ./...
-go test -v ./internal/domain/...  # Run tests for specific package
+just test                          # Runs `go test ./...` then `nix build`
+go test -v ./internal/domain/...   # Run tests for specific package
 ```
 
 ## Visual TUI Testing
