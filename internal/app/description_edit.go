@@ -5,6 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -24,6 +25,10 @@ func (m *model) startDescriptionInlineEdit(catIdx, taskIdx int) tea.Cmd {
 	task := cat.Tasks[taskIdx]
 
 	ta := textarea.New()
+	// Default cursor-line bg is pure black, a stark bar on light terminals; use a neutral mid-gray instead.
+	styles := ta.Styles()
+	styles.Focused.CursorLine = lipgloss.NewStyle().Background(lipgloss.Color("240"))
+	ta.SetStyles(styles)
 	ta.SetValue(task.Description)
 	ta.ShowLineNumbers = false
 	ta.Prompt = ""
