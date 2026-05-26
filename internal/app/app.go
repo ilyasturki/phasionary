@@ -487,7 +487,7 @@ func (m model) renderLayoutItemTruncated(item LayoutItem, maxRows int) string {
 	return strings.Join(rendered[:maxRows], "\n")
 }
 
-func Run(dataDir string, projectSelector string, cfgManager config.Reader, workingDir string) error {
+func Run(dataDir string, projectSelector string, cfgManager config.Reader, workingDir string, forcePicker bool) error {
 	store := data.NewStore(dataDir)
 	if err := store.Ensure(); err != nil {
 		return err
@@ -511,7 +511,8 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 		if err != nil {
 			return err
 		}
-		_ = stateManager.SetLastProjectID(project.ID)
+		_ = stateManager.SetProjectForDir(project.ID)
+		projects = []domain.Project{project}
 	} else if projectSelector != "" {
 		project, err = store.LoadProject(projectSelector)
 		if err != nil {
@@ -520,9 +521,9 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 			}
 			return err
 		}
-		_ = stateManager.SetLastProjectID(project.ID)
-	} else if lastID := stateManager.GetLastProjectID(); lastID != "" {
-		project, err = store.LoadProject(lastID)
+		_ = stateManager.SetProjectForDir(project.ID)
+	} else if linkedID := stateManager.GetProjectForDir(); linkedID != "" {
+		project, err = store.LoadProject(linkedID)
 		if err != nil {
 			if errors.Is(err, data.ErrProjectNotFound) {
 				startMode = modes.ModeProjectPicker
@@ -530,9 +531,13 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 				return err
 			}
 		} else {
-			_ = stateManager.SetLastProjectID(project.ID)
+			_ = stateManager.SetProjectForDir(project.ID)
 		}
 	} else {
+		startMode = modes.ModeProjectPicker
+	}
+
+	if forcePicker {
 		startMode = modes.ModeProjectPicker
 	}
 
@@ -550,11 +555,20 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 	m.ui.Fold = foldState
 
 	if startMode == modes.ModeProjectPicker {
+		ordered := orderProjects(projects, stateManager.GetProjectOrder())
+		selected := 0
+		for i, p := range ordered {
+			if p.ID == project.ID {
+				selected = i
+				break
+			}
+		}
 		m.ui.Picker = ProjectPickerState{
-			projects:     projects,
-			selected:     0,
+			projects:     ordered,
+			selected:     selected,
 			scrollOffset: 0,
 		}
+		m.ui.Picker.ensureVisible()
 	}
 
 	program := tea.NewProgram(m)

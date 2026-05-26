@@ -38,7 +38,7 @@ func newRootCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return app.Run(dataDir, viper.GetString("project"), cfgManager, workingDir)
+			return app.Run(dataDir, viper.GetString("project"), cfgManager, workingDir, false)
 		},
 	}
 
@@ -54,6 +54,7 @@ func newRootCmd() *cobra.Command {
 	cmd.PersistentFlags().StringP("project", "p", "", "target project for commands")
 	cmd.PersistentFlags().BoolP("json", "j", false, "output in JSON format")
 	cmd.PersistentFlags().BoolP("quiet", "q", false, "suppress non-essential output")
+	cmd.PersistentFlags().BoolP("long", "l", false, "show additional details (IDs, timestamps) in list output")
 
 	viper.AutomaticEnv()
 	if err := viper.BindEnv("config", config.EnvConfigPath); err != nil {
@@ -77,10 +78,14 @@ func newRootCmd() *cobra.Command {
 	if err := viper.BindPFlag("quiet", cmd.PersistentFlags().Lookup("quiet")); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
+	if err := viper.BindPFlag("long", cmd.PersistentFlags().Lookup("long")); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newProjectCmd())
 	cmd.AddCommand(newProjectsCmd())
+	cmd.AddCommand(newPickCmd())
 	cmd.AddCommand(newTaskCmd())
 	cmd.AddCommand(newTasksCmd())
 	cmd.AddCommand(newCategoryCmd())

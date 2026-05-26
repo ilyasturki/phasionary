@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
@@ -17,7 +16,7 @@ func newCategoriesCmd() *cobra.Command {
 		Aliases: []string{"cs"},
 		Short:   "List categories",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return viewProject(viper.GetString("project"), func(project domain.Project) error {
+			return viewProject(projectSelector(nil), func(project domain.Project) error {
 				return writeCategories(cmd.OutOrStdout(), project.Categories)
 			})
 		},
@@ -25,10 +24,13 @@ func newCategoriesCmd() *cobra.Command {
 	return cmd
 }
 
+const categoryIdentifierHelp = "The <category> argument accepts a category name or ID (full or 4+ char prefix)."
+
 func newCategoryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "category",
 		Short: "Manage categories",
+		Long:  "Manage categories within a project.\n\n" + categoryIdentifierHelp,
 	}
 
 	cmd.AddCommand(newCategoryShowCmd())
@@ -41,13 +43,14 @@ func newCategoryCmd() *cobra.Command {
 
 func newCategoryShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "show <name-or-id>",
+		Use:               "show <category>",
 		Aliases:           []string{"c"},
 		Short:             "Show category details",
-		Args:              cobra.ExactArgs(1),
+		Long:              "Show category details.\n\n" + categoryIdentifierHelp,
+		Args:              exactArgs("category"),
 		ValidArgsFunction: completeCategories,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return viewProject(viper.GetString("project"), func(project domain.Project) error {
+			return viewProject(projectSelector(nil), func(project domain.Project) error {
 				cat, _, err := resolveCategory(project, args[0])
 				if err != nil {
 					return fmt.Errorf("category %q not found", args[0])
@@ -64,11 +67,11 @@ func newCategoryAddCmd() *cobra.Command {
 		Use:     "add <name>",
 		Aliases: []string{"ca"},
 		Short:   "Add a category",
-		Args:    cobra.ExactArgs(1),
+		Args:    exactArgs("name"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			var created *domain.Category
-			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+			err := withProject(projectSelector(nil), func(_ *data.Store, project *domain.Project) error {
 				cat, err := project.AddCategoryNamed(name)
 				if err != nil {
 					if errors.Is(err, domain.ErrDuplicateCategoryName) {
@@ -93,17 +96,18 @@ func newCategoryEditCmd() *cobra.Command {
 	var name string
 
 	cmd := &cobra.Command{
-		Use:               "edit <name-or-id>",
+		Use:               "edit <category>",
 		Aliases:           []string{"ce"},
 		Short:             "Edit category (rename)",
-		Args:              cobra.ExactArgs(1),
+		Long:              "Rename a category.\n\n" + categoryIdentifierHelp,
+		Args:              exactArgs("category"),
 		ValidArgsFunction: completeCategories,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
 
-			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+			err := withProject(projectSelector(nil), func(_ *data.Store, project *domain.Project) error {
 				_, catIdx, err := resolveCategory(*project, args[0])
 				if err != nil {
 					return fmt.Errorf("category %q not found", args[0])
@@ -133,13 +137,14 @@ func newCategoryDeleteCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:               "delete <name-or-id>",
+		Use:               "delete <category>",
 		Aliases:           []string{"cd"},
 		Short:             "Delete a category",
-		Args:              cobra.ExactArgs(1),
+		Long:              "Delete a category.\n\n" + categoryIdentifierHelp,
+		Args:              exactArgs("category"),
 		ValidArgsFunction: completeCategories,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, project, err := loadStoreAndProject(viper.GetString("project"))
+			store, project, err := loadStoreAndProject(projectSelector(nil))
 			if err != nil {
 				return err
 			}

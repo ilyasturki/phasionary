@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"phasionary/internal/app"
 	"phasionary/internal/domain"
 )
 
@@ -28,6 +29,10 @@ func getOutputFormat() OutputFormat {
 
 func isQuiet() bool {
 	return viper.GetBool("quiet")
+}
+
+func isLong() bool {
+	return viper.GetBool("long")
 }
 
 type ProjectListItem struct {
@@ -62,10 +67,17 @@ func writeProjects(w io.Writer, projects []domain.Project) error {
 		return nil
 	}
 
+	if !isLong() {
+		for _, p := range projects {
+			fmt.Fprintln(w, p.Name)
+		}
+		return nil
+	}
+
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tID")
+	fmt.Fprintln(tw, "NAME\tID\tCREATED")
 	for _, p := range projects {
-		fmt.Fprintf(tw, "%s\t%s\n", p.Name, p.ID)
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", p.Name, p.ID, app.FormatDate(p.CreatedAt))
 	}
 	return tw.Flush()
 }
@@ -105,11 +117,32 @@ func writeCategories(w io.Writer, categories []domain.Category) error {
 	}
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tTASKS\tID")
-	for _, c := range categories {
-		fmt.Fprintf(tw, "%s\t%d\t%s\n", c.Name, len(c.Tasks), c.ID)
+	if isLong() {
+		fmt.Fprintln(tw, "NAME\tID\tSTATUS\tTASKS\tESTIMATE")
+		for _, c := range categories {
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\n", c.Name, c.ID, formatAggregateStatus(c.AggregateStatus()), len(c.Tasks), formatEstimateCell(c.EstimateMinutes))
+		}
+	} else {
+		fmt.Fprintln(tw, "NAME\tSTATUS\tTASKS\tESTIMATE")
+		for _, c := range categories {
+			fmt.Fprintf(tw, "%s\t%s\t%d\t%s\n", c.Name, formatAggregateStatus(c.AggregateStatus()), len(c.Tasks), formatEstimateCell(c.EstimateMinutes))
+		}
 	}
 	return tw.Flush()
+}
+
+func formatAggregateStatus(status string) string {
+	if status == "" {
+		return "-"
+	}
+	return status
+}
+
+func formatEstimateCell(minutes int) string {
+	if minutes <= 0 {
+		return "-"
+	}
+	return formatDuration(minutes)
 }
 
 type TaskListItem struct {
@@ -139,13 +172,24 @@ func writeTaskList(w io.Writer, tasks []TaskListItem) error {
 	}
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "CATEGORY\tSTATUS\tPRIORITY\tTITLE")
-	for _, t := range tasks {
-		priority := t.Priority
-		if priority == "" {
-			priority = "-"
+	if isLong() {
+		fmt.Fprintln(tw, "ID\tCATEGORY\tSTATUS\tPRIORITY\tESTIMATE\tTITLE")
+		for _, t := range tasks {
+			priority := t.Priority
+			if priority == "" {
+				priority = "-"
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", t.ID, t.Category, t.Status, priority, formatEstimateCell(t.EstimateMinutes), t.Title)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", t.Category, t.Status, priority, t.Title)
+	} else {
+		fmt.Fprintln(tw, "CATEGORY\tSTATUS\tPRIORITY\tTITLE")
+		for _, t := range tasks {
+			priority := t.Priority
+			if priority == "" {
+				priority = "-"
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", t.Category, t.Status, priority, t.Title)
+		}
 	}
 	return tw.Flush()
 }
@@ -240,11 +284,10 @@ func writeProjectDetail(w io.Writer, project domain.Project) error {
 	}
 
 	fmt.Fprintf(w, "Name:       %s\n", detail.Name)
-	fmt.Fprintf(w, "ID:         %s\n", detail.ID)
 	fmt.Fprintf(w, "Categories: %d\n", detail.CategoryCount)
 	fmt.Fprintf(w, "Tasks:      %d\n", detail.TaskCount)
-	fmt.Fprintf(w, "Created:    %s\n", detail.CreatedAt)
-	fmt.Fprintf(w, "Updated:    %s\n", detail.UpdatedAt)
+	fmt.Fprintf(w, "Created:    %s\n", app.FormatDate(detail.CreatedAt))
+	fmt.Fprintf(w, "Updated:    %s\n", app.FormatDate(detail.UpdatedAt))
 	if len(categories) > 0 {
 		fmt.Fprintf(w, "\nCategories: %s\n", strings.Join(categories, ", "))
 	}

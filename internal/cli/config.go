@@ -88,10 +88,6 @@ func newConfigSetCmd() *cobra.Command {
 				err = cfgManager.Update(func(c *config.Config) {
 					c.StatusDisplay = value
 				})
-			case "default_project":
-				err = cfgManager.Update(func(c *config.Config) {
-					c.DefaultProject = value
-				})
 			default:
 				return fmt.Errorf("unknown config key: %s", key)
 			}

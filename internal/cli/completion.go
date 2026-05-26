@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"phasionary/internal/domain"
 )
@@ -64,7 +63,7 @@ func completeTasks(cmd *cobra.Command, args []string, toComplete string) ([]stri
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
-	project, err := store.LoadProject(viper.GetString("project"))
+	project, err := store.LoadProject(projectSelector(nil))
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
@@ -82,7 +81,7 @@ func completeCategories(cmd *cobra.Command, args []string, toComplete string) ([
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
-	project, err := store.LoadProject(viper.GetString("project"))
+	project, err := store.LoadProject(projectSelector(nil))
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}

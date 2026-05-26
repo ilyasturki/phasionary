@@ -17,8 +17,8 @@ func newStubStateManager() *stubStateManager {
 	return &stubStateManager{folded: make(map[string][]string)}
 }
 
-func (s *stubStateManager) GetLastProjectID() string                { return "" }
-func (s *stubStateManager) SetLastProjectID(id string) error        { return nil }
+func (s *stubStateManager) GetProjectForDir() string                { return "" }
+func (s *stubStateManager) SetProjectForDir(id string) error        { return nil }
 func (s *stubStateManager) GetProjectOrder() []string               { return nil }
 func (s *stubStateManager) SetProjectOrder(order []string) error    { return nil }
 func (s *stubStateManager) GetFoldedCategories(projectID string) []string {

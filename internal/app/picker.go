@@ -151,7 +151,7 @@ func (m *model) confirmDeleteProject() {
 		}
 		if len(projects) > 0 {
 			m.project = projects[0]
-			_ = m.deps.StateManager.SetLastProjectID(m.project.ID)
+			_ = m.deps.StateManager.SetProjectForDir(m.project.ID)
 			m.ui.Filter = NewFilterState()
 			m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(m.project.ID))
 			m.ui.History.Reset()
@@ -210,7 +210,7 @@ func (m *model) createProjectFromPicker() {
 		return
 	}
 
-	_ = m.deps.StateManager.SetLastProjectID(project.ID)
+	_ = m.deps.StateManager.SetProjectForDir(project.ID)
 	order := m.deps.StateManager.GetProjectOrder()
 	order = append(order, project.ID)
 	_ = m.deps.StateManager.SetProjectOrder(order)
@@ -253,7 +253,7 @@ func (m *model) selectProject() {
 		return
 	}
 
-	_ = m.deps.StateManager.SetLastProjectID(project.ID)
+	_ = m.deps.StateManager.SetProjectForDir(project.ID)
 
 	m.project = project
 	m.ui.Filter = NewFilterState()

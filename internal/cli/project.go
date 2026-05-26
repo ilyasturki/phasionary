@@ -2,14 +2,45 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"phasionary/internal/app"
 	"phasionary/internal/config"
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
 )
+
+func newPickCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "pick",
+		Aliases: []string{"switch"},
+		Short:   "Launch the TUI and open the project picker",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := config.ResolveConfigPath(viper.GetString("config"))
+			if err != nil {
+				return err
+			}
+			cfgManager := config.NewManager(configPath)
+			if err := cfgManager.Load(); err != nil {
+				return err
+			}
+			dataDir, err := config.ResolveDataDir(viper.GetString("data"))
+			if err != nil {
+				return err
+			}
+			workingDir, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			return app.Run(dataDir, viper.GetString("project"), cfgManager, workingDir, true)
+		},
+	}
+	return cmd
+}
 
 func newProjectsCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -41,7 +72,8 @@ func newProjectCmd() *cobra.Command {
 	cmd.AddCommand(newProjectAddCmd())
 	cmd.AddCommand(newProjectEditCmd())
 	cmd.AddCommand(newProjectDeleteCmd())
-	cmd.AddCommand(newProjectUseCmd())
+	cmd.AddCommand(newProjectLinkCmd())
+	cmd.AddCommand(newProjectUnlinkCmd())
 
 	return cmd
 }
@@ -67,7 +99,7 @@ func newProjectAddCmd() *cobra.Command {
 		Use:     "add <name>",
 		Aliases: []string{"pa"},
 		Short:   "Add a new project",
-		Args:    cobra.ExactArgs(1),
+		Args:    exactArgs("name"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
 			if err != nil {
@@ -76,6 +108,9 @@ func newProjectAddCmd() *cobra.Command {
 			project, err := store.CreateProject(args[0])
 			if err != nil {
 				return err
+			}
+			if mgr, err := stateManagerFromViper(); err == nil {
+				_ = mgr.SetProjectForDir(project.ID)
 			}
 			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Created project: %s (%s)", project.Name, project.ID))
 			return nil
@@ -156,12 +191,12 @@ func newProjectDeleteCmd() *cobra.Command {
 	return cmd
 }
 
-func newProjectUseCmd() *cobra.Command {
+func newProjectLinkCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "use <name-or-id>",
-		Aliases:           []string{"pu"},
-		Short:             "Set default project",
-		Args:              cobra.ExactArgs(1),
+		Use:               "link <project>",
+		Aliases:           []string{"pl"},
+		Short:             "Link the current directory to a project",
+		Args:              exactArgs("project"),
 		ValidArgsFunction: completeProjects,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := storeFromViper()
@@ -172,21 +207,48 @@ func newProjectUseCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
-			configPath, err := config.ResolveConfigPath(viper.GetString("config"))
+			mgr, err := stateManagerFromViper()
 			if err != nil {
 				return err
 			}
-			cfgManager := config.NewManager(configPath)
-			if err := cfgManager.Load(); err != nil {
+			if err := mgr.SetProjectForDir(project.ID); err != nil {
 				return err
 			}
-			cfgManager.SetDefaultProject(project.ID)
-			if err := cfgManager.Save(); err != nil {
-				return err
-			}
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Linked directory to project: %s", project.Name))
+			return nil
+		},
+	}
+	return cmd
+}
 
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Set default project to: %s", project.Name))
+func newProjectUnlinkCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "unlink",
+		Aliases: []string{"pul"},
+		Short:   "Remove the link between the current directory and its project",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mgr, err := stateManagerFromViper()
+			if err != nil {
+				return err
+			}
+			prevID, err := mgr.UnlinkDir()
+			if err != nil {
+				return err
+			}
+			if prevID == "" {
+				fmt.Fprintln(cmd.OutOrStdout(), "No project linked to this directory.")
+				return nil
+			}
+			store, err := storeFromViper()
+			if err != nil {
+				return err
+			}
+			name := prevID
+			if p, err := store.LoadProject(prevID); err == nil {
+				name = p.Name
+			}
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Unlinked directory from project: %s", name))
 			return nil
 		},
 	}

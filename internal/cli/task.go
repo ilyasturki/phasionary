@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
@@ -35,7 +34,7 @@ func newTasksCmd() *cobra.Command {
 				}
 			}
 
-			return viewProject(viper.GetString("project"), func(project domain.Project) error {
+			return viewProject(projectSelector(nil), func(project domain.Project) error {
 				var tasks []TaskListItem
 				for _, cat := range project.Categories {
 					if category != "" && domain.NormalizeName(cat.Name) != domain.NormalizeName(category) {
@@ -75,10 +74,13 @@ func newTasksCmd() *cobra.Command {
 	return cmd
 }
 
+const taskIdentifierHelp = "The <task> argument accepts a task title or ID (full or 4+ char prefix)."
+
 func newTaskCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "task",
 		Short: "Manage tasks",
+		Long:  "Manage tasks within a project.\n\n" + taskIdentifierHelp,
 	}
 
 	cmd.AddCommand(newTaskShowCmd())
@@ -94,13 +96,14 @@ func newTaskCmd() *cobra.Command {
 
 func newTaskShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "show <id-or-title>",
+		Use:               "show <task>",
 		Aliases:           []string{"t"},
 		Short:             "Show task details",
-		Args:              cobra.ExactArgs(1),
+		Long:              "Show task details.\n\n" + taskIdentifierHelp,
+		Args:              exactArgs("task"),
 		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return viewProject(viper.GetString("project"), func(project domain.Project) error {
+			return viewProject(projectSelector(nil), func(project domain.Project) error {
 				ref, err := resolveTask(project, args[0])
 				if err != nil {
 					return fmt.Errorf("task %q not found", args[0])
@@ -123,7 +126,7 @@ func newTaskAddCmd() *cobra.Command {
 		Use:     "add <title>",
 		Aliases: []string{"ta"},
 		Short:   "Add a task",
-		Args:    cobra.ExactArgs(1),
+		Args:    exactArgs("title"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(categoryName) == "" {
 				return errors.New("--category is required")
@@ -150,7 +153,7 @@ func newTaskAddCmd() *cobra.Command {
 				task.EstimateMinutes = minutes
 			}
 
-			err = withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+			err = withProject(projectSelector(nil), func(_ *data.Store, project *domain.Project) error {
 				_, catIdx, err := resolveCategory(*project, categoryName)
 				if err != nil {
 					return fmt.Errorf("category %q not found", categoryName)
@@ -184,14 +187,15 @@ func newTaskEditCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:               "edit <id-or-title>",
+		Use:               "edit <task>",
 		Aliases:           []string{"te"},
 		Short:             "Edit task properties",
-		Args:              cobra.ExactArgs(1),
+		Long:              "Edit task properties.\n\n" + taskIdentifierHelp,
+		Args:              exactArgs("task"),
 		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var updatedTitle string
-			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+			err := withProject(projectSelector(nil), func(_ *data.Store, project *domain.Project) error {
 				ref, err := resolveTask(*project, args[0])
 				if err != nil {
 					return fmt.Errorf("task %q not found", args[0])
@@ -237,13 +241,14 @@ func newTaskDeleteCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:               "delete <id-or-title>",
+		Use:               "delete <task>",
 		Aliases:           []string{"td"},
 		Short:             "Delete a task",
-		Args:              cobra.ExactArgs(1),
+		Long:              "Delete a task.\n\n" + taskIdentifierHelp,
+		Args:              exactArgs("task"),
 		ValidArgsFunction: completeTasks,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, project, err := loadStoreAndProject(viper.GetString("project"))
+			store, project, err := loadStoreAndProject(projectSelector(nil))
 			if err != nil {
 				return err
 			}
@@ -285,10 +290,11 @@ func newTaskDeleteCmd() *cobra.Command {
 
 func newTaskStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "status <id-or-title> <status>",
+		Use:     "status <task> <status>",
 		Aliases: []string{"tst"},
 		Short:   "Update task status",
-		Args:    cobra.ExactArgs(2),
+		Long:    "Update task status.\n\n" + taskIdentifierHelp,
+		Args:    exactArgs("task", "status"),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			if len(args) == 0 {
 				return completeTasks(cmd, args, toComplete)
@@ -304,7 +310,7 @@ func newTaskStatusCmd() *cobra.Command {
 			}
 
 			var title string
-			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+			err := withProject(projectSelector(nil), func(_ *data.Store, project *domain.Project) error {
 				ref, err := resolveTask(*project, selector)
 				if err != nil {
 					return fmt.Errorf("task %q not found", selector)
@@ -328,10 +334,11 @@ func newTaskStatusCmd() *cobra.Command {
 
 func newTaskPriorityCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "priority <id-or-title> <priority>",
+		Use:     "priority <task> <priority>",
 		Aliases: []string{"tp"},
 		Short:   "Update task priority",
-		Args:    cobra.ExactArgs(2),
+		Long:    "Update task priority.\n\n" + taskIdentifierHelp,
+		Args:    exactArgs("task", "priority"),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			if len(args) == 0 {
 				return completeTasks(cmd, args, toComplete)
@@ -347,7 +354,7 @@ func newTaskPriorityCmd() *cobra.Command {
 			}
 
 			var title string
-			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+			err := withProject(projectSelector(nil), func(_ *data.Store, project *domain.Project) error {
 				ref, err := resolveTask(*project, selector)
 				if err != nil {
 					return fmt.Errorf("task %q not found", selector)
@@ -371,10 +378,11 @@ func newTaskPriorityCmd() *cobra.Command {
 
 func newTaskMoveCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "move <id-or-title> <category>",
+		Use:     "move <task> <category>",
 		Aliases: []string{"tm"},
 		Short:   "Move task to different category",
-		Args:    cobra.ExactArgs(2),
+		Long:    "Move task to a different category.\n\n" + taskIdentifierHelp + "\n" + categoryIdentifierHelp,
+		Args:    exactArgs("task", "category"),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			if len(args) == 0 {
 				return completeTasks(cmd, args, toComplete)
@@ -386,7 +394,7 @@ func newTaskMoveCmd() *cobra.Command {
 			targetCategory := args[1]
 
 			var title, destName string
-			err := withProject(viper.GetString("project"), func(_ *data.Store, project *domain.Project) error {
+			err := withProject(projectSelector(nil), func(_ *data.Store, project *domain.Project) error {
 				ref, err := resolveTask(*project, selector)
 				if err != nil {
 					return fmt.Errorf("task %q not found", selector)

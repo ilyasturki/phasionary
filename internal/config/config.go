@@ -22,7 +22,6 @@ const (
 type Config struct {
 	StatusDisplay   string `json:"status_display,omitempty"`
 	PriorityColor   string `json:"priority_color,omitempty"`
-	DefaultProject  string `json:"default_project,omitempty"`
 	ShowShortcutBar bool   `json:"show_shortcut_bar"`
 }
 

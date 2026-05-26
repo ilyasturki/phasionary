@@ -16,8 +16,8 @@ type State struct {
 
 // StateRepository abstracts persistence of UI state. Implemented by *StateManager.
 type StateRepository interface {
-	GetLastProjectID() string
-	SetLastProjectID(id string) error
+	GetProjectForDir() string
+	SetProjectForDir(id string) error
 	GetProjectOrder() []string
 	SetProjectOrder(order []string) error
 	GetFoldedCategories(projectID string) []string
@@ -34,7 +34,8 @@ type StateManager struct {
 var _ StateRepository = (*StateManager)(nil)
 
 // NewStateManager creates a state manager that persists to <stateDir>/state.json.
-// currentDir is used to scope the "last project" entry per-working-directory; pass "" for global.
+// currentDir is the working directory that owns the linked project; pass "" for an
+// unscoped (global fallback) entry.
 func NewStateManager(stateDir, currentDir string) *StateManager {
 	return &StateManager{
 		path:       filepath.Join(stateDir, "state.json"),
@@ -92,23 +93,36 @@ func (m *StateManager) Save() error {
 	return os.WriteFile(m.path, data, 0o644)
 }
 
-func (m *StateManager) GetLastProjectID() string {
+// GetProjectForDir returns the project ID owned by the manager's current
+// directory, or "" if none is linked.
+func (m *StateManager) GetProjectForDir() string {
 	if m.state.DirectoryProjects == nil {
 		return ""
 	}
-	if m.currentDir != "" {
-		return m.state.DirectoryProjects[m.currentDir]
-	}
-	return m.state.DirectoryProjects[""]
+	return m.state.DirectoryProjects[m.currentDir]
 }
 
-func (m *StateManager) SetLastProjectID(id string) error {
+// SetProjectForDir links the manager's current directory to the given project ID.
+func (m *StateManager) SetProjectForDir(id string) error {
 	if m.state.DirectoryProjects == nil {
 		m.state.DirectoryProjects = make(map[string]string)
 	}
-	key := m.currentDir
-	m.state.DirectoryProjects[key] = id
+	m.state.DirectoryProjects[m.currentDir] = id
 	return m.Save()
+}
+
+// UnlinkDir removes the link for the manager's current directory. Returns the
+// previously linked project ID (empty if none was linked).
+func (m *StateManager) UnlinkDir() (string, error) {
+	if m.state.DirectoryProjects == nil {
+		return "", nil
+	}
+	prev, ok := m.state.DirectoryProjects[m.currentDir]
+	if !ok {
+		return "", nil
+	}
+	delete(m.state.DirectoryProjects, m.currentDir)
+	return prev, m.Save()
 }
 
 func (m *StateManager) GetProjectOrder() []string {

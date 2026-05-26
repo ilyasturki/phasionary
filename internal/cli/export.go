@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"phasionary/internal/domain"
 	"phasionary/internal/export"
@@ -30,7 +29,7 @@ func newExportCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			project, err := store.LoadProject(viper.GetString("project"))
+			project, err := store.LoadProject(projectSelector(nil))
 			if err != nil {
 				return err
 			}
