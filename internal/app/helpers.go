@@ -22,6 +22,33 @@ func (m model) selectedPosition() (selection.Position, bool) {
 	return m.ui.Selection.SelectedPosition()
 }
 
+func (m model) isTaskCut(taskID string) bool {
+	if !m.ui.Clipboard.IsCut || taskID == "" {
+		return false
+	}
+	if m.ui.Clipboard.SourceID == taskID {
+		return true
+	}
+	for _, id := range m.ui.Clipboard.TaskIDs {
+		if id == taskID {
+			return true
+		}
+	}
+	return false
+}
+
+func (m model) isCategoryCut(categoryID string) bool {
+	if !m.ui.Clipboard.IsCut || categoryID == "" {
+		return false
+	}
+	for _, id := range m.ui.Clipboard.CategoryIDs {
+		if id == categoryID {
+			return true
+		}
+	}
+	return false
+}
+
 const (
 	prefixWidth     = 2
 	footerHeight    = 0 // No bottom status area — status text appears on the project line.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"phasionary/internal/app/components"
@@ -71,18 +72,24 @@ func (m model) renderEditProjectLine() string {
 	)
 }
 
-func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string, selected bool, folded bool, width int, focused bool, visualMode bool) string {
+func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string, selected bool, folded bool, width int, focused bool, visualMode bool, isCursor bool, cut bool) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
 	}
 	style := ui.CategoryStyle
 	if selected {
-		if visualMode {
+		switch {
+		case visualMode && isCursor:
+			style = ui.GetVisualCursorStyle(focused)
+		case visualMode:
 			style = ui.GetVisualSelectedStyle(focused)
-		} else {
+		default:
 			style = ui.GetSelectedStyle(focused)
 		}
+	}
+	if cut {
+		style = ui.ApplyCut(style)
 	}
 
 	foldIndicator := "▼ "
@@ -95,6 +102,8 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 	if aggregateStatus != "" {
 		statusBadgeText = " [" + statusIcon(aggregateStatus) + "]"
 		switch {
+		case selected && visualMode && isCursor:
+			statusBadge = ui.GetVisualCursorStyle(focused).Render(statusBadgeText)
 		case selected && visualMode:
 			statusBadge = ui.GetVisualSelectedStyle(focused).Render(statusBadgeText)
 		case selected:
@@ -109,6 +118,8 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 	if estimateMinutes > 0 {
 		estimateBadgeText = " ~" + FormatEstimate(estimateMinutes)
 		switch {
+		case selected && visualMode && isCursor:
+			estimateBadge = ui.GetVisualCursorStyle(focused).Render(estimateBadgeText)
 		case selected && visualMode:
 			estimateBadge = ui.GetVisualSelectedStyle(focused).Render(estimateBadgeText)
 		case selected:
@@ -118,13 +129,24 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 		}
 	}
 
-	suffix := statusBadge + estimateBadge
+	cutBadge := ""
+	cutBadgeText := ""
+	if cut {
+		cutBadgeText = ui.CutMark
+		if selected {
+			cutBadge = style.Render(cutBadgeText)
+		} else {
+			cutBadge = ui.CutBadgeStyle.Render(cutBadgeText)
+		}
+	}
+
+	suffix := cutBadge + statusBadge + estimateBadge
 
 	if width <= 0 {
 		return style.Render(prefix+foldIndicator+name) + suffix
 	}
 
-	suffixWidth := len(statusBadgeText) + len(estimateBadgeText)
+	suffixWidth := len(statusBadgeText) + len(estimateBadgeText) + ansi.StringWidth(cutBadgeText)
 	foldWidth := 2
 	available := safeWidth(width, prefixWidth+foldWidth+suffixWidth)
 	wrapped := ansi.Wrap(name, available, "")
@@ -140,19 +162,41 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 			result = append(result, style.Render(indent)+styledLine)
 		}
 	}
+	if selected && visualMode {
+		padBandToWidth(result, style, width)
+	}
 	return strings.Join(result, "\n")
 }
 
-func (m model) renderTaskLine(task domain.Task, selected bool, width int, focused bool, visualMode bool) string {
+// padBandToWidth extends each line to the full row width with style-rendered
+// spaces, so the visual selection band reads as a solid block instead of
+// stopping at the end of the content.
+func padBandToWidth(lines []string, style lipgloss.Style, width int) {
+	if width <= 0 {
+		return
+	}
+	for i, l := range lines {
+		gap := width - ansi.StringWidth(l)
+		if gap <= 0 {
+			continue
+		}
+		lines[i] = l + style.Render(strings.Repeat(" ", gap))
+	}
+}
+
+func (m model) renderTaskLine(task domain.Task, selected bool, width int, focused bool, visualMode bool, isCursor bool, cut bool) string {
 	cfg := m.deps.CfgManager.Get()
 	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).
-		WithVisualMode(visualMode)
+		WithVisualMode(visualMode).
+		WithCursor(isCursor).
+		WithCut(cut)
 	return renderer.Render(task, selected)
 }
 
-func (m model) renderTaskDescription(task domain.Task, selected bool, width int, focused bool) string {
+func (m model) renderTaskDescription(task domain.Task, selected bool, width int, focused bool, cut bool) string {
 	cfg := m.deps.CfgManager.Get()
-	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused)
+	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).
+		WithCut(cut)
 	indent := taskDescriptionIndent(task, cfg.StatusDisplay)
 	return renderer.RenderDescription(task.Description, indent, selected)
 }

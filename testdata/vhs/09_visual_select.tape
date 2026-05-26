@@ -23,6 +23,17 @@ Type "j"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/09_visual_range.png"
 
+# Swap anchor and cursor — cursor jumps to the other end of the range
+# (the cursor row is rendered with reverse colors so it stands out from
+# the yellow visual range band).
+Type "o"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_visual_swap.png"
+
+# Swap back to the original cursor end before cutting.
+Type "o"
+Sleep 200ms
+
 # Cut the range, then move down into the "Fix" category and paste
 Type "x"
 Sleep 400ms

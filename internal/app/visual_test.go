@@ -236,6 +236,61 @@ func TestVisualMode_TaskAnchorDoesNotEscapeToCategories(t *testing.T) {
 	assert.Equal(t, 2, m.ui.Selection.Selected())
 }
 
+func TestVisualSwap_ExchangesAnchorAndCursor(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // cursor at t2, anchor at t1
+
+	require.Equal(t, 3, m.ui.Selection.Selected())
+	require.Equal(t, "t1", m.ui.Visual.AnchorTaskID)
+
+	m.visualSwap()
+
+	// Anchor now stable on t2, cursor moved back to t1's index.
+	assert.Equal(t, "t2", m.ui.Visual.AnchorTaskID)
+	assert.Equal(t, 2, m.ui.Selection.Selected())
+
+	// Range still covers the same two tasks.
+	selPositions := m.visualSelectedPositions()
+	require.Len(t, selPositions, 2)
+	assert.Equal(t, 0, selPositions[0].TaskIndex)
+	assert.Equal(t, 1, selPositions[1].TaskIndex)
+
+	// Swapping again restores the original orientation.
+	m.visualSwap()
+	assert.Equal(t, "t1", m.ui.Visual.AnchorTaskID)
+	assert.Equal(t, 3, m.ui.Selection.Selected())
+}
+
+func TestVisualSwap_NoopWhenAnchorEqualsCursor(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2)
+	m.enterVisualMode()
+	// Anchor and cursor are both on t1 — swap should leave state unchanged.
+	m.visualSwap()
+	assert.Equal(t, "t1", m.ui.Visual.AnchorTaskID)
+	assert.Equal(t, 2, m.ui.Selection.Selected())
+}
+
+func TestVisualSwap_ExtendsFromSwappedEnd(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // cursor at t3, anchor at t1, range = t1..t3
+
+	m.visualSwap() // anchor now t3, cursor on t1
+	m.visualMoveCursor(-1)
+	// Cursor should have stayed at t1 since there's no earlier task in Cat A.
+	assert.Equal(t, 2, m.ui.Selection.Selected())
+
+	// Now extend from the anchor end downward by swapping back and growing.
+	m.visualSwap() // anchor t1, cursor t3
+	m.visualMoveCursor(1) // cursor t4 (skips Cat B header)
+	selPositions := m.visualSelectedPositions()
+	assert.Len(t, selPositions, 4)
+}
+
 func TestVisualMode_CategoryAnchorSelectsOnlyCategories(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(1) // Cat A header

@@ -28,13 +28,41 @@ var (
 	// tell at a glance they're in visual mode.
 	VisualSelectedStyle         = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3"))
 	UnfocusedVisualSelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3")).Faint(true)
+
+	// VisualCursorStyle marks the cursor row inside an active visual range.
+	// Reverse swaps fg/bg natively so the cursor reads as a distinct block
+	// against the yellow range band — same visual language as the normal-mode
+	// cursor, which makes it obvious which end `j`/`k` extends and which end
+	// `o` swaps to.
+	VisualCursorStyle          = lipgloss.NewStyle().Bold(true).Reverse(true)
+	UnfocusedVisualCursorStyle = lipgloss.NewStyle().Bold(true).Reverse(true).Faint(true)
+
+	// CutBadgeStyle marks rows whose item is staged for cut/paste.
+	CutBadgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true)
 )
+
+// CutMark is the badge appended to rows whose item is pending a cut/paste.
+const CutMark = " ✂"
+
+// ApplyCut decorates a style so cut rows read as "ghosted/in flight": faint
+// plus italic so the differentiation survives even when the row is also
+// selected (which inverts colors) or completed (which is already faint).
+func ApplyCut(s lipgloss.Style) lipgloss.Style {
+	return s.Faint(true).Italic(true)
+}
 
 func GetVisualSelectedStyle(focused bool) lipgloss.Style {
 	if focused {
 		return VisualSelectedStyle
 	}
 	return UnfocusedVisualSelectedStyle
+}
+
+func GetVisualCursorStyle(focused bool) lipgloss.Style {
+	if focused {
+		return VisualCursorStyle
+	}
+	return UnfocusedVisualCursorStyle
 }
 
 func StatusStyle(status string) lipgloss.Style {

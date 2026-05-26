@@ -40,6 +40,41 @@ func (m *model) exitVisualMode() {
 	m.ui.Modes.ToNormal()
 }
 
+// visualSwap exchanges the anchor and cursor positions, leaving the covered
+// range unchanged. Useful for extending the selection from the other end.
+func (m *model) visualSwap() {
+	if !m.ui.Visual.Active {
+		return
+	}
+	anchorIdx := m.resolveVisualAnchor()
+	if anchorIdx < 0 {
+		return
+	}
+	cursorIdx := m.ui.Selection.Selected()
+	if anchorIdx == cursorIdx {
+		return
+	}
+	positions := m.ui.Selection.Positions()
+	if cursorIdx < 0 || cursorIdx >= len(positions) {
+		return
+	}
+	curPos := positions[cursorIdx]
+	if curPos.CategoryIndex < 0 || curPos.CategoryIndex >= len(m.project.Categories) {
+		return
+	}
+	cat := m.project.Categories[curPos.CategoryIndex]
+	m.ui.Visual.AnchorCategoryID = cat.ID
+	m.ui.Visual.AnchorTaskID = ""
+	if curPos.Kind == selection.FocusTask {
+		if curPos.TaskIndex < 0 || curPos.TaskIndex >= len(cat.Tasks) {
+			return
+		}
+		m.ui.Visual.AnchorTaskID = cat.Tasks[curPos.TaskIndex].ID
+	}
+	m.ui.Selection.MoveTo(anchorIdx)
+	m.ensureVisible()
+}
+
 func (m *model) visualMoveCursor(delta int) {
 	if !m.ui.Visual.Active {
 		return
@@ -603,6 +638,9 @@ func (m model) handleVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "g":
 		m.visualMoveCursor(-len(m.ui.Selection.Positions()))
+		return m, nil
+	case "o", "O":
+		m.visualSwap()
 		return m, nil
 	case "y":
 		return m, m.visualCopyTitles()

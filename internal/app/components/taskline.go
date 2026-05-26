@@ -17,6 +17,8 @@ type TaskLineRenderer struct {
 	priorityColor string
 	focused       bool
 	visualMode    bool
+	isCursor      bool
+	cut           bool
 }
 
 func NewTaskLineRenderer(width int, statusDisplay, priorityColor string, focused bool) *TaskLineRenderer {
@@ -33,11 +35,31 @@ func (r *TaskLineRenderer) WithVisualMode(v bool) *TaskLineRenderer {
 	return r
 }
 
+func (r *TaskLineRenderer) WithCursor(c bool) *TaskLineRenderer {
+	r.isCursor = c
+	return r
+}
+
+func (r *TaskLineRenderer) WithCut(c bool) *TaskLineRenderer {
+	r.cut = c
+	return r
+}
+
+func (r *TaskLineRenderer) maybeCut(s lipgloss.Style) lipgloss.Style {
+	if r.cut {
+		return ui.ApplyCut(s)
+	}
+	return s
+}
+
 func (r *TaskLineRenderer) selectedStyle() lipgloss.Style {
 	if r.visualMode {
-		return ui.GetVisualSelectedStyle(r.focused)
+		if r.isCursor {
+			return r.maybeCut(ui.GetVisualCursorStyle(r.focused))
+		}
+		return r.maybeCut(ui.GetVisualSelectedStyle(r.focused))
 	}
-	return ui.GetSelectedStyle(r.focused)
+	return r.maybeCut(ui.GetSelectedStyle(r.focused))
 }
 
 func (r *TaskLineRenderer) Render(task domain.Task, selected bool) string {
@@ -48,9 +70,30 @@ func (r *TaskLineRenderer) Render(task domain.Task, selected bool) string {
 	priorityIcon := ui.PriorityIcon(task.Priority)
 
 	if selected {
-		return r.renderSelected(task, prefix, priorityIcon)
+		return r.padToWidth(r.renderSelected(task, prefix, priorityIcon))
 	}
 	return r.renderUnselected(task, prefix, priorityIcon)
+}
+
+// padToWidth extends each rendered line to the full row width using the
+// active selection style, so a visual-mode highlight reads as a solid band
+// rather than stopping at the end of the text. Only active when the row
+// participates in the visual range (r.visualMode); normal-mode selection
+// keeps its current "text-width" highlight.
+func (r *TaskLineRenderer) padToWidth(rendered string) string {
+	if r.width <= 0 || !r.visualMode {
+		return rendered
+	}
+	style := r.selectedStyle()
+	lines := strings.Split(rendered, "\n")
+	for i, l := range lines {
+		gap := r.width - ansi.StringWidth(l)
+		if gap <= 0 {
+			continue
+		}
+		lines[i] = l + style.Render(strings.Repeat(" ", gap))
+	}
+	return strings.Join(lines, "\n")
 }
 
 // RenderDescription renders a task description as a standalone, focusable block
@@ -71,6 +114,8 @@ func (r *TaskLineRenderer) RenderDescription(description string, indent int, sel
 	style := ui.MutedStyle
 	if selected {
 		style = r.selectedStyle()
+	} else if r.cut {
+		style = ui.ApplyCut(style)
 	}
 
 	// When selected, every visual line gets padded to the full row width so the
@@ -114,13 +159,15 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 		if task.Status == domain.StatusCompleted || task.Status == domain.StatusCancelled {
 			iconStyle = iconStyle.Faint(true)
 		}
+		iconStyle = r.maybeCut(iconStyle)
 		icon = iconStyle.Render(priorityIcon) + " "
 	}
 	descMarker := r.formatDescriptionBadge(task.Description, false)
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, false)
-	suffix := descMarker + estimate
-	suffixText := r.descriptionBadgeText(task.Description) + r.estimateBadgeText(task.EstimateMinutes)
-	titleStyle := ui.TaskTitleStyle(task.Priority, task.Status, r.priorityColor)
+	cutBadge, cutBadgeText := r.formatCutBadge(false)
+	suffix := cutBadge + descMarker + estimate
+	suffixText := cutBadgeText + r.descriptionBadgeText(task.Description) + r.estimateBadgeText(task.EstimateMinutes)
+	titleStyle := r.maybeCut(ui.TaskTitleStyle(task.Priority, task.Status, r.priorityColor))
 	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, status, icon)
 
 	if r.width <= 0 {
@@ -145,8 +192,9 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 
 	descMarker := r.formatDescriptionBadge(task.Description, true)
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, true)
-	suffix := descMarker + estimate
-	suffixText := r.descriptionBadgeText(task.Description) + r.estimateBadgeText(task.EstimateMinutes)
+	cutBadge, cutBadgeText := r.formatCutBadge(true)
+	suffix := cutBadge + descMarker + estimate
+	suffixText := cutBadgeText + r.descriptionBadgeText(task.Description) + r.estimateBadgeText(task.EstimateMinutes)
 
 	prefixPart := selectedStyle.Render(prefix+"[") +
 		statusStyle.Render(statusText) +
@@ -280,6 +328,17 @@ func (r *TaskLineRenderer) descriptionBadgeText(description string) string {
 		return ""
 	}
 	return " ¶"
+}
+
+func (r *TaskLineRenderer) formatCutBadge(selected bool) (string, string) {
+	if !r.cut {
+		return "", ""
+	}
+	text := ui.CutMark
+	if selected {
+		return r.selectedStyle().Render(text), text
+	}
+	return ui.CutBadgeStyle.Render(text), text
 }
 
 func formatEstimateShort(minutes int) string {

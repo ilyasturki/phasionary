@@ -392,39 +392,43 @@ func (m model) renderView() string {
 }
 
 func (m model) renderLayoutItem(item LayoutItem) string {
-	isSelected := item.PositionIndex >= 0 && item.PositionIndex == m.selected()
+	isCursor := item.PositionIndex >= 0 && item.PositionIndex == m.selected()
 	inVisualRange := item.PositionIndex >= 0 && m.isInVisualRange(item.PositionIndex)
-	if inVisualRange {
-		isSelected = true
-	}
+	// A row participates in the selection-style band if it is the cursor OR
+	// inside the visual range. The cursor is rendered distinctly within the
+	// range so the user can see which end will extend on j/k.
+	isSelected := isCursor || inVisualRange
 	visualMode := m.ui.Modes.IsVisual()
 	focused := m.ui.Screen.WindowFocused
 
 	switch item.Kind {
 	case LayoutProject:
-		if m.ui.Modes.IsEdit() && isSelected {
+		if m.ui.Modes.IsEdit() && isCursor {
 			return m.renderEditProjectLine()
 		}
 		return renderProjectLine(m.project.Name, isSelected, focused, m.ui.Filter.HasActiveFilter(), visualMode, m.statusText(), m.ui.Screen.Width)
 
 	case LayoutCategory:
 		category := m.project.Categories[item.CategoryIndex]
-		if m.ui.Modes.IsEdit() && isSelected {
+		if m.ui.Modes.IsEdit() && isCursor {
 			return m.renderEditCategoryLine()
 		}
 		folded := m.ui.Fold.IsFolded(category.ID)
-		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Screen.Width, focused, inVisualRange)
+		cut := m.isCategoryCut(category.ID)
+		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Screen.Width, focused, inVisualRange, isCursor, cut)
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
-		if m.ui.Modes.IsEdit() && isSelected {
+		if m.ui.Modes.IsEdit() && isCursor {
 			return m.renderEditTaskLine(task)
 		}
-		return m.renderTaskLine(task, isSelected, m.ui.Screen.Width, focused, inVisualRange)
+		cut := m.isTaskCut(task.ID)
+		return m.renderTaskLine(task, isSelected, m.ui.Screen.Width, focused, inVisualRange, isCursor, cut)
 
 	case LayoutDescription:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
-		return m.renderTaskDescription(task, isSelected, m.ui.Screen.Width, focused)
+		cut := m.isTaskCut(task.ID)
+		return m.renderTaskDescription(task, isCursor, m.ui.Screen.Width, focused, cut)
 
 	case LayoutEmptyCategory:
 		return ui.MutedStyle.Render("    (no tasks)")

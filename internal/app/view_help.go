@@ -70,6 +70,7 @@ func computeHelpRows() ([]helpRow, []int) {
 		helpRow{text: ui.DialogTitleStyle.Render("Visual mode:")},
 		helpRow{text: "  v             enter visual mode (anchor at cursor)"},
 		helpRow{text: "  j/k           extend range (skips category rows)"},
+		helpRow{text: "  o             swap anchor and cursor"},
 		helpRow{text: "  y             copy titles (newline-joined)"},
 		helpRow{text: "  Y             copy as markdown checklist"},
 		helpRow{text: "  x             cut range (then p to paste)"},
