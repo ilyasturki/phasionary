@@ -82,11 +82,19 @@ func (m model) projectPickerView() string {
 		lines = append(lines, ui.DialogHintStyle.Render(scrollMoreBelow))
 	}
 
-	hintText := "J/K reorder · ⏎ select · d delete · esc cancel"
-	if m.ui.Picker.isAdding {
-		hintText = "⏎ create · esc cancel"
+	hints := []ui.Hint{
+		{Key: "J/K", Label: "reorder"},
+		{Key: "⏎", Label: "select"},
+		{Key: "d", Label: "delete"},
+		{Key: "esc", Label: "cancel"},
 	}
-	lines = append(lines, "", ui.DialogHintStyle.Render(hintText))
+	if m.ui.Picker.isAdding {
+		hints = []ui.Hint{
+			{Key: "⏎", Label: "create"},
+			{Key: "esc", Label: "cancel"},
+		}
+	}
+	lines = append(lines, "", ui.RenderHints(hints))
 
 	// lipgloss.Width includes horizontal padding but not the border.
 	return ui.HelpDialogStyle.Width(contentWidth + ui.HelpDialogStyle.GetHorizontalPadding()).Render(strings.Join(lines, "\n"))

@@ -17,7 +17,7 @@ CFG="/tmp/phas-vt/cfg"
 OUT="/tmp/phas-vt/vhs-out"
 
 # Tapes that mutate state need a fresh seed before they run.
-MUTATING_TAPES=(03_add_task 04_toggle_and_filter 05_options 06_reorder_across_categories 07_open_url 09_visual_select 10_reload 12_undo_redo 13_status_cycle)
+MUTATING_TAPES=(03_add_task 04_toggle_and_filter 05_options 06_reorder_across_categories 07_open_url 09_visual_select 10_reload 12_undo_redo 13_status_cycle 14_shortcut_bar)
 
 rm -rf "$OUT" && mkdir -p "$OUT"
 go build -o phasionary ./cmd/phasionary

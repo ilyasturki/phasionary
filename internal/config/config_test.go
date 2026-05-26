@@ -67,7 +67,7 @@ func TestManager(t *testing.T) {
 		// Should contain default config with status_display
 		data, err := os.ReadFile(configPath)
 		require.NoError(t, err)
-		assert.JSONEq(t, `{"status_display":"icons","priority_color":"full"}`, string(data))
+		assert.JSONEq(t, `{"status_display":"icons","priority_color":"full","show_shortcut_bar":true}`, string(data))
 	})
 
 	t.Run("loads existing config", func(t *testing.T) {
@@ -129,5 +129,5 @@ func TestManager(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	assert.Equal(t, Config{StatusDisplay: StatusDisplayIcons, PriorityColor: PriorityColorFull}, cfg)
+	assert.Equal(t, Config{StatusDisplay: StatusDisplayIcons, PriorityColor: PriorityColorFull, ShowShortcutBar: true}, cfg)
 }

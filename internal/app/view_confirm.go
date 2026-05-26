@@ -31,7 +31,7 @@ func (m model) confirmDeleteView() string {
 	lines := []string{
 		message,
 		"",
-		ui.DialogHintStyle.Render("y/enter confirm | n/esc cancel"),
+		ui.RenderHints([]ui.Hint{{Key: "y/enter", Label: "confirm"}, {Key: "n/esc", Label: "cancel"}}),
 	}
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
@@ -57,7 +57,7 @@ func (m model) confirmDeleteVisualRangeView() string {
 	lines := []string{
 		message,
 		"",
-		ui.DialogHintStyle.Render("y/enter confirm | n/esc cancel"),
+		ui.RenderHints([]ui.Hint{{Key: "y/enter", Label: "confirm"}, {Key: "n/esc", Label: "cancel"}}),
 	}
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
@@ -73,7 +73,7 @@ func (m model) confirmDeleteProjectView() string {
 	lines := []string{
 		fmt.Sprintf("Delete project %q?", truncateText(projectName, 30)),
 		"",
-		ui.DialogHintStyle.Render("y/enter confirm | n/esc cancel"),
+		ui.RenderHints([]ui.Hint{{Key: "y/enter", Label: "confirm"}, {Key: "n/esc", Label: "cancel"}}),
 	}
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }

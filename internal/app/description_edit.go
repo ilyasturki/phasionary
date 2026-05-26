@@ -163,13 +163,16 @@ func (m model) descriptionEditView() string {
 		title = "Add Description"
 	}
 	body := state.textarea.View()
-	hint := "ctrl+s save  ·  esc cancel  ·  enter newline"
 	lines := []string{
 		ui.DialogTitleStyle.Render(title),
 		"",
 		body,
 		"",
-		ui.DialogHintStyle.Render(hint),
+		ui.RenderHints([]ui.Hint{
+			{Key: "ctrl+s", Label: "save"},
+			{Key: "esc", Label: "cancel"},
+			{Key: "enter", Label: "newline"},
+		}),
 	}
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }

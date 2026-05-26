@@ -7,6 +7,12 @@ import (
 	"phasionary/internal/ui"
 )
 
+var filterSubHints = []ui.Hint{
+	{Key: "space", Label: "toggle"},
+	{Key: "esc", Label: "back"},
+	{Key: "f", Label: "close"},
+}
+
 func (m model) filterView() string {
 	switch m.ui.Filter.View() {
 	case FilterViewStatus:
@@ -61,7 +67,7 @@ func (m model) filterHubView() string {
 	}
 	lines = append(lines, clearLine)
 
-	lines = append(lines, "", ui.DialogHintStyle.Render("enter open · q/esc/f close"))
+	lines = append(lines, "", ui.RenderHints([]ui.Hint{{Key: "enter", Label: "open"}, {Key: "q/esc/f", Label: "close"}}))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 
@@ -74,7 +80,7 @@ func (m model) filterStatusView() string {
 			i == m.ui.Filter.Selected(),
 		))
 	}
-	lines = append(lines, "", ui.DialogHintStyle.Render("space toggle · esc back · f close"))
+	lines = append(lines, "", ui.RenderHints(filterSubHints))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 
@@ -87,7 +93,7 @@ func (m model) filterPriorityView() string {
 			i == m.ui.Filter.Selected(),
 		))
 	}
-	lines = append(lines, "", ui.DialogHintStyle.Render("space toggle · esc back · f close"))
+	lines = append(lines, "", ui.RenderHints(filterSubHints))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 
@@ -104,7 +110,7 @@ func (m model) filterCategoryView() string {
 			))
 		}
 	}
-	lines = append(lines, "", ui.DialogHintStyle.Render("space toggle · esc back · f close"))
+	lines = append(lines, "", ui.RenderHints(filterSubHints))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 

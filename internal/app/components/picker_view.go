@@ -6,7 +6,7 @@ import (
 	"phasionary/internal/ui"
 )
 
-func RenderListPicker(title string, items []string, selected int, hint string) string {
+func RenderListPicker(title string, items []string, selected int, hints []ui.Hint) string {
 	lines := []string{ui.DialogTitleStyle.Render(title), ""}
 	for i, item := range items {
 		prefix := "  "
@@ -19,6 +19,6 @@ func RenderListPicker(title string, items []string, selected int, hint string) s
 		}
 		lines = append(lines, line)
 	}
-	lines = append(lines, "", ui.DialogHintStyle.Render(hint))
+	lines = append(lines, "", ui.RenderHints(hints))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }

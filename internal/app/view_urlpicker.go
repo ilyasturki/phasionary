@@ -2,6 +2,7 @@ package app
 
 import (
 	"phasionary/internal/app/components"
+	"phasionary/internal/ui"
 )
 
 func (m model) urlPickerView() string {
@@ -9,6 +10,6 @@ func (m model) urlPickerView() string {
 		"Open URL",
 		m.ui.URLPicker.URLs,
 		m.ui.URLPicker.Selected,
-		"enter open | esc cancel",
+		[]ui.Hint{{Key: "enter", Label: "open"}, {Key: "esc", Label: "cancel"}},
 	)
 }

@@ -150,10 +150,14 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) model {
 }
 
 func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
-	const optionCount = 2
+	const optionCount = 3
 	switch msg.String() {
 	case "q", "esc", "enter":
 		m.ui.Modes.ToNormal()
+		// Re-clamp scroll now that the shortcut bar (which is hidden while
+		// Options was open) may have toggled visible/hidden — its row count
+		// changes available content height.
+		m.ensureVisible()
 	case "j", "down":
 		if m.ui.Options.selectedOption < optionCount-1 {
 			m.ui.Options.selectedOption++
@@ -273,6 +277,14 @@ func (m *model) toggleSelectedOption() {
 		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
 			cfg.PriorityColor = newValue
 		})
+	case 2: // ShowShortcutBar
+		newValue := !m.deps.CfgManager.Get().ShowShortcutBar
+		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
+			cfg.ShowShortcutBar = newValue
+		})
+		// The bar is hidden while Options is open, so the layout under us
+		// hasn't actually changed yet. handleOptionsKey's exit branch calls
+		// ensureVisible against the post-toggle layout once Options closes.
 	}
 }
 
@@ -367,6 +379,23 @@ func (m model) renderView() string {
 	}
 
 	content := strings.Join(lines, "\n")
+	if bar := m.renderShortcutBar(); bar != "" {
+		// Push the bar to the bottom row even when content is shorter than the
+		// screen. The viewport already reserved this row via FooterHeight, so
+		// the gap calculation below accounts for the bar itself.
+		rendered := strings.Count(content, "\n") + 1
+		if content == "" {
+			rendered = 0
+		}
+		gap := m.ui.Screen.Height - rendered - 1
+		if gap > 0 {
+			content += strings.Repeat("\n", gap)
+		}
+		if content != "" {
+			content += "\n"
+		}
+		content += bar
+	}
 	modal := components.NewModal(m.ui.Screen.Width, m.ui.Screen.Height)
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:

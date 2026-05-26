@@ -2,6 +2,7 @@ package app
 
 import (
 	"phasionary/internal/app/components"
+	"phasionary/internal/ui"
 )
 
 var estimatePresetLabels = []string{
@@ -22,6 +23,6 @@ func (m model) estimatePickerView() string {
 		"Time Estimate",
 		estimatePresetLabels,
 		m.ui.EstimatePicker.Selected,
-		"enter select | esc cancel",
+		[]ui.Hint{{Key: "enter", Label: "select"}, {Key: "esc", Label: "cancel"}},
 	)
 }

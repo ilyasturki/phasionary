@@ -24,9 +24,15 @@ func (m model) optionsView() string {
 		priorityValue = "None"
 	}
 
+	shortcutBarValue := "Off"
+	if cfg.ShowShortcutBar {
+		shortcutBarValue = "On"
+	}
+
 	rows := []string{
 		fmt.Sprintf("Status Display:  [%s]", statusValue),
 		fmt.Sprintf("Priority Color:  [%s]", priorityValue),
+		fmt.Sprintf("Shortcut Bar:    [%s]", shortcutBarValue),
 	}
 
 	lines := []string{
@@ -42,7 +48,7 @@ func (m model) optionsView() string {
 	}
 	lines = append(lines,
 		"",
-		ui.DialogHintStyle.Render("space/tab cycle | q/esc/enter close"),
+		ui.RenderHints([]ui.Hint{{Key: "space/tab", Label: "cycle"}, {Key: "q/esc/enter", Label: "close"}}),
 	)
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }

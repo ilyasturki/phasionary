@@ -39,6 +39,13 @@ var (
 
 	// CutBadgeStyle marks rows whose item is staged for cut/paste.
 	CutBadgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true)
+
+	// Shortcut bar (lazygit-style footer): keys read brighter, labels read
+	// quieter so the eye can hop between them. Faint avoids any explicit
+	// color, which keeps the bar usable on both light and dark terminals.
+	ShortcutKeyStyle   = lipgloss.NewStyle().Bold(true)
+	ShortcutLabelStyle = lipgloss.NewStyle().Faint(true)
+	ShortcutSepStyle   = lipgloss.NewStyle().Faint(true)
 )
 
 // CutMark is the badge appended to rows whose item is pending a cut/paste.

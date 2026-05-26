@@ -58,11 +58,13 @@ const (
 )
 
 func (m model) footerHeight() int {
-	return footerHeight
+	return footerHeight + m.shortcutBarHeight()
 }
 
 func (m model) layoutConfig() LayoutConfig {
-	return DefaultLayoutConfig()
+	cfg := DefaultLayoutConfig()
+	cfg.FooterHeight += m.shortcutBarHeight()
+	return cfg
 }
 
 func sanitizeInput(input *textinput.Model) {

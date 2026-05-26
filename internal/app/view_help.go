@@ -14,7 +14,11 @@ type helpRow struct {
 	bindingIndex int
 }
 
-const helpHint = "ctrl+d/u page  ·  enter run  ·  ?/esc close"
+var helpHint = []ui.Hint{
+	{Key: "ctrl+d/u", Label: "page"},
+	{Key: "enter", Label: "run"},
+	{Key: "?/esc", Label: "close"},
+}
 
 func helpDisabled(b keyBinding) bool {
 	for _, k := range b.keys {
@@ -176,6 +180,6 @@ func (m model) helpView() string {
 		lines = append(lines, ui.MutedStyle.Render(scrollMoreBelow))
 	}
 
-	lines = append(lines, "", ui.DialogHintStyle.Render(helpHint))
+	lines = append(lines, "", ui.RenderHints(helpHint))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
