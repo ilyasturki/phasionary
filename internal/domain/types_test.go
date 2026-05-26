@@ -97,6 +97,36 @@ func TestTask_CycleStatus(t *testing.T) {
 	})
 }
 
+func TestTask_CycleStatusReverse(t *testing.T) {
+	t.Run("cycles from todo to cancelled", func(t *testing.T) {
+		task := Task{Status: StatusTodo}
+		changed := task.CycleStatusReverse()
+		assert.True(t, changed)
+		assert.Equal(t, StatusCancelled, task.Status)
+	})
+
+	t.Run("cycles from cancelled to completed", func(t *testing.T) {
+		task := Task{Status: StatusCancelled}
+		changed := task.CycleStatusReverse()
+		assert.True(t, changed)
+		assert.Equal(t, StatusCompleted, task.Status)
+	})
+
+	t.Run("cycles from completed to in_progress", func(t *testing.T) {
+		task := Task{Status: StatusCompleted}
+		changed := task.CycleStatusReverse()
+		assert.True(t, changed)
+		assert.Equal(t, StatusInProgress, task.Status)
+	})
+
+	t.Run("cycles from in_progress to todo", func(t *testing.T) {
+		task := Task{Status: StatusInProgress}
+		changed := task.CycleStatusReverse()
+		assert.True(t, changed)
+		assert.Equal(t, StatusTodo, task.Status)
+	})
+}
+
 func TestCategory_AddTask(t *testing.T) {
 	t.Run("adds task to category", func(t *testing.T) {
 		cat := Category{Tasks: []Task{}}

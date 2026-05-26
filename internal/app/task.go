@@ -97,6 +97,14 @@ func (m *model) rebuildAndClamp() {
 }
 
 func (m *model) toggleSelectedTask() {
+	m.cycleSelectedTask(false)
+}
+
+func (m *model) toggleSelectedTaskReverse() {
+	m.cycleSelectedTask(true)
+}
+
+func (m *model) cycleSelectedTask(reverse bool) {
 	if !m.ui.Modes.CanPerformAction(modes.ActionToggleTask) {
 		return
 	}
@@ -106,7 +114,13 @@ func (m *model) toggleSelectedTask() {
 	}
 	task := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
 	m.recordHistory()
-	if task.CycleStatus() {
+	var changed bool
+	if reverse {
+		changed = task.CycleStatusReverse()
+	} else {
+		changed = task.CycleStatus()
+	}
+	if changed {
 		m.storeTaskUpdate()
 		return
 	}

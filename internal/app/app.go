@@ -178,7 +178,7 @@ func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
 		if m.ui.Options.selectedOption > 0 {
 			m.ui.Options.selectedOption--
 		}
-	case " ", "tab", "h", "l":
+	case "space", "tab", "h", "l":
 		m.toggleSelectedOption()
 	}
 	return m
@@ -202,7 +202,7 @@ func (m model) handleFilterKey(msg tea.KeyPressMsg) model {
 		m.ui.Filter.MoveDown(catCount)
 	case "k", "up":
 		m.ui.Filter.MoveUp()
-	case "enter", " ":
+	case "enter", "space":
 		if m.ui.Filter.View() == FilterViewHub {
 			m.openFilterHubSelection()
 		} else {

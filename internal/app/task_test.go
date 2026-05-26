@@ -27,6 +27,29 @@ func TestToggleSelectedTask_NoopOnCategory(t *testing.T) {
 	assert.Equal(t, domain.StatusTodo, m.project.Categories[0].Tasks[0].Status)
 }
 
+func TestToggleSelectedTaskReverse_CyclesStatusBackward(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1 (Todo)
+	m.toggleSelectedTaskReverse()
+	assert.Equal(t, domain.StatusCancelled, m.project.Categories[0].Tasks[0].Status)
+	m.toggleSelectedTaskReverse()
+	assert.Equal(t, domain.StatusCompleted, m.project.Categories[0].Tasks[0].Status)
+	m.toggleSelectedTaskReverse()
+	assert.Equal(t, domain.StatusInProgress, m.project.Categories[0].Tasks[0].Status)
+	m.toggleSelectedTaskReverse()
+	assert.Equal(t, domain.StatusTodo, m.project.Categories[0].Tasks[0].Status)
+}
+
+func TestToggleSelectedTaskReverse_RecordsHistory(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2)
+	require.Equal(t, 0, m.ui.History.UndoDepth())
+	m.toggleSelectedTaskReverse()
+	assert.Equal(t, 1, m.ui.History.UndoDepth())
+	m.undo()
+	assert.Equal(t, domain.StatusTodo, m.project.Categories[0].Tasks[0].Status)
+}
+
 func TestIncreasePriority_FromMediumToHigh(t *testing.T) {
 	p := sampleProject()
 	p.Categories[0].Tasks[0].Priority = domain.PriorityMedium

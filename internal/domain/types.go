@@ -226,6 +226,27 @@ func (t *Task) CycleStatus() bool {
 	return true
 }
 
+func (t *Task) CycleStatusReverse() bool {
+	var nextStatus string
+	switch t.Status {
+	case StatusTodo:
+		nextStatus = StatusCancelled
+	case StatusCancelled:
+		nextStatus = StatusCompleted
+	case StatusCompleted:
+		nextStatus = StatusInProgress
+	case StatusInProgress:
+		nextStatus = StatusTodo
+	default:
+		nextStatus = StatusTodo
+	}
+	if nextStatus == t.Status {
+		return false
+	}
+	_ = t.SetStatus(nextStatus)
+	return true
+}
+
 type StatusCounts struct {
 	Todo       int
 	InProgress int
