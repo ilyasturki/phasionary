@@ -58,7 +58,7 @@ Config lives at `~/.config/phasionary/config.json`. Override with `phasionary co
 | `default_project` | project UUID | (none) | Project to open on launch |
 | `priority_color` | `full`, `icon`, `none` | `full` | How priority is colored — full row, icon only, or off |
 
-Paths can be relocated with `PHASIONARY_CONFIG_PATH` and `PHASIONARY_DATA_PATH`.
+Paths can be relocated with `PHASIONARY_CONFIG_PATH` and `PHASIONARY_DATA_PATH` — both name a directory; `PHASIONARY_CONFIG_PATH` also accepts a path ending in `config.json` for convenience.
 
 ## Data
 

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -48,14 +49,23 @@ func ResolveDataDir(input string) (string, error) {
 	return filepath.Join(home, ".local", "share", "phasionary", "projects"), nil
 }
 
+// configDirFromPath accepts either a directory path or a path pointing at a
+// `*.json` file (in which case the parent directory is used).
+func configDirFromPath(p string) string {
+	if strings.HasSuffix(p, ".json") {
+		return filepath.Dir(p)
+	}
+	return p
+}
+
 // ResolveConfigDir returns the config directory path.
 // Priority: input > PHASIONARY_CONFIG_PATH > XDG_CONFIG_HOME > ~/.config/phasionary
 func ResolveConfigDir(input string) (string, error) {
 	if input != "" {
-		return input, nil
+		return configDirFromPath(input), nil
 	}
 	if env := os.Getenv(EnvConfigPath); env != "" {
-		return env, nil
+		return configDirFromPath(env), nil
 	}
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return filepath.Join(xdg, "phasionary"), nil

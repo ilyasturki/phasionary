@@ -128,6 +128,9 @@ func newTaskAddCmd() *cobra.Command {
 			if strings.TrimSpace(categoryName) == "" {
 				return errors.New("--category is required")
 			}
+			if strings.TrimSpace(args[0]) == "" {
+				return errors.New("title is required")
+			}
 
 			task, err := domain.NewTask(args[0])
 			if err != nil {

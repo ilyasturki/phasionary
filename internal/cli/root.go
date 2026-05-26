@@ -45,6 +45,7 @@ func newRootCmd() *cobra.Command {
 	cmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", version.Version, version.Commit, version.BuildDate)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
+	cmd.SilenceUsage = true
 
 	cmd.Flags().BoolP("version", "v", false, "Print version information")
 
