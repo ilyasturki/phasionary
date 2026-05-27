@@ -6,13 +6,16 @@ A terminal-first project planner for people who'd rather press `j` than reach fo
 
 ## Install
 
-From source:
+### Arch Linux (AUR)
 
 ```bash
-go build -o phasionary ./cmd/phasionary
+yay -S phasionary       # build from source
+yay -S phasionary-bin   # prebuilt binary
 ```
 
-From the Nix flake — run without installing:
+### Nix
+
+Run without installing:
 
 ```bash
 nix run github:ilyasturki/phasionary
@@ -23,6 +26,16 @@ Or pin it in your system flake:
 ```nix
 inputs.phasionary.url = "github:ilyasturki/phasionary";
 # environment.systemPackages = [ inputs.phasionary.packages.x86_64-linux.default ];
+```
+
+### Prebuilt binary
+
+Grab the latest `phasionary-linux-x64` or `phasionary-linux-arm64` from the [releases page](https://github.com/ilyasturki/phasionary/releases), `chmod +x`, drop in `$PATH`.
+
+### From source
+
+```bash
+go build -o phasionary ./cmd/phasionary
 ```
 
 ## Quick start
