@@ -1,0 +1,205 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - 'v*'
+
+permissions:
+    contents: write
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+
+            - name: Setup Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version: stable
+                  cache: true
+
+            - name: Build linux binaries
+              run: |
+                  version="${GITHUB_REF_NAME#v}"
+                  commit="${GITHUB_SHA::7}"
+                  build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  ldflags="-s -w \
+                      -X phasionary/internal/version.Version=v${version} \
+                      -X phasionary/internal/version.Commit=${commit} \
+                      -X phasionary/internal/version.BuildDate=${build_date}"
+
+                  GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o phasionary-linux-x64 ./cmd/phasionary
+                  GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o phasionary-linux-arm64 ./cmd/phasionary
+
+            - name: Smoke test (linux-x64)
+              run: |
+                  ./phasionary-linux-x64 --version
+                  ./phasionary-linux-x64 --help
+                  ./phasionary-linux-x64 completion bash | grep -q 'phasionary'
+                  ./phasionary-linux-x64 completion zsh | grep -q 'phasionary'
+                  ./phasionary-linux-x64 completion fish | grep -q 'phasionary'
+
+            - name: Upload binaries
+              uses: actions/upload-artifact@v7
+              with:
+                  name: binaries
+                  path: |
+                      phasionary-linux-x64
+                      phasionary-linux-arm64
+
+    github-release:
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+
+            - name: Download binaries
+              uses: actions/download-artifact@v8
+              with:
+                  name: binaries
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v3
+              with:
+                  generate_release_notes: true
+                  files: |
+                      phasionary-linux-x64
+                      phasionary-linux-arm64
+
+    aur:
+        needs: github-release
+        runs-on: ubuntu-latest
+        steps:
+            - name: Generate PKGBUILD
+              run: |
+                  version="${GITHUB_REF_NAME#v}"
+                  src_sha=$(curl -sL "https://github.com/ilyasturki/phasionary/archive/v${version}.tar.gz" | sha256sum | cut -d ' ' -f 1)
+
+                  cat > PKGBUILD << 'HEREDOC'
+                  # Maintainer: Ilyas Turki <ilyasturki at gmail dot com>
+                  pkgname=phasionary
+                  pkgver=${VERSION}
+                  pkgrel=1
+                  pkgdesc="Terminal-first, single-user project planning tool"
+                  arch=('x86_64' 'aarch64')
+                  url="https://github.com/ilyasturki/phasionary"
+                  license=('MIT')
+                  makedepends=('go')
+                  provides=('phasionary')
+                  conflicts=('phasionary-bin')
+                  source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/v${pkgver}.tar.gz")
+                  sha256sums=('${SRC_SHA}')
+
+                  prepare() {
+                      cd "${pkgname}-${pkgver}"
+                      mkdir -p build
+                      export GOPATH="${srcdir}/gopath"
+                      go mod download
+                  }
+
+                  build() {
+                      cd "${pkgname}-${pkgver}"
+                      export GOPATH="${srcdir}/gopath"
+                      export CGO_CPPFLAGS="${CPPFLAGS}"
+                      export CGO_CFLAGS="${CFLAGS}"
+                      export CGO_CXXFLAGS="${CXXFLAGS}"
+                      export CGO_LDFLAGS="${LDFLAGS}"
+                      go build \
+                          -trimpath \
+                          -buildmode=pie \
+                          -mod=readonly \
+                          -modcacherw \
+                          -ldflags "-s -w -linkmode=external -X phasionary/internal/version.Version=v${pkgver}" \
+                          -o build/phasionary \
+                          ./cmd/phasionary
+                  }
+
+                  package() {
+                      cd "${pkgname}-${pkgver}"
+                      install -Dm755 build/phasionary "${pkgdir}/usr/bin/phasionary"
+                      install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+
+                      "${pkgdir}/usr/bin/phasionary" completion bash | install -Dm644 /dev/stdin "${pkgdir}/usr/share/bash-completion/completions/phasionary"
+                      "${pkgdir}/usr/bin/phasionary" completion zsh | install -Dm644 /dev/stdin "${pkgdir}/usr/share/zsh/site-functions/_phasionary"
+                      "${pkgdir}/usr/bin/phasionary" completion fish | install -Dm644 /dev/stdin "${pkgdir}/usr/share/fish/vendor_completions.d/phasionary.fish"
+                  }
+                  HEREDOC
+
+                  sed -i "s/\${VERSION}/${version}/g" PKGBUILD
+                  sed -i "s/\${SRC_SHA}/${src_sha}/g" PKGBUILD
+
+            - name: Publish to AUR
+              uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+              with:
+                  pkgname: phasionary
+                  pkgbuild: ./PKGBUILD
+                  commit_username: Ilyas Turki
+                  commit_email: ilyasturki@gmail.com
+                  ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+                  commit_message: ${{ github.ref_name }}
+                  force_push: true
+
+    aur-bin:
+        needs: github-release
+        runs-on: ubuntu-latest
+        steps:
+            - name: Download binaries
+              uses: actions/download-artifact@v8
+              with:
+                  name: binaries
+
+            - name: Generate PKGBUILD
+              run: |
+                  version="${GITHUB_REF_NAME#v}"
+                  x64_sha=$(sha256sum phasionary-linux-x64 | cut -d ' ' -f 1)
+                  arm64_sha=$(sha256sum phasionary-linux-arm64 | cut -d ' ' -f 1)
+
+                  cat > PKGBUILD << 'HEREDOC'
+                  # Maintainer: Ilyas Turki <ilyasturki at gmail dot com>
+                  pkgname=phasionary-bin
+                  pkgver=${VERSION}
+                  pkgrel=1
+                  pkgdesc="Terminal-first, single-user project planning tool"
+                  arch=('x86_64' 'aarch64')
+                  url="https://github.com/ilyasturki/phasionary"
+                  license=('MIT')
+                  depends=('glibc')
+                  provides=('phasionary')
+                  conflicts=('phasionary')
+                  options=('!strip')
+
+                  source=("LICENSE-${pkgver}::${url}/raw/v${pkgver}/LICENSE")
+                  source_x86_64=("${pkgname}-${pkgver}-x86_64::${url}/releases/download/v${pkgver}/phasionary-linux-x64")
+                  source_aarch64=("${pkgname}-${pkgver}-aarch64::${url}/releases/download/v${pkgver}/phasionary-linux-arm64")
+                  sha256sums=('SKIP')
+                  sha256sums_x86_64=('${X64_SHA}')
+                  sha256sums_aarch64=('${ARM64_SHA}')
+
+                  package() {
+                      install -Dm755 "${pkgname}-${pkgver}-${CARCH}" "${pkgdir}/usr/bin/phasionary"
+                      install -Dm644 "LICENSE-${pkgver}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+
+                      "${pkgdir}/usr/bin/phasionary" completion bash | install -Dm644 /dev/stdin "${pkgdir}/usr/share/bash-completion/completions/phasionary"
+                      "${pkgdir}/usr/bin/phasionary" completion zsh | install -Dm644 /dev/stdin "${pkgdir}/usr/share/zsh/site-functions/_phasionary"
+                      "${pkgdir}/usr/bin/phasionary" completion fish | install -Dm644 /dev/stdin "${pkgdir}/usr/share/fish/vendor_completions.d/phasionary.fish"
+                  }
+                  HEREDOC
+
+                  sed -i "s/\${VERSION}/${version}/g" PKGBUILD
+                  sed -i "s/\${X64_SHA}/${x64_sha}/g" PKGBUILD
+                  sed -i "s/\${ARM64_SHA}/${arm64_sha}/g" PKGBUILD
+
+            - name: Publish to AUR
+              uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+              with:
+                  pkgname: phasionary-bin
+                  pkgbuild: ./PKGBUILD
+                  commit_username: Ilyas Turki
+                  commit_email: ilyasturki@gmail.com
+                  ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+                  commit_message: ${{ github.ref_name }}
+                  force_push: true
