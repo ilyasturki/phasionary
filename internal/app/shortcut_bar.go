@@ -22,6 +22,7 @@ var normalShortcuts = []ui.Hint{
 }
 
 var visualShortcuts = []ui.Hint{
+	{Key: "J/K", Label: "move"},
 	{Key: "y", Label: "copy"},
 	{Key: "Y", Label: "markdown"},
 	{Key: "x", Label: "cut"},

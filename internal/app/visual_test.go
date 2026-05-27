@@ -291,6 +291,156 @@ func TestVisualSwap_ExtendsFromSwappedEnd(t *testing.T) {
 	assert.Len(t, selPositions, 4)
 }
 
+func TestVisualMoveDown_ShiftsTaskBlockWithinCategory(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t2 → block [t1, t2], cursor on t2
+
+	m.visualMoveDown()
+
+	// Cat A order is now t3, t1, t2
+	require.Len(t, m.project.Categories[0].Tasks, 3)
+	assert.Equal(t, []string{"t3", "t1", "t2"},
+		[]string{
+			m.project.Categories[0].Tasks[0].ID,
+			m.project.Categories[0].Tasks[1].ID,
+			m.project.Categories[0].Tasks[2].ID,
+		})
+
+	// Cursor follows t2 to its new position.
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusTask, pos.Kind)
+	assert.Equal(t, 0, pos.CategoryIndex)
+	assert.Equal(t, 2, pos.TaskIndex)
+
+	// Anchor (t1) is still part of the range.
+	assert.Equal(t, "t1", m.ui.Visual.AnchorTaskID)
+	selPositions := m.visualSelectedPositions()
+	require.Len(t, selPositions, 2)
+	assert.Equal(t, 1, selPositions[0].TaskIndex)
+	assert.Equal(t, 2, selPositions[1].TaskIndex)
+}
+
+func TestVisualMoveUp_ShiftsTaskBlockWithinCategory(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(3) // t2
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t3 → block [t2, t3]
+
+	m.visualMoveUp()
+
+	require.Len(t, m.project.Categories[0].Tasks, 3)
+	assert.Equal(t, []string{"t2", "t3", "t1"},
+		[]string{
+			m.project.Categories[0].Tasks[0].ID,
+			m.project.Categories[0].Tasks[1].ID,
+			m.project.Categories[0].Tasks[2].ID,
+		})
+}
+
+func TestVisualMoveDown_NoOpAtBottomOfCategory(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(3) // t2
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t3 → block reaches end of Cat A
+
+	m.visualMoveDown()
+
+	// Order unchanged.
+	assert.Equal(t, []string{"t1", "t2", "t3"},
+		[]string{
+			m.project.Categories[0].Tasks[0].ID,
+			m.project.Categories[0].Tasks[1].ID,
+			m.project.Categories[0].Tasks[2].ID,
+		})
+}
+
+func TestVisualMoveDown_NoOpAcrossCategories(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(4) // t3 (last in Cat A)
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t4 (first in Cat B)
+
+	m.visualMoveDown()
+
+	// No mutation — block spans categories.
+	assert.Equal(t, []string{"t1", "t2", "t3"},
+		[]string{
+			m.project.Categories[0].Tasks[0].ID,
+			m.project.Categories[0].Tasks[1].ID,
+			m.project.Categories[0].Tasks[2].ID,
+		})
+	assert.Equal(t, []string{"t4", "t5"},
+		[]string{
+			m.project.Categories[1].Tasks[0].ID,
+			m.project.Categories[1].Tasks[1].ID,
+		})
+}
+
+func TestVisualMoveDown_ShiftsCategoryBlock(t *testing.T) {
+	project := sampleProject()
+	project.Categories = append(project.Categories, domain.Category{ID: "c3", Name: "Cat C"})
+	m := newTestModel(t, project)
+	m.ui.Selection.MoveTo(1) // Cat A header
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // extend to Cat B → block [Cat A, Cat B]
+
+	m.visualMoveDown()
+
+	require.Len(t, m.project.Categories, 3)
+	assert.Equal(t, []string{"c3", "c1", "c2"},
+		[]string{
+			m.project.Categories[0].ID,
+			m.project.Categories[1].ID,
+			m.project.Categories[2].ID,
+		})
+	// Anchor stable on Cat A.
+	assert.Equal(t, "c1", m.ui.Visual.AnchorCategoryID)
+	// Range still covers Cat A + Cat B.
+	selPositions := m.visualSelectedPositions()
+	require.Len(t, selPositions, 2)
+	assert.Equal(t, "c1", m.project.Categories[selPositions[0].CategoryIndex].ID)
+	assert.Equal(t, "c2", m.project.Categories[selPositions[1].CategoryIndex].ID)
+}
+
+func TestVisualMoveUp_ShiftsCategoryBlock(t *testing.T) {
+	project := sampleProject()
+	project.Categories = append(project.Categories, domain.Category{ID: "c3", Name: "Cat C"})
+	m := newTestModel(t, project)
+	// Start on Cat B (position 5 = Cat B header in [Project, CatA, t1, t2, t3, CatB, t4, t5, CatC])
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusCategory && p.CategoryIndex == 1
+	})
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // extend to Cat C
+
+	m.visualMoveUp()
+
+	require.Len(t, m.project.Categories, 3)
+	assert.Equal(t, []string{"c2", "c3", "c1"},
+		[]string{
+			m.project.Categories[0].ID,
+			m.project.Categories[1].ID,
+			m.project.Categories[2].ID,
+		})
+}
+
+func TestVisualMoveUp_NoOpAtTop(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(1) // Cat A header
+	m.enterVisualMode()
+
+	m.visualMoveUp()
+
+	assert.Equal(t, []string{"c1", "c2"},
+		[]string{
+			m.project.Categories[0].ID,
+			m.project.Categories[1].ID,
+		})
+}
+
 func TestVisualMode_CategoryAnchorSelectsOnlyCategories(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(1) // Cat A header

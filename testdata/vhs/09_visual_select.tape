@@ -23,6 +23,16 @@ Type "j"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/09_visual_range.png"
 
+# Shift the whole range down with J, then back up with K so the
+# rest of the tape sees the original task order.
+Type "J"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_visual_shift_down.png"
+
+Type "K"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/09_visual_shift_up.png"
+
 # Swap anchor and cursor — cursor jumps to the other end of the range
 # (the cursor row is rendered with reverse colors so it stands out from
 # the yellow visual range band).

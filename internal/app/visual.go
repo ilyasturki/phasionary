@@ -348,6 +348,98 @@ func (m *model) removeTaskByIDIfExists(id string) bool {
 	return false
 }
 
+// visualMoveDown shifts the visual selection block one position down,
+// preserving the block's contents and the anchor/cursor orientation.
+// Categories shift across the whole project; tasks shift within their
+// category. No-op if the selection has no room to move, spans multiple
+// categories (tasks only), or is not source-contiguous in task indices
+// (e.g. a filter excludes interleaving tasks).
+func (m *model) visualMoveDown() {
+	m.visualShift(+1)
+}
+
+func (m *model) visualMoveUp() {
+	m.visualShift(-1)
+}
+
+func (m *model) visualShift(dir int) {
+	selPositions := m.visualSelectedPositions()
+	if len(selPositions) == 0 {
+		return
+	}
+	switch m.ui.Visual.Kind {
+	case selection.FocusCategory:
+		m.visualShiftCategories(selPositions, dir)
+	case selection.FocusTask:
+		m.visualShiftTasks(selPositions, dir)
+	}
+}
+
+func (m *model) visualShiftCategories(selPositions []selection.Position, dir int) {
+	lo := selPositions[0].CategoryIndex
+	hi := selPositions[len(selPositions)-1].CategoryIndex
+	var neighbor, dst int
+	if dir > 0 {
+		if hi >= len(m.project.Categories)-1 {
+			return
+		}
+		neighbor = hi + 1
+		dst = lo
+	} else {
+		if lo <= 0 {
+			return
+		}
+		neighbor = lo - 1
+		dst = hi
+	}
+	m.recordHistory()
+	moved := m.project.Categories[neighbor]
+	_ = m.project.RemoveCategory(neighbor)
+	m.project.InsertCategory(dst, moved)
+	m.rebuildPositions()
+	m.ui.Selection.MoveBy(dir)
+	m.ensureVisible()
+	m.storeTaskUpdate()
+}
+
+func (m *model) visualShiftTasks(selPositions []selection.Position, dir int) {
+	catIdx := selPositions[0].CategoryIndex
+	for _, p := range selPositions[1:] {
+		if p.CategoryIndex != catIdx {
+			return
+		}
+	}
+	taskLo := selPositions[0].TaskIndex
+	taskHi := selPositions[len(selPositions)-1].TaskIndex
+	if taskHi-taskLo+1 != len(selPositions) {
+		return
+	}
+	cat := &m.project.Categories[catIdx]
+	var neighbor, dst int
+	if dir > 0 {
+		if taskHi >= len(cat.Tasks)-1 {
+			return
+		}
+		neighbor = taskHi + 1
+		dst = taskLo
+	} else {
+		if taskLo <= 0 {
+			return
+		}
+		neighbor = taskLo - 1
+		dst = taskHi
+	}
+	m.recordHistory()
+	moved := cat.Tasks[neighbor]
+	_ = cat.RemoveTask(neighbor)
+	cat.InsertTask(dst, moved)
+	m.project.UpdatedAt = domain.NowTimestamp()
+	m.rebuildPositions()
+	m.ui.Selection.MoveBy(dir)
+	m.ensureVisible()
+	m.storeTaskUpdate()
+}
+
 func (m *model) visualCut() {
 	selPositions := m.visualSelectedPositions()
 	if len(selPositions) == 0 {
@@ -648,6 +740,12 @@ func (m model) handleVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "k", "up":
 		m.visualMoveCursor(-1)
+		return m, nil
+	case "J":
+		m.visualMoveDown()
+		return m, nil
+	case "K":
+		m.visualMoveUp()
 		return m, nil
 	case "ctrl+d":
 		m.visualMoveCursor(halfPageStep(m.availableHeight()))
