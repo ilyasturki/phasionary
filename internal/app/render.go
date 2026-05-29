@@ -189,7 +189,8 @@ func (m model) renderTaskLine(task domain.Task, selected bool, width int, focuse
 	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).
 		WithVisualMode(visualMode).
 		WithCursor(isCursor).
-		WithCut(cut)
+		WithCut(cut).
+		WithDescriptionExpanded(m.ui.Screen.ExpandDescriptions)
 	return renderer.Render(task, selected)
 }
 
@@ -197,11 +198,13 @@ func (m model) renderTaskDescription(task domain.Task, selected bool, width int,
 	cfg := m.deps.CfgManager.Get()
 	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).
 		WithCut(cut)
-	indent := taskDescriptionIndent(task, cfg.StatusDisplay)
+	indent := taskTitleColumn(task, cfg.StatusDisplay)
 	return renderer.RenderDescription(task.Description, indent, selected)
 }
 
-func taskDescriptionIndent(task domain.Task, statusDisplay string) int {
+// taskTitleColumn returns the column where the task title begins on its row,
+// so the description's blockquote bar can sit flush with the title.
+func taskTitleColumn(task domain.Task, statusDisplay string) int {
 	prefix := "  "
 	priorityIcon := ui.PriorityIcon(task.Priority)
 	iconText := ""
@@ -209,7 +212,7 @@ func taskDescriptionIndent(task domain.Task, statusDisplay string) int {
 		iconText = priorityIcon + " "
 	}
 	statusText := statusLabel(task.Status, statusDisplay)
-	return ansi.StringWidth(prefix+"["+statusText+"] "+iconText) + 2
+	return ansi.StringWidth(prefix + "[" + statusText + "] " + iconText)
 }
 
 func statusLabel(status, displayMode string) string {

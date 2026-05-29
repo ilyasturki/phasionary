@@ -12,13 +12,14 @@ import (
 )
 
 type TaskLineRenderer struct {
-	width         int
-	statusDisplay string
-	priorityColor string
-	focused       bool
-	visualMode    bool
-	isCursor      bool
-	cut           bool
+	width               int
+	statusDisplay       string
+	priorityColor       string
+	focused             bool
+	visualMode          bool
+	isCursor            bool
+	cut                 bool
+	descriptionExpanded bool
 }
 
 func NewTaskLineRenderer(width int, statusDisplay, priorityColor string, focused bool) *TaskLineRenderer {
@@ -42,6 +43,11 @@ func (r *TaskLineRenderer) WithCursor(c bool) *TaskLineRenderer {
 
 func (r *TaskLineRenderer) WithCut(c bool) *TaskLineRenderer {
 	r.cut = c
+	return r
+}
+
+func (r *TaskLineRenderer) WithDescriptionExpanded(v bool) *TaskLineRenderer {
+	r.descriptionExpanded = v
 	return r
 }
 
@@ -96,26 +102,31 @@ func (r *TaskLineRenderer) padToWidth(rendered string) string {
 	return strings.Join(lines, "\n")
 }
 
+const descriptionBar = "▎ "
+
 // RenderDescription renders a task description as a standalone, focusable block
-// indented to `indent` columns. When `selected`, the block uses the row-selection
-// style; otherwise it renders muted to read as secondary text.
+// with a blockquote-style left bar. The bar sits at `indent` columns (aligned
+// with the title on the task row) and text follows after it. Italic + bar
+// distinguishes descriptions from completed-task rows (which use Faint).
 func (r *TaskLineRenderer) RenderDescription(description string, indent int, selected bool) string {
 	if description == "" {
 		return ""
 	}
 	indentStr := strings.Repeat(" ", indent)
+	prefixWidth := indent + ansi.StringWidth(descriptionBar)
 	available := 0
 	if r.width > 0 {
-		available = r.width - indent
+		available = r.width - prefixWidth
 		if available < 1 {
 			available = 0
 		}
 	}
-	style := ui.MutedStyle
-	if selected {
-		style = r.selectedStyle()
-	} else if r.cut {
-		style = ui.ApplyCut(style)
+
+	textStyle := ui.DescriptionStyle
+	barStyle := ui.DescriptionBarStyle
+	if r.cut {
+		textStyle = ui.ApplyCut(textStyle)
+		barStyle = ui.ApplyCut(barStyle)
 	}
 
 	// When selected, every visual line gets padded to the full row width so the
@@ -126,7 +137,7 @@ func (r *TaskLineRenderer) RenderDescription(description string, indent int, sel
 	var out []string
 	for _, paragraph := range strings.Split(description, "\n") {
 		if paragraph == "" {
-			out = append(out, style.Render(padDescriptionLine(indentStr, r.width, shouldPad)))
+			out = append(out, r.styleDescriptionLine(indentStr, "", textStyle, barStyle, selected, shouldPad))
 			continue
 		}
 		text := paragraph
@@ -134,10 +145,22 @@ func (r *TaskLineRenderer) RenderDescription(description string, indent int, sel
 			text = ansi.Wrap(paragraph, available, "")
 		}
 		for _, l := range strings.Split(text, "\n") {
-			out = append(out, style.Render(padDescriptionLine(indentStr+l, r.width, shouldPad)))
+			out = append(out, r.styleDescriptionLine(indentStr, l, textStyle, barStyle, selected, shouldPad))
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+func (r *TaskLineRenderer) styleDescriptionLine(indentStr, text string, textStyle, barStyle lipgloss.Style, selected, shouldPad bool) string {
+	if selected {
+		sel := r.selectedStyle()
+		line := indentStr + descriptionBar + text
+		if shouldPad {
+			line = padDescriptionLine(line, r.width, true)
+		}
+		return sel.Render(line)
+	}
+	return indentStr + barStyle.Render(descriptionBar) + textStyle.Render(text)
 }
 
 func padDescriptionLine(s string, width int, pad bool) string {
@@ -153,14 +176,16 @@ func padDescriptionLine(s string, width int, pad bool) string {
 
 func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIcon string) string {
 	status := r.formatStatus(task.Status, false)
-	icon := ""
+	iconStyled := ""
+	iconWidth := 0
 	if priorityIcon != "" {
 		iconStyle := ui.PriorityIconStyle(task.Priority, r.priorityColor)
 		if task.Status == domain.StatusCompleted || task.Status == domain.StatusCancelled {
 			iconStyle = iconStyle.Faint(true)
 		}
 		iconStyle = r.maybeCut(iconStyle)
-		icon = iconStyle.Render(priorityIcon) + " "
+		iconStyled = iconStyle.Render(priorityIcon) + " "
+		iconWidth = ansi.StringWidth(priorityIcon + " ")
 	}
 	descMarker := r.formatDescriptionBadge(task.Description, false)
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, false)
@@ -168,13 +193,13 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 	suffix := cutBadge + descMarker + estimate
 	suffixText := cutBadgeText + r.descriptionBadgeText(task.Description) + r.estimateBadgeText(task.EstimateMinutes)
 	titleStyle := r.maybeCut(ui.TaskTitleStyle(task.Priority, task.Status, r.priorityColor))
-	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, status, icon)
+	prefixPart := fmt.Sprintf("%s[%s] ", prefix, status)
 
 	if r.width <= 0 {
-		return prefixPart + titleStyle.Render(task.Title) + suffix
+		return prefixPart + iconStyled + titleStyle.Render(task.Title) + suffix
 	}
 
-	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, titleStyle, suffix, suffixText)
+	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, iconStyled, iconWidth, titleStyle, suffix, suffixText)
 }
 
 func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon string) string {
@@ -183,11 +208,11 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 	priorityStyle := selectedStyle
 	statusStyle := selectedStyle
 
-	icon := ""
-	iconText := ""
+	iconStyled := ""
+	iconWidth := 0
 	if priorityIcon != "" {
-		icon = priorityStyle.Render(priorityIcon + " ")
-		iconText = priorityIcon + " "
+		iconStyled = priorityStyle.Render(priorityIcon + " ")
+		iconWidth = ansi.StringWidth(priorityIcon + " ")
 	}
 
 	descMarker := r.formatDescriptionBadge(task.Description, true)
@@ -198,53 +223,65 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 
 	prefixPart := selectedStyle.Render(prefix+"[") +
 		statusStyle.Render(statusText) +
-		selectedStyle.Render("] ") + icon
+		selectedStyle.Render("] ")
 
 	if r.width <= 0 {
-		return prefixPart + priorityStyle.Render(task.Title) + suffix
+		return prefixPart + iconStyled + priorityStyle.Render(task.Title) + suffix
 	}
 
-	overhead := ansi.StringWidth(prefix + "[" + statusText + "] " + iconText)
-	return r.wrapSelectedContentWithSuffix(task.Title, prefixPart, overhead, priorityStyle, suffix, suffixText)
+	overhead := ansi.StringWidth(prefix + "[" + statusText + "] ")
+	return r.wrapSelectedContentWithSuffix(task.Title, prefixPart, iconStyled, iconWidth, overhead, priorityStyle, suffix, suffixText)
 }
 
-func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart string, titleStyle lipgloss.Style, suffix, suffixText string) string {
+func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, iconStyled string, iconWidth int, titleStyle lipgloss.Style, suffix, suffixText string) string {
 	overhead := ansi.StringWidth(prefixPart)
 	suffixWidth := ansi.StringWidth(suffixText)
-	available := safeWidth(r.width, overhead+suffixWidth)
+	available := safeWidth(r.width, overhead+iconWidth+suffixWidth)
 	wrapped := ansi.Wrap(title, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
+	last := len(wrapLines) - 1
 
 	var result []string
 	for i, line := range wrapLines {
 		styledLine := titleStyle.Render(line)
+		var rendered string
 		if i == 0 {
-			result = append(result, prefixPart+styledLine+suffix)
+			rendered = prefixPart + iconStyled + styledLine
 		} else {
-			result = append(result, indent+styledLine)
+			rendered = indent + styledLine
 		}
+		if i == last {
+			rendered += suffix
+		}
+		result = append(result, rendered)
 	}
 	return strings.Join(result, "\n")
 }
 
-func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart string, overhead int, titleStyle lipgloss.Style, suffix, suffixText string) string {
+func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart, iconStyled string, iconWidth, overhead int, titleStyle lipgloss.Style, suffix, suffixText string) string {
 	suffixWidth := ansi.StringWidth(suffixText)
-	available := safeWidth(r.width, overhead+suffixWidth)
+	available := safeWidth(r.width, overhead+iconWidth+suffixWidth)
 	wrapped := ansi.Wrap(title, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
 	selectedStyle := r.selectedStyle()
+	last := len(wrapLines) - 1
 
 	var result []string
 	for i, line := range wrapLines {
 		styledTitle := titleStyle.Render(line)
+		var rendered string
 		if i == 0 {
-			result = append(result, prefixPart+styledTitle+suffix)
+			rendered = prefixPart + iconStyled + styledTitle
 		} else {
 			styledIndent := selectedStyle.Render(indent)
-			result = append(result, styledIndent+styledTitle)
+			rendered = styledIndent + styledTitle
 		}
+		if i == last {
+			rendered += suffix
+		}
+		result = append(result, rendered)
 	}
 	return strings.Join(result, "\n")
 }
@@ -324,7 +361,7 @@ func (r *TaskLineRenderer) formatDescriptionBadge(description string, selected b
 }
 
 func (r *TaskLineRenderer) descriptionBadgeText(description string) string {
-	if description == "" {
+	if description == "" || r.descriptionExpanded {
 		return ""
 	}
 	return " ¶"

@@ -40,6 +40,12 @@ var (
 	// CutBadgeStyle marks rows whose item is staged for cut/paste.
 	CutBadgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true)
 
+	// Description rendering uses italic text with a faint left bar glyph — a
+	// markdown-blockquote treatment that visually distinguishes descriptions
+	// from completed-task rows (which use Faint).
+	DescriptionStyle    = lipgloss.NewStyle().Italic(true)
+	DescriptionBarStyle = lipgloss.NewStyle().Faint(true)
+
 	// Shortcut bar (lazygit-style footer): keys read brighter, labels read
 	// quieter so the eye can hop between them. Faint avoids any explicit
 	// color, which keeps the bar usable on both light and dark terminals.

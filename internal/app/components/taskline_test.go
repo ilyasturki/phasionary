@@ -55,6 +55,28 @@ func TestTaskLineRenderer_Render(t *testing.T) {
 		assert.True(t, len(lines) > 1)
 	})
 
+	t.Run("priority icon flows inline; wrapped lines align at icon column", func(t *testing.T) {
+		renderer := NewTaskLineRenderer(40, "text", "full", true)
+		task := domain.Task{
+			Title:    "This is a very long task title that should wrap to multiple lines",
+			Status:   domain.StatusTodo,
+			Priority: domain.PriorityHigh,
+		}
+		result := renderer.Render(task, false)
+		lines := strings.Split(result, "\n")
+		assert.True(t, len(lines) > 1, "expected wrapping")
+		plain0 := ansi.Strip(lines[0])
+		iconCol := strings.Index(plain0, "▲")
+		assert.GreaterOrEqual(t, iconCol, 0, "expected priority icon on first line")
+		for i, line := range lines[1:] {
+			plain := ansi.Strip(line)
+			// Continuation lines start at the icon's column — no extra indent for the icon itself.
+			leading := len(plain) - len(strings.TrimLeft(plain, " "))
+			assert.Equal(t, iconCol, leading,
+				"continuation line %d should align at icon column %d, got %d (line=%q)", i+1, iconCol, leading, plain)
+		}
+	})
+
 	t.Run("renders with icon status display", func(t *testing.T) {
 		renderer := NewTaskLineRenderer(0, "icons", "full", true)
 		task := domain.Task{
@@ -68,14 +90,14 @@ func TestTaskLineRenderer_Render(t *testing.T) {
 }
 
 func TestTaskLineRenderer_RenderDescription(t *testing.T) {
-	t.Run("renders description with given indent", func(t *testing.T) {
+	t.Run("renders description with blockquote bar at given indent", func(t *testing.T) {
 		renderer := NewTaskLineRenderer(80, "text", "full", true)
 		result := renderer.RenderDescription("Some details about the task", 9, false)
 		assert.Contains(t, result, "Some details about the task")
-		// Each line should start with 9 spaces of indent (after stripping styles).
+		// Each line should start with 9 spaces of indent + the bar glyph (after stripping styles).
 		for _, line := range strings.Split(result, "\n") {
 			plain := ansi.Strip(line)
-			assert.True(t, strings.HasPrefix(plain, "         "), "line %q lacks 9-col indent", line)
+			assert.True(t, strings.HasPrefix(plain, "         ▎ "), "line %q lacks indented blockquote prefix", line)
 		}
 	})
 
