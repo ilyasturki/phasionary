@@ -96,8 +96,9 @@ func (m model) projectPickerView() string {
 	}
 	lines = append(lines, "", ui.RenderHints(hints))
 
-	// lipgloss.Width includes horizontal padding but not the border.
-	return ui.HelpDialogStyle.Width(contentWidth + ui.HelpDialogStyle.GetHorizontalPadding()).Render(strings.Join(lines, "\n"))
+	// lipgloss.Width is the total block width (content + padding + border),
+	// so add both back to land on the intended content area.
+	return ui.HelpDialogStyle.Width(contentWidth + pickerDialogChromeWidth).Render(strings.Join(lines, "\n"))
 }
 
 func (m model) renderPickerRow(i int, isSelected bool, contentWidth int) string {
