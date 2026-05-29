@@ -49,5 +49,18 @@ Sleep 300ms
 Escape
 Sleep 300ms
 
+Type ","
+Sleep 300ms
+Type "jjj"
+Sleep 200ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_descriptions_off.png"
+Type " "
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_descriptions_on.png"
+Type " "
+Sleep 200ms
+Escape
+Sleep 300ms
+
 Hide
 Type "q"

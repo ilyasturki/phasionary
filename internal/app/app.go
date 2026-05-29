@@ -150,7 +150,7 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) model {
 }
 
 func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
-	const optionCount = 3
+	const optionCount = 4
 	switch msg.String() {
 	case "q", "esc", "enter":
 		m.ui.Modes.ToNormal()
@@ -285,6 +285,13 @@ func (m *model) toggleSelectedOption() {
 		// The bar is hidden while Options is open, so the layout under us
 		// hasn't actually changed yet. handleOptionsKey's exit branch calls
 		// ensureVisible against the post-toggle layout once Options closes.
+	case 3: // ExpandDescriptionsByDefault
+		newValue := !m.deps.CfgManager.Get().ExpandDescriptionsByDefault
+		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
+			cfg.ExpandDescriptionsByDefault = newValue
+		})
+		m.ui.Screen.ExpandDescriptions = newValue
+		m.rebuildPositions()
 	}
 }
 
@@ -542,7 +549,8 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 	}
 
 	foldState := NewFoldStateFrom(stateManager.GetFoldedCategories(project.ID))
-	positions := rebuildPositions(project.Categories, nil, &foldState, false)
+	expandDescriptions := cfgManager.Get().ExpandDescriptionsByDefault
+	positions := rebuildPositions(project.Categories, nil, &foldState, expandDescriptions)
 	initialSelection := findFirstTaskIndex(positions)
 	selMgr := selection.NewManager(positions, initialSelection)
 	modeMachine := modes.NewMachine(startMode)
@@ -553,6 +561,7 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 		deps:    NewDependencies(store, cfgManager, stateManager),
 	}
 	m.ui.Fold = foldState
+	m.ui.Screen.ExpandDescriptions = expandDescriptions
 
 	if startMode == modes.ModeProjectPicker {
 		ordered := orderProjects(projects, stateManager.GetProjectOrder())

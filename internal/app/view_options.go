@@ -29,10 +29,16 @@ func (m model) optionsView() string {
 		shortcutBarValue = "On"
 	}
 
+	expandDescValue := "Off"
+	if cfg.ExpandDescriptionsByDefault {
+		expandDescValue = "On"
+	}
+
 	rows := []string{
 		fmt.Sprintf("Status Display:  [%s]", statusValue),
 		fmt.Sprintf("Priority Color:  [%s]", priorityValue),
 		fmt.Sprintf("Shortcut Bar:    [%s]", shortcutBarValue),
+		fmt.Sprintf("Descriptions:    [%s]", expandDescValue),
 	}
 
 	lines := []string{

@@ -20,17 +20,19 @@ const (
 
 // Config holds user preferences.
 type Config struct {
-	StatusDisplay   string `json:"status_display,omitempty"`
-	PriorityColor   string `json:"priority_color,omitempty"`
-	ShowShortcutBar bool   `json:"show_shortcut_bar"`
+	StatusDisplay               string `json:"status_display,omitempty"`
+	PriorityColor               string `json:"priority_color,omitempty"`
+	ShowShortcutBar             bool   `json:"show_shortcut_bar"`
+	ExpandDescriptionsByDefault bool   `json:"expand_descriptions_by_default"`
 }
 
 // DefaultConfig returns a Config with default values.
 func DefaultConfig() Config {
 	return Config{
-		StatusDisplay:   StatusDisplayIcons,
-		PriorityColor:   PriorityColorFull,
-		ShowShortcutBar: true,
+		StatusDisplay:               StatusDisplayIcons,
+		PriorityColor:               PriorityColorFull,
+		ShowShortcutBar:             true,
+		ExpandDescriptionsByDefault: false,
 	}
 }
 
