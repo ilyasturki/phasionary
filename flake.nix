@@ -47,5 +47,8 @@
         type = "app";
         program = "${self.packages.${system}.phasionary}/bin/phasionary";
       };
+
+      nixosModules.default = import ./nix/module.nix { inherit self; };
+      nixosModules.phasionary = self.nixosModules.default;
     };
 }
