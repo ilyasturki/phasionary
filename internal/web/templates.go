@@ -16,8 +16,10 @@ func (s *Server) parseTemplates() error {
 	funcs := template.FuncMap{
 		"statusLabel":    statusLabel,
 		"statusSlug":     statusSlug,
+		"statusBadge":    statusBadge,
 		"priorityLabel":  priorityLabel,
 		"prioritySlug":   prioritySlug,
+		"priorityBadge":  priorityBadge,
 		"formatEstimate": formatEstimate,
 		"countsLine":     countsLine,
 		"dict":           dict,
@@ -199,6 +201,22 @@ func prioritySlug(p string) string {
 		return "none"
 	}
 	return p
+}
+
+// statusBadge returns the CSS classes for the status toggle button: a
+// basecoat .btn-sm with a status-specific color override defined in style.css.
+func statusBadge(s string) string {
+	return "btn-sm status-" + statusSlug(s)
+}
+
+// priorityBadge returns the CSS classes for the priority toggle button.
+// Returns "" for empty priority — the template renders a muted em-dash
+// placeholder instead.
+func priorityBadge(p string) string {
+	if p == "" {
+		return ""
+	}
+	return "btn-sm priority-" + p
 }
 
 func formatEstimate(m int) string {

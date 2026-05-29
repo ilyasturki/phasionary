@@ -1,8 +1,8 @@
 {{define "content"}}
 <header class="top-bar">
-  <h1>Projects</h1>
+  <h1 class="top-title">Projects</h1>
   <div class="top-actions">
-    <a class="btn btn-primary" href="/projects/new">+ New</a>
+    <a class="btn" href="/projects/new">+ New</a>
   </div>
 </header>
 
@@ -10,14 +10,19 @@
 <ul class="project-list">
   {{range .Projects}}
     <li>
-      <a class="project-card" href="/projects/{{.ID}}">
-        <div class="project-card-title">{{.Name}}</div>
-        <div class="project-card-meta">{{countsLine .StatusCounts}}</div>
+      <a class="card project-card" href="/projects/{{.ID}}">
+        <header>
+          <h2>{{.Name}}</h2>
+          <p>{{countsLine .StatusCounts}}</p>
+        </header>
       </a>
     </li>
   {{end}}
 </ul>
 {{else}}
-<p class="empty">No projects yet. <a href="/projects/new">Create one</a>.</p>
+<div class="alert empty-state">
+  <h2>No projects yet</h2>
+  <section><a href="/projects/new">Create one</a> to get started.</section>
+</div>
 {{end}}
 {{end}}

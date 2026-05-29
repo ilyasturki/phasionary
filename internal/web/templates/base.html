@@ -3,16 +3,76 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f0f12" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <title>{{.Title}} · Phasionary</title>
+  <script>
+    (function () {
+      var stored = null;
+      try { stored = localStorage.getItem('theme'); } catch (e) {}
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored === 'dark' || (stored !== 'light' && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/basecoat.css">
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/basecoat.min.js" defer></script>
 </head>
-<body hx-boost="true">
-  <main>
+<body hx-boost="true" class="bg-background text-foreground">
+  <main class="page">
     {{block "content" .}}{{end}}
   </main>
+
+  <dialog id="confirm-dialog" class="dialog" role="alertdialog"
+          aria-labelledby="confirm-title" aria-describedby="confirm-message"
+          onclick="if(event.target===this) this.close('cancel')">
+    <div>
+      <header>
+        <h2 id="confirm-title">Are you sure?</h2>
+        <p id="confirm-message">This action cannot be undone.</p>
+      </header>
+      <footer>
+        <button class="btn-outline" type="button" onclick="this.closest('dialog').close('cancel')">Cancel</button>
+        <button class="btn-destructive" id="confirm-ok" type="button">Delete</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <script>
+    (function () {
+      var dlg = document.getElementById('confirm-dialog');
+      var msg = document.getElementById('confirm-message');
+      var ok = document.getElementById('confirm-ok');
+      var pending = null;
+
+      function close() {
+        if (dlg.open) dlg.close();
+        pending = null;
+      }
+
+      ok.addEventListener('click', function () {
+        var p = pending;
+        close();
+        if (p) p.issueRequest(true);
+      });
+      dlg.addEventListener('close', function () { pending = null; });
+
+      document.body.addEventListener('htmx:confirm', function (e) {
+        if (!e.detail.question) return;
+        e.preventDefault();
+        // If the dialog is already open for another request, ignore this
+        // one rather than overwriting `pending` — otherwise the user's
+        // confirmation would fire the wrong destructive action.
+        if (dlg.open) return;
+        msg.textContent = e.detail.question;
+        pending = e.detail;
+        dlg.showModal();
+      });
+    })();
+  </script>
 </body>
 </html>
 {{end}}

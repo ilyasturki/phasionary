@@ -1,19 +1,24 @@
 {{define "content"}}
 <header class="top-bar">
-  <a class="back" href="/projects/{{.Project.ID}}" aria-label="Cancel">←</a>
-  <h1>{{if .IsNew}}New category{{else}}Rename category{{end}}</h1>
+  <a class="btn-icon-ghost back" href="/projects/{{.Project.ID}}" aria-label="Cancel">←</a>
+  <h1 class="top-title">{{if .IsNew}}New category{{else}}Rename category{{end}}</h1>
 </header>
 
-{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+{{if .Error}}
+<div class="alert-destructive form-error">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <h2>{{.Error}}</h2>
+</div>
+{{end}}
 
 <form class="form" method="post" action="{{if .IsNew}}/projects/{{.Project.ID}}/categories{{else}}/projects/{{.Project.ID}}/categories/{{.Category.ID}}{{end}}">
-  <label>
-    Name
-    <input type="text" name="name" required autofocus value="{{.Category.Name}}">
-  </label>
+  <div class="field">
+    <label class="label" for="category-name">Name</label>
+    <input class="input" id="category-name" type="text" name="name" required autofocus value="{{.Category.Name}}">
+  </div>
   <div class="form-actions">
-    <a class="btn" href="/projects/{{.Project.ID}}">Cancel</a>
-    <button type="submit" class="btn btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+    <a class="btn-outline" href="/projects/{{.Project.ID}}">Cancel</a>
+    <button type="submit" class="btn">{{if .IsNew}}Create{{else}}Save{{end}}</button>
   </div>
 </form>
 {{end}}

@@ -1,51 +1,56 @@
 {{define "content"}}
 <header class="top-bar">
-  <a class="back" href="/projects/{{.Project.ID}}" aria-label="Cancel">←</a>
-  <h1>{{if .IsNew}}New task{{else}}Edit task{{end}}</h1>
-  <div class="top-actions"><span class="muted">in {{.Category.Name}}</span></div>
+  <a class="btn-icon-ghost back" href="/projects/{{.Project.ID}}" aria-label="Cancel">←</a>
+  <h1 class="top-title">{{if .IsNew}}New task{{else}}Edit task{{end}}</h1>
+  <div class="top-actions"><span class="text-muted-foreground">in {{.Category.Name}}</span></div>
 </header>
 
-{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+{{if .Error}}
+<div class="alert-destructive form-error">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <h2>{{.Error}}</h2>
+</div>
+{{end}}
 
 <form class="form" method="post" action="{{if .IsNew}}/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks{{else}}/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks/{{.Task.ID}}{{end}}">
-  <label>
-    Title
-    <input type="text" name="title" required autofocus value="{{.Task.Title}}">
-  </label>
+  <div class="field">
+    <label class="label" for="task-title">Title</label>
+    <input class="input" id="task-title" type="text" name="title" required autofocus value="{{.Task.Title}}">
+  </div>
 
-  <label>
-    Status
-    <select name="status">
+  <div class="field">
+    <label class="label" for="task-status">Status</label>
+    <select class="select" id="task-status" name="status">
       <option value="todo" {{if eq .Task.Status "todo"}}selected{{end}}>Todo</option>
       <option value="in_progress" {{if eq .Task.Status "in_progress"}}selected{{end}}>In progress</option>
       <option value="completed" {{if eq .Task.Status "completed"}}selected{{end}}>Done</option>
       <option value="cancelled" {{if eq .Task.Status "cancelled"}}selected{{end}}>Cancelled</option>
     </select>
-  </label>
+  </div>
 
-  <label>
-    Priority
-    <select name="priority">
+  <div class="field">
+    <label class="label" for="task-priority">Priority</label>
+    <select class="select" id="task-priority" name="priority">
       <option value="" {{if eq .Task.Priority ""}}selected{{end}}>—</option>
       <option value="high" {{if eq .Task.Priority "high"}}selected{{end}}>High</option>
       <option value="medium" {{if eq .Task.Priority "medium"}}selected{{end}}>Medium</option>
       <option value="low" {{if eq .Task.Priority "low"}}selected{{end}}>Low</option>
     </select>
-  </label>
+  </div>
 
-  <label>
-    Estimate (minutes)
-    <input type="number" name="estimate" min="0" step="5" value="{{if .Task.EstimateMinutes}}{{.Task.EstimateMinutes}}{{end}}">
-  </label>
+  <div class="field">
+    <label class="label" for="task-estimate">Estimate (minutes)</label>
+    <input class="input" id="task-estimate" type="number" name="estimate" min="0" step="5" value="{{if .Task.EstimateMinutes}}{{.Task.EstimateMinutes}}{{end}}">
+  </div>
 
-  <label>
-    Description
-    <textarea name="description" rows="4">{{.Task.Description}}</textarea>
-  </label>
+  <div class="field">
+    <label class="label" for="task-description">Description</label>
+    <textarea class="textarea" id="task-description" name="description" rows="4">{{.Task.Description}}</textarea>
+  </div>
 
   <div class="form-actions">
-    <a class="btn" href="/projects/{{.Project.ID}}">Cancel</a>
-    <button type="submit" class="btn btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+    <a class="btn-outline" href="/projects/{{.Project.ID}}">Cancel</a>
+    <button type="submit" class="btn">{{if .IsNew}}Create{{else}}Save{{end}}</button>
   </div>
 </form>
 {{end}}

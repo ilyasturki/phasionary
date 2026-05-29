@@ -1,29 +1,30 @@
 {{define "category"}}
-<section class="category" id="category-{{.Category.ID}}">
+<section class="card category" id="category-{{.Category.ID}}">
   <header class="category-header">
     <h2 class="category-name">{{.Category.Name}}</h2>
+    <a class="btn-sm-icon-ghost category-rename" href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/edit" aria-label="Rename category">✎</a>
     <div class="category-actions">
-      <button class="btn-icon"
+      <button class="btn-sm-icon-ghost"
               hx-post="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/move?dir=up"
               hx-target="#categories"
               hx-swap="outerHTML"
               aria-label="Move category up">↑</button>
-      <button class="btn-icon"
+      <button class="btn-sm-icon-ghost"
               hx-post="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/move?dir=down"
               hx-target="#categories"
               hx-swap="outerHTML"
               aria-label="Move category down">↓</button>
-      <a class="btn-icon" href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/edit" aria-label="Rename category">✎</a>
-      <button class="btn-icon btn-danger"
+      <button class="btn-sm-icon-destructive"
               hx-delete="/projects/{{.Project.ID}}/categories/{{.Category.ID}}"
               hx-confirm="Delete category and all its tasks?"
               hx-target="closest .category"
               hx-swap="delete"
               aria-label="Delete category">✕</button>
-      <a class="btn btn-small btn-primary" href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks/new">+ Task</a>
+      <a class="btn-sm" href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks/new">+ Task</a>
     </div>
   </header>
 
+  <section class="category-body">
   {{if .Category.Tasks}}
   <ul class="task-list">
     {{$proj := .Project}}
@@ -33,7 +34,8 @@
     {{end}}
   </ul>
   {{else}}
-  <p class="empty empty-tasks">No tasks. <a href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks/new">Add one</a>.</p>
+  <p class="empty-tasks text-muted-foreground">No tasks. <a href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks/new">Add one</a>.</p>
   {{end}}
+  </section>
 </section>
 {{end}}
