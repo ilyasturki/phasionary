@@ -16,7 +16,7 @@ Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/08_description_indicator.png"
 
 Sleep 200ms
-Type "i"
+Type "gi"
 Sleep 800ms
 Screenshot "/tmp/phas-vt/vhs-out/08_description_info.png"
 

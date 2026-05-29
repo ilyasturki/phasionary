@@ -67,7 +67,7 @@ var normalBindings = []keyBinding{
 		action: void((*model).unfoldAll)},
 	{keys: []string{"d"}, prefix: 'z', display: "zd", desc: "toggle inline descriptions", section: sectionNavigation,
 		action: void((*model).toggleExpandDescriptions)},
-	{keys: []string{"P"}, desc: "switch project", section: sectionNavigation,
+	{keys: []string{"ctrl+p"}, desc: "switch project", section: sectionNavigation,
 		action: void((*model).openProjectPicker)},
 
 	// Actions
@@ -101,7 +101,7 @@ var normalBindings = []keyBinding{
 		action: void((*model).decreasePriority)},
 	{keys: []string{"l"}, section: sectionActions,
 		action: void((*model).increasePriority)},
-	{keys: []string{"t"}, desc: "set time estimate", section: sectionActions,
+	{keys: []string{"ctrl+t"}, desc: "set time estimate", section: sectionActions,
 		action: void((*model).openEstimatePicker)},
 	{keys: []string{"y"}, desc: "copy selected text", section: sectionActions,
 		action: func(m *model) tea.Cmd { return m.copySelected() }},
@@ -115,7 +115,7 @@ var normalBindings = []keyBinding{
 		action: void((*model).enterVisualMode)},
 	{keys: []string{"d"}, desc: "delete selected item", section: sectionActions,
 		action: void((*model).deleteSelected)},
-	{keys: []string{"i"}, desc: "show item info", section: sectionActions,
+	{keys: []string{"i"}, prefix: 'g', display: "gi", desc: "show item info", section: sectionActions,
 		action: func(m *model) tea.Cmd { m.ui.Modes.ToInfo(); return nil }},
 	{keys: []string{"r"}, desc: "reload project from disk", section: sectionActions,
 		action: void((*model).reloadProject)},

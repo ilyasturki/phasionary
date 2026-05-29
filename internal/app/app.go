@@ -219,7 +219,7 @@ func (m *model) openFilterHubSelection() {
 
 func (m model) handleInfoKey(msg tea.KeyPressMsg) model {
 	switch msg.String() {
-	case "i", "q", "esc":
+	case "q", "esc":
 		m.ui.Modes.ToNormal()
 	}
 	return m

@@ -13,7 +13,7 @@ Sleep 800ms
 Show
 
 # Open the project picker
-Type "P"
+Ctrl+P
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/08_picker_open.png"
 

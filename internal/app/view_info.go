@@ -27,7 +27,7 @@ func (m model) infoView() string {
 		lines = m.taskInfoLines(pos.CategoryIndex, pos.TaskIndex)
 	}
 
-	lines = append(lines, "", ui.RenderHints([]ui.Hint{{Key: "i/esc/q", Label: "close"}}))
+	lines = append(lines, "", ui.RenderHints([]ui.Hint{{Key: "esc/q", Label: "close"}}))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
 }
 
