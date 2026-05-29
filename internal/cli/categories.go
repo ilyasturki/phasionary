@@ -167,19 +167,26 @@ func newCategoryDeleteCmd() *cobra.Command {
 			}
 
 			// Re-resolve under the project flock so a concurrent writer can't
-			// shift indices between the prompt and the actual delete.
+			// shift indices between the prompt and the actual delete, and
+			// re-check the task count so the destructive guard isn't bypassed
+			// by tasks added between the unlocked load and the locked delete.
+			var deletedName string
 			_, err = store.WithProjectLocked(project.ID, func(p *domain.Project) error {
-				_, idx, err := resolveCategory(*p, args[0])
-				if err != nil {
+				lockedCat, idx, rerr := resolveCategory(*p, args[0])
+				if rerr != nil {
 					return fmt.Errorf("category %q not found", args[0])
 				}
+				if !force && len(lockedCat.Tasks) > len(cat.Tasks) {
+					return fmt.Errorf("category %q gained %d task(s) since the prompt; re-run with -f to confirm", lockedCat.Name, len(lockedCat.Tasks)-len(cat.Tasks))
+				}
+				deletedName = lockedCat.Name
 				return p.RemoveCategory(idx)
 			})
 			if err != nil {
 				return err
 			}
 
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Deleted category: %s", cat.Name))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Deleted category: %s", deletedName))
 			return nil
 		},
 	}

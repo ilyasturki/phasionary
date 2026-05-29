@@ -101,21 +101,30 @@ func (s *Server) handleProjectUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimSpace(r.FormValue("name"))
-	if name == "" {
-		project, _ := s.store.LoadProjectByID(pid)
+	renderFormErr := func(errMsg string) {
+		project, err := s.store.LoadProjectByID(pid)
+		if err != nil {
+			s.mutationError(w, err)
+			return
+		}
+		project.Name = name
 		s.render(w, "project_form", projectFormData{
 			Title:   "Rename " + project.Name,
 			Project: project,
 			IsNew:   false,
-			Error:   "Name is required.",
+			Error:   errMsg,
 		})
+	}
+	if name == "" {
+		renderFormErr("Name is required.")
 		return
 	}
-	project, err := s.withProject(pid, func(p *domain.Project) error {
-		p.Name = name
-		return nil
-	})
+	project, err := s.store.RenameProject(pid, name)
 	if err != nil {
+		if errors.Is(err, data.ErrDuplicateProjectName) {
+			renderFormErr("A project with that name already exists.")
+			return
+		}
 		s.mutationError(w, err)
 		return
 	}

@@ -352,6 +352,62 @@ func TestProjectDeleteSendsRedirect(t *testing.T) {
 	}
 }
 
+func TestProjectDeleteViaPOSTFallback(t *testing.T) {
+	// POST /projects/{pid}/delete is the non-htmx fallback for the delete
+	// button; without this route a JS-less browser's form submit would land
+	// on handleProjectUpdate and rerender "Name is required."
+	srv, store := newTestServer(t, "")
+	p, _ := store.CreateProject("Test")
+
+	resp := do(t, srv, newRequest(t, "POST", "/projects/"+p.ID+"/delete", nil))
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status: want 303, got %d", resp.StatusCode)
+	}
+	projects, _ := store.ListProjects()
+	if len(projects) != 0 {
+		t.Fatalf("expected no projects after delete, got %d", len(projects))
+	}
+}
+
+func TestProjectUpdateRejectsDuplicateName(t *testing.T) {
+	srv, store := newTestServer(t, "")
+	a, _ := store.CreateProject("Alpha")
+	_, _ = store.CreateProject("Beta")
+
+	resp := do(t, srv, newRequest(t, "POST", "/projects/"+a.ID, url.Values{"name": {"Beta"}}))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200 (form re-render), got %d", resp.StatusCode)
+	}
+	body := readBody(t, resp)
+	if !strings.Contains(body, "already exists") {
+		t.Fatalf("expected duplicate-name error in re-rendered form, got: %s", body)
+	}
+	got, _ := store.LoadProjectByID(a.ID)
+	if got.Name != "Alpha" {
+		t.Fatalf("rename must not partially apply; name = %q", got.Name)
+	}
+}
+
+func TestTaskCreateRejectsNegativeEstimate(t *testing.T) {
+	srv, store := newTestServer(t, "")
+	pid, cid, _ := setupProjectWithTask(t, srv, store)
+
+	resp := do(t, srv, newRequest(t, "POST",
+		"/projects/"+pid+"/categories/"+cid+"/tasks",
+		url.Values{
+			"title":    {"New"},
+			"status":   {"todo"},
+			"priority": {""},
+			"estimate": {"-10"},
+		}))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200 (form re-render), got %d", resp.StatusCode)
+	}
+	if !strings.Contains(readBody(t, resp), "estimate must be") {
+		t.Fatalf("expected estimate validation error in re-rendered form")
+	}
+}
+
 func TestAuthMissingToken401(t *testing.T) {
 	srv, _ := newTestServer(t, "secret-token")
 	resp := do(t, srv, newRequest(t, "GET", "/projects", nil))

@@ -4,10 +4,36 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"syscall"
 
 	"phasionary/internal/domain"
 )
+
+// globalLockName is the lock file used to serialize operations that span
+// multiple projects (CreateProject, RenameProject). Lock-ordering rule:
+// always acquire the global lock BEFORE any per-project lock to avoid
+// deadlocks against per-project writers.
+const globalLockName = ".global.lock"
+
+func (s *Store) globalLockPath() string {
+	return filepath.Join(s.Dir, globalLockName)
+}
+
+func (s *Store) acquireGlobalLock() (*os.File, error) {
+	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(s.globalLockPath(), os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return f, nil
+}
 
 // SaveProjectLocked saves a project while holding an exclusive flock on a
 // per-project lock file. Use this when multiple processes may write to the
@@ -16,7 +42,27 @@ import (
 // The lock file lives next to the project JSON at `{id}.json.lock` and is
 // kept on disk between calls; only the flock state matters. Closing the fd
 // releases the advisory lock, so an explicit LOCK_UN isn't needed.
+//
+// Returns ErrProjectNotFound if the project's JSON file is missing — this
+// prevents a stale in-memory snapshot from resurrecting a project that was
+// just deleted by another process. Use saveNewProjectLocked for the
+// create path.
 func (s *Store) SaveProjectLocked(project domain.Project) error {
+	f, err := s.acquireProjectLock(project.ID)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := os.Stat(s.projectPath(project.ID)); errors.Is(err, fs.ErrNotExist) {
+		return ErrProjectNotFound
+	}
+	return s.saveProjectAtomic(project)
+}
+
+// saveNewProjectLocked writes a fresh project file under the per-project
+// flock. Unlike SaveProjectLocked it does not require the file to already
+// exist; only CreateProject should use it.
+func (s *Store) saveNewProjectLocked(project domain.Project) error {
 	f, err := s.acquireProjectLock(project.ID)
 	if err != nil {
 		return err

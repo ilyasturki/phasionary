@@ -15,7 +15,7 @@
 {{end}}
 
 <footer class="bottom-bar">
-  <form method="post" action="/projects/{{.Project.ID}}"
+  <form method="post" action="/projects/{{.Project.ID}}/delete"
         hx-delete="/projects/{{.Project.ID}}"
         hx-confirm="Delete this project and all its data?">
     <button type="submit" class="btn btn-danger btn-small">Delete project</button>

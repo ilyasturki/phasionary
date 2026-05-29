@@ -25,6 +25,7 @@ type ProjectRepository interface {
 	SaveProjectLocked(project domain.Project) error
 	WithProjectLocked(id string, fn func(*domain.Project) error) (domain.Project, error)
 	CreateProject(name string) (domain.Project, error)
+	RenameProject(id, newName string) (domain.Project, error)
 	DeleteProject(id string) error
 }
 
@@ -80,7 +81,17 @@ func (s *Store) LoadProjectByID(id string) (domain.Project, error) {
 	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		return domain.Project{}, ErrProjectNotFound
 	}
-	return s.loadProjectFile(path)
+	project, err := s.loadProjectFile(path)
+	if err != nil {
+		return domain.Project{}, err
+	}
+	// A blank id would cause saveProjectAtomic to write to "<dir>/.json",
+	// silently splitting state; treat such files as not-found rather than
+	// loading them as a zero-ID project.
+	if project.ID == "" {
+		return domain.Project{}, ErrProjectNotFound
+	}
+	return project, nil
 }
 
 func (s *Store) LoadProject(selector string) (domain.Project, error) {
@@ -149,15 +160,17 @@ func writeFileSync(path string, data []byte, perm os.FileMode) error {
 }
 
 func (s *Store) CreateProject(name string) (domain.Project, error) {
-	projects, err := s.ListProjects()
+	// Hold the global lock across the duplicate-name check and the save so
+	// two racing CreateProject calls can't both observe a missing name and
+	// each write their own project file.
+	g, err := s.acquireGlobalLock()
 	if err != nil {
 		return domain.Project{}, err
 	}
-	needle := domain.NormalizeName(name)
-	for _, project := range projects {
-		if domain.NormalizeName(project.Name) == needle {
-			return domain.Project{}, fmt.Errorf("%w: %q", ErrDuplicateProjectName, name)
-		}
+	defer g.Close()
+
+	if err := s.checkProjectNameAvailableLocked(name, ""); err != nil {
+		return domain.Project{}, err
 	}
 	project, err := domain.NewProject(name)
 	if err != nil {
@@ -168,10 +181,65 @@ func (s *Store) CreateProject(name string) (domain.Project, error) {
 		return domain.Project{}, err
 	}
 	project.Categories = populateSampleTasks(project.Categories)
-	if err := s.SaveProjectLocked(project); err != nil {
+	if err := s.saveNewProjectLocked(project); err != nil {
 		return domain.Project{}, err
 	}
 	return project, nil
+}
+
+// RenameProject updates a project's display name while holding the global
+// lock, so the unique-name invariant survives concurrent renames/creates
+// from other processes. excludeID lets the duplicate check skip the
+// project being renamed.
+func (s *Store) RenameProject(id, newName string) (domain.Project, error) {
+	g, err := s.acquireGlobalLock()
+	if err != nil {
+		return domain.Project{}, err
+	}
+	defer g.Close()
+
+	if err := s.checkProjectNameAvailableLocked(newName, id); err != nil {
+		return domain.Project{}, err
+	}
+	// Per-project flock for the read-modify-write itself. Global lock is
+	// already held, so the acquisition order is global → project.
+	if _, err := os.Stat(s.projectPath(id)); errors.Is(err, fs.ErrNotExist) {
+		return domain.Project{}, ErrProjectNotFound
+	}
+	pl, err := s.acquireProjectLock(id)
+	if err != nil {
+		return domain.Project{}, err
+	}
+	defer pl.Close()
+	project, err := s.LoadProjectByID(id)
+	if err != nil {
+		return domain.Project{}, err
+	}
+	project.Name = newName
+	if err := s.saveProjectAtomic(project); err != nil {
+		return domain.Project{}, err
+	}
+	return project, nil
+}
+
+// checkProjectNameAvailableLocked returns ErrDuplicateProjectName if any
+// existing project (other than excludeID) shares the normalized name.
+// Caller must hold the global lock.
+func (s *Store) checkProjectNameAvailableLocked(name, excludeID string) error {
+	projects, err := s.ListProjects()
+	if err != nil {
+		return err
+	}
+	needle := domain.NormalizeName(name)
+	for _, p := range projects {
+		if p.ID == excludeID {
+			continue
+		}
+		if domain.NormalizeName(p.Name) == needle {
+			return fmt.Errorf("%w: %q", ErrDuplicateProjectName, name)
+		}
+	}
+	return nil
 }
 
 func (s *Store) InitDefault() (domain.Project, error) {

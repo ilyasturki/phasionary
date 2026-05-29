@@ -116,12 +116,16 @@ func (s *Server) handleCategoryUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if renderError != "" {
-		idx, _ := project.FindCategoryByID(cid)
-		cat := domain.Category{Name: name}
-		if idx >= 0 {
-			cat = project.Categories[idx]
-			cat.Name = name
+		// If a concurrent writer deleted the category between the closure
+		// and the reload, surface a 404 instead of rendering a form whose
+		// action URL is missing the category id.
+		idx, err := project.FindCategoryByID(cid)
+		if err != nil {
+			s.mutationError(w, err)
+			return
 		}
+		cat := project.Categories[idx]
+		cat.Name = name
 		s.render(w, "category_form", categoryFormData{
 			Title:    "Rename category",
 			Project:  project,

@@ -27,6 +27,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects/{pid}/edit", s.handleProjectEdit)
 	mux.HandleFunc("POST /projects/{pid}", s.handleProjectUpdate)
 	mux.HandleFunc("DELETE /projects/{pid}", s.handleProjectDelete)
+	// Plain-form fallback for the delete button when htmx is unavailable;
+	// without it a POST would route to handleProjectUpdate and fail
+	// validation rather than deleting.
+	mux.HandleFunc("POST /projects/{pid}/delete", s.handleProjectDelete)
 
 	mux.HandleFunc("GET /projects/{pid}/categories/new", s.handleCategoryNew)
 	mux.HandleFunc("POST /projects/{pid}/categories", s.handleCategoryCreate)

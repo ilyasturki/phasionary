@@ -1,12 +1,31 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"phasionary/internal/domain"
 )
+
+// parseEstimate accepts a non-negative minute count or empty (= 0). Reject
+// negatives and non-numerics so a tampered <input min="0"> can't poison the
+// stored value.
+func parseEstimate(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, errors.New("estimate must be a whole number of minutes")
+	}
+	if n < 0 {
+		return 0, errors.New("estimate must be zero or greater")
+	}
+	return n, nil
+}
 
 func (s *Server) handleTaskNew(w http.ResponseWriter, r *http.Request) {
 	pid := r.PathValue("pid")
@@ -43,19 +62,24 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 		status = domain.StatusTodo
 	}
 	priority := r.FormValue("priority")
-	estimate, _ := strconv.Atoi(r.FormValue("estimate"))
+	estimate, estErr := parseEstimate(r.FormValue("estimate"))
 	description := strings.TrimRight(r.FormValue("description"), "\n")
 
 	renderForm := func(errMsg string) {
-		project, _ := s.store.LoadProjectByID(pid)
-		cat := domain.Category{}
-		if idx, ferr := project.FindCategoryByID(cid); ferr == nil {
-			cat = project.Categories[idx]
+		project, err := s.store.LoadProjectByID(pid)
+		if err != nil {
+			s.mutationError(w, err)
+			return
+		}
+		idx, err := project.FindCategoryByID(cid)
+		if err != nil {
+			s.mutationError(w, err)
+			return
 		}
 		s.render(w, "task_form", taskFormData{
 			Title:    "New task",
 			Project:  project,
-			Category: cat,
+			Category: project.Categories[idx],
 			Task: domain.Task{
 				Title:           title,
 				Status:          status,
@@ -81,6 +105,10 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := probe.SetPriority(priority); err != nil {
 		renderForm("Invalid priority.")
+		return
+	}
+	if estErr != nil {
+		renderForm(estErr.Error())
 		return
 	}
 
@@ -146,14 +174,19 @@ func (s *Server) handleTaskUpdate(w http.ResponseWriter, r *http.Request) {
 	title := strings.TrimSpace(r.FormValue("title"))
 	status := r.FormValue("status")
 	priority := r.FormValue("priority")
-	estimate, _ := strconv.Atoi(r.FormValue("estimate"))
+	estimate, estErr := parseEstimate(r.FormValue("estimate"))
 	description := strings.TrimRight(r.FormValue("description"), "\n")
 
 	renderForm := func(errMsg string) {
-		project, _ := s.store.LoadProjectByID(pid)
-		var cat domain.Category
-		if cidx, ferr := project.FindCategoryByID(cid); ferr == nil {
-			cat = project.Categories[cidx]
+		project, err := s.store.LoadProjectByID(pid)
+		if err != nil {
+			s.mutationError(w, err)
+			return
+		}
+		cidx, err := project.FindCategoryByID(cid)
+		if err != nil {
+			s.mutationError(w, err)
+			return
 		}
 		// Preserve the user's just-typed values; carry only ID over from the
 		// persisted task so the form action URL still points at the right row.
@@ -168,7 +201,7 @@ func (s *Server) handleTaskUpdate(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "task_form", taskFormData{
 			Title:    "Edit task",
 			Project:  project,
-			Category: cat,
+			Category: project.Categories[cidx],
 			Task:     task,
 			IsNew:    false,
 			Error:    errMsg,
@@ -186,6 +219,10 @@ func (s *Server) handleTaskUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := probe.SetPriority(priority); err != nil {
 		renderForm("Invalid priority.")
+		return
+	}
+	if estErr != nil {
+		renderForm(estErr.Error())
 		return
 	}
 
@@ -302,10 +339,8 @@ func (s *Server) handleTaskMove(w http.ResponseWriter, r *http.Request) {
 		s.badRequest(w, err.Error())
 		return
 	}
-	var cidx int
 	project, err := s.withProject(pid, func(p *domain.Project) error {
-		var err error
-		cidx, err = p.FindCategoryByID(cid)
+		cidx, err := p.FindCategoryByID(cid)
 		if err != nil {
 			return err
 		}
@@ -320,6 +355,14 @@ func (s *Server) handleTaskMove(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil
 	})
+	if err != nil {
+		s.mutationError(w, err)
+		return
+	}
+	// Re-resolve the category index against the post-call project — the
+	// errNoChange branch of withProject reloads from disk without the
+	// project flock, so any closure-captured cidx may be stale.
+	cidx, err := project.FindCategoryByID(cid)
 	if err != nil {
 		s.mutationError(w, err)
 		return

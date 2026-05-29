@@ -132,12 +132,13 @@ func newProjectEditCmd() *cobra.Command {
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
-
-			err := withProject(projectSelector(args), func(_ *data.Store, project *domain.Project) error {
-				project.Name = name
-				return nil
-			})
+			store, project, err := loadStoreAndProject(projectSelector(args))
 			if err != nil {
+				return err
+			}
+			// RenameProject takes the global lock so the duplicate-name
+			// check + save are atomic across processes.
+			if _, err := store.RenameProject(project.ID, name); err != nil {
 				return err
 			}
 			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Renamed project to: %s", name))

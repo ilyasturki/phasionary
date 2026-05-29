@@ -16,9 +16,6 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		return next
 	}
 	expected := []byte(s.cfg.Token)
-	// On non-loopback binds, the cookie travels over the network; mark it
-	// Secure so a downgraded HTTP listener doesn't leak it in cleartext.
-	secureCookie := !IsLoopbackAddr(s.cfg.Addr)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/static/") {
 			next.ServeHTTP(w, r)
@@ -38,12 +35,16 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			}
 		}
 		if provided != "" && subtle.ConstantTimeCompare([]byte(provided), expected) == 1 {
+			// The server speaks plain HTTP, so don't set Secure — a Secure
+			// cookie is silently dropped by browsers over HTTP and the
+			// post-redirect request would re-trigger the auth path.
+			// Operators terminating TLS in front of this server should
+			// rely on a reverse proxy that re-stamps the cookie.
 			http.SetCookie(w, &http.Cookie{
 				Name:     sessionCookieName,
 				Value:    s.cfg.Token,
 				Path:     "/",
 				HttpOnly: true,
-				Secure:   secureCookie,
 				SameSite: http.SameSiteLaxMode,
 				MaxAge:   30 * 24 * 60 * 60,
 			})

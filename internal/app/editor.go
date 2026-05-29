@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"phasionary/internal/app/selection"
+	"phasionary/internal/data"
 	"phasionary/internal/domain"
 )
 
@@ -176,12 +177,19 @@ func (m *model) applyProjectEdit(content string) {
 	}
 
 	m.recordHistory()
-	m.project.Name = name
-	m.project.UpdatedAt = domain.NowTimestamp()
-	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
+	// RenameProject takes the global lock so a duplicate name across
+	// projects is rejected instead of silently producing two homonyms.
+	updated, err := m.deps.Store.RenameProject(m.project.ID, name)
+	if err != nil {
+		m.discardLastHistory()
+		if errors.Is(err, data.ErrDuplicateProjectName) {
+			m.ui.Screen.StatusMsg = "A project with that name already exists"
+			return
+		}
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
 		return
 	}
+	m.project = updated
 	m.ui.Screen.StatusMsg = "Project updated"
 }
 
