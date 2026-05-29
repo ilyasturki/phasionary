@@ -1,0 +1,39 @@
+{{define "category"}}
+<section class="category" id="category-{{.Category.ID}}">
+  <header class="category-header">
+    <h2 class="category-name">{{.Category.Name}}</h2>
+    <div class="category-actions">
+      <button class="btn-icon"
+              hx-post="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/move?dir=up"
+              hx-target="#categories"
+              hx-swap="outerHTML"
+              aria-label="Move category up">↑</button>
+      <button class="btn-icon"
+              hx-post="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/move?dir=down"
+              hx-target="#categories"
+              hx-swap="outerHTML"
+              aria-label="Move category down">↓</button>
+      <a class="btn-icon" href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/edit" aria-label="Rename category">✎</a>
+      <button class="btn-icon btn-danger"
+              hx-delete="/projects/{{.Project.ID}}/categories/{{.Category.ID}}"
+              hx-confirm="Delete category and all its tasks?"
+              hx-target="closest .category"
+              hx-swap="delete"
+              aria-label="Delete category">✕</button>
+      <a class="btn btn-small btn-primary" href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks/new">+ Task</a>
+    </div>
+  </header>
+
+  {{if .Category.Tasks}}
+  <ul class="task-list">
+    {{$proj := .Project}}
+    {{$cat := .Category}}
+    {{range .Category.Tasks}}
+      {{template "task_row" (dict "Project" $proj "Category" $cat "Task" .)}}
+    {{end}}
+  </ul>
+  {{else}}
+  <p class="empty empty-tasks">No tasks. <a href="/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks/new">Add one</a>.</p>
+  {{end}}
+</section>
+{{end}}

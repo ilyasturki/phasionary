@@ -223,10 +223,10 @@ func (m *model) moveTaskDown() {
 	}
 	catIndex := position.CategoryIndex
 	taskIndex := position.TaskIndex
-	tasks := m.project.Categories[catIndex].Tasks
-	if taskIndex < len(tasks)-1 {
+	if taskIndex < len(m.project.Categories[catIndex].Tasks)-1 {
 		m.recordHistory()
-		tasks[taskIndex], tasks[taskIndex+1] = tasks[taskIndex+1], tasks[taskIndex]
+		_ = m.project.Categories[catIndex].MoveTask(taskIndex, 1)
+		m.project.UpdatedAt = domain.NowTimestamp()
 		m.rebuildPositions()
 		m.ui.Selection.MoveBy(1)
 		m.ensureVisible()
@@ -237,7 +237,7 @@ func (m *model) moveTaskDown() {
 		return
 	}
 	m.recordHistory()
-	task := tasks[taskIndex]
+	task := m.project.Categories[catIndex].Tasks[taskIndex]
 	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
 	dstCatIndex := catIndex + 1
 	m.project.Categories[dstCatIndex].InsertTask(0, task)
@@ -260,8 +260,8 @@ func (m *model) moveTaskUp() {
 	taskIndex := position.TaskIndex
 	if taskIndex > 0 {
 		m.recordHistory()
-		tasks := m.project.Categories[catIndex].Tasks
-		tasks[taskIndex], tasks[taskIndex-1] = tasks[taskIndex-1], tasks[taskIndex]
+		_ = m.project.Categories[catIndex].MoveTask(taskIndex, -1)
+		m.project.UpdatedAt = domain.NowTimestamp()
 		m.rebuildPositions()
 		m.ui.Selection.MoveBy(-1)
 		m.ensureVisible()
@@ -305,8 +305,7 @@ func (m *model) moveCategoryDown() {
 		return
 	}
 	m.recordHistory()
-	m.project.Categories[catIndex], m.project.Categories[catIndex+1] =
-		m.project.Categories[catIndex+1], m.project.Categories[catIndex]
+	_ = m.project.MoveCategory(catIndex, 1)
 	m.rebuildPositions()
 	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
 		return p.Kind == selection.FocusCategory && p.CategoryIndex == catIndex+1
@@ -328,8 +327,7 @@ func (m *model) moveCategoryUp() {
 		return
 	}
 	m.recordHistory()
-	m.project.Categories[catIndex], m.project.Categories[catIndex-1] =
-		m.project.Categories[catIndex-1], m.project.Categories[catIndex]
+	_ = m.project.MoveCategory(catIndex, -1)
 	m.rebuildPositions()
 	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
 		return p.Kind == selection.FocusCategory && p.CategoryIndex == catIndex-1

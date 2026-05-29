@@ -1,0 +1,19 @@
+{{define "content"}}
+<header class="top-bar">
+  <a class="back" href="/projects/{{.Project.ID}}" aria-label="Cancel">←</a>
+  <h1>{{if .IsNew}}New category{{else}}Rename category{{end}}</h1>
+</header>
+
+{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
+<form class="form" method="post" action="{{if .IsNew}}/projects/{{.Project.ID}}/categories{{else}}/projects/{{.Project.ID}}/categories/{{.Category.ID}}{{end}}">
+  <label>
+    Name
+    <input type="text" name="name" required autofocus value="{{.Category.Name}}">
+  </label>
+  <div class="form-actions">
+    <a class="btn" href="/projects/{{.Project.ID}}">Cancel</a>
+    <button type="submit" class="btn btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+  </div>
+</form>
+{{end}}

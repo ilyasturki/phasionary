@@ -5,11 +5,16 @@ import (
 	"phasionary/internal/domain"
 )
 
+// storeTaskUpdate persists the in-memory project to disk under the project
+// flock. The lock makes the WRITE atomic vs. concurrent `phasionary serve`
+// activity, but the TUI's load-mutate-save cycle still wins blindly over any
+// edits serve made in the meantime — use reloadProject (R) to pick up
+// out-of-band changes before continuing to edit.
 func (m *model) storeTaskUpdate() {
 	if m.deps.Store == nil {
 		return
 	}
-	if err := m.deps.Store.SaveProject(m.project); err != nil {
+	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
 		m.ui.Screen.StatusMsg = "Save failed: " + err.Error()
 	}
 }

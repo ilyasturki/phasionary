@@ -3,12 +3,12 @@ build:
     go build -ldflags "-X phasionary/internal/version.Version=$(git describe --tags --always) -X phasionary/internal/version.Commit=$(git rev-parse --short HEAD) -X phasionary/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o phasionary ./cmd/phasionary
 
 # Run the CLI binary
-run:
-    ./phasionary
+run *ARGS:
+    ./phasionary {{ARGS}}
 
 # Run the CLI binary with the app data
-run-app:
-    ./phasionary --data ./data
+run-app *ARGS:
+    ./phasionary --data ./data {{ARGS}}
 
 # Build the CLI binary using Nix.
 build-nix:

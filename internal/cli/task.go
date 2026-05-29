@@ -271,10 +271,16 @@ func newTaskDeleteCmd() *cobra.Command {
 			}
 
 			title := ref.Task.Title
-			if err := project.Categories[ref.CategoryIndex].RemoveTask(ref.TaskIndex); err != nil {
-				return err
-			}
-			if err := store.SaveProject(project); err != nil {
+			// Re-resolve under the project flock so a concurrent writer can't
+			// shift indices between the prompt and the actual delete.
+			_, err = store.WithProjectLocked(project.ID, func(p *domain.Project) error {
+				r, err := resolveTask(*p, args[0])
+				if err != nil {
+					return fmt.Errorf("task %q not found", args[0])
+				}
+				return p.Categories[r.CategoryIndex].RemoveTask(r.TaskIndex)
+			})
+			if err != nil {
 				return err
 			}
 

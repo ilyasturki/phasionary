@@ -1,0 +1,24 @@
+{{define "content"}}
+<header class="top-bar">
+  <a class="back" href="/projects" aria-label="Back to projects">←</a>
+  <h1>{{.Project.Name}}</h1>
+  <div class="top-actions">
+    <a class="btn btn-small" href="/projects/{{.Project.ID}}/edit">Rename</a>
+    <a class="btn btn-small btn-primary" href="/projects/{{.Project.ID}}/categories/new">+ Category</a>
+  </div>
+</header>
+
+{{if .Project.Categories}}
+{{template "categories" (dict "Project" .Project "Categories" .Project.Categories)}}
+{{else}}
+<p class="empty">No categories yet. <a href="/projects/{{.Project.ID}}/categories/new">Add one</a>.</p>
+{{end}}
+
+<footer class="bottom-bar">
+  <form method="post" action="/projects/{{.Project.ID}}"
+        hx-delete="/projects/{{.Project.ID}}"
+        hx-confirm="Delete this project and all its data?">
+    <button type="submit" class="btn btn-danger btn-small">Delete project</button>
+  </form>
+</footer>
+{{end}}

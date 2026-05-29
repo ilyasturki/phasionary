@@ -1,0 +1,51 @@
+{{define "content"}}
+<header class="top-bar">
+  <a class="back" href="/projects/{{.Project.ID}}" aria-label="Cancel">←</a>
+  <h1>{{if .IsNew}}New task{{else}}Edit task{{end}}</h1>
+  <div class="top-actions"><span class="muted">in {{.Category.Name}}</span></div>
+</header>
+
+{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
+<form class="form" method="post" action="{{if .IsNew}}/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks{{else}}/projects/{{.Project.ID}}/categories/{{.Category.ID}}/tasks/{{.Task.ID}}{{end}}">
+  <label>
+    Title
+    <input type="text" name="title" required autofocus value="{{.Task.Title}}">
+  </label>
+
+  <label>
+    Status
+    <select name="status">
+      <option value="todo" {{if eq .Task.Status "todo"}}selected{{end}}>Todo</option>
+      <option value="in_progress" {{if eq .Task.Status "in_progress"}}selected{{end}}>In progress</option>
+      <option value="completed" {{if eq .Task.Status "completed"}}selected{{end}}>Done</option>
+      <option value="cancelled" {{if eq .Task.Status "cancelled"}}selected{{end}}>Cancelled</option>
+    </select>
+  </label>
+
+  <label>
+    Priority
+    <select name="priority">
+      <option value="" {{if eq .Task.Priority ""}}selected{{end}}>—</option>
+      <option value="high" {{if eq .Task.Priority "high"}}selected{{end}}>High</option>
+      <option value="medium" {{if eq .Task.Priority "medium"}}selected{{end}}>Medium</option>
+      <option value="low" {{if eq .Task.Priority "low"}}selected{{end}}>Low</option>
+    </select>
+  </label>
+
+  <label>
+    Estimate (minutes)
+    <input type="number" name="estimate" min="0" step="5" value="{{if .Task.EstimateMinutes}}{{.Task.EstimateMinutes}}{{end}}">
+  </label>
+
+  <label>
+    Description
+    <textarea name="description" rows="4">{{.Task.Description}}</textarea>
+  </label>
+
+  <div class="form-actions">
+    <a class="btn" href="/projects/{{.Project.ID}}">Cancel</a>
+    <button type="submit" class="btn btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+  </div>
+</form>
+{{end}}

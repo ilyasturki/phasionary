@@ -13,12 +13,17 @@ import (
 	"phasionary/internal/domain"
 )
 
-var ErrProjectNotFound = errors.New("project not found")
+var (
+	ErrProjectNotFound      = errors.New("project not found")
+	ErrDuplicateProjectName = errors.New("project name already exists")
+)
 
 type ProjectRepository interface {
 	ListProjects() ([]domain.Project, error)
 	LoadProject(selector string) (domain.Project, error)
-	SaveProject(project domain.Project) error
+	LoadProjectByID(id string) (domain.Project, error)
+	SaveProjectLocked(project domain.Project) error
+	WithProjectLocked(id string, fn func(*domain.Project) error) (domain.Project, error)
 	CreateProject(name string) (domain.Project, error)
 	DeleteProject(id string) error
 }
@@ -70,6 +75,14 @@ func (s *Store) ListProjects() ([]domain.Project, error) {
 	return projects, nil
 }
 
+func (s *Store) LoadProjectByID(id string) (domain.Project, error) {
+	path := s.projectPath(id)
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		return domain.Project{}, ErrProjectNotFound
+	}
+	return s.loadProjectFile(path)
+}
+
 func (s *Store) LoadProject(selector string) (domain.Project, error) {
 	projects, err := s.ListProjects()
 	if err != nil {
@@ -90,9 +103,8 @@ func (s *Store) LoadProject(selector string) (domain.Project, error) {
 	return domain.Project{}, ErrProjectNotFound
 }
 
-func (s *Store) SaveProject(project domain.Project) error {
+func (s *Store) saveProjectAtomic(project domain.Project) error {
 	project.UpdatedAt = domain.NowTimestamp()
-	path := s.projectPath(project.ID)
 	data, err := json.MarshalIndent(project, "", "  ")
 	if err != nil {
 		return err
@@ -100,7 +112,40 @@ func (s *Store) SaveProject(project domain.Project) error {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	path := s.projectPath(project.ID)
+	tmp := s.tmpPath(project.ID)
+	if err := writeFileSync(tmp, data, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	// Flush the directory entry so the rename survives a crash.
+	if dir, derr := os.Open(s.Dir); derr == nil {
+		_ = dir.Sync()
+		_ = dir.Close()
+	}
+	return nil
+}
+
+// writeFileSync writes data to path and fsyncs the file before closing.
+// os.WriteFile only returns once the bytes are in the page cache, which is
+// not crash-safe; the atomic rename pattern needs a flushed tmp file.
+func writeFileSync(path string, data []byte, perm os.FileMode) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func (s *Store) CreateProject(name string) (domain.Project, error) {
@@ -111,7 +156,7 @@ func (s *Store) CreateProject(name string) (domain.Project, error) {
 	needle := domain.NormalizeName(name)
 	for _, project := range projects {
 		if domain.NormalizeName(project.Name) == needle {
-			return domain.Project{}, fmt.Errorf("project %q already exists", name)
+			return domain.Project{}, fmt.Errorf("%w: %q", ErrDuplicateProjectName, name)
 		}
 	}
 	project, err := domain.NewProject(name)
@@ -123,7 +168,7 @@ func (s *Store) CreateProject(name string) (domain.Project, error) {
 		return domain.Project{}, err
 	}
 	project.Categories = populateSampleTasks(project.Categories)
-	if err := s.SaveProject(project); err != nil {
+	if err := s.SaveProjectLocked(project); err != nil {
 		return domain.Project{}, err
 	}
 	return project, nil
@@ -171,12 +216,29 @@ func (s *Store) projectPath(id string) string {
 	return filepath.Join(s.Dir, fmt.Sprintf("%s.json", id))
 }
 
+func (s *Store) lockPath(id string) string { return s.projectPath(id) + ".lock" }
+func (s *Store) tmpPath(id string) string  { return s.projectPath(id) + ".tmp" }
+
 func (s *Store) DeleteProject(id string) error {
+	// Hold the project flock while deleting so a concurrent writer can't
+	// race in mid-delete. We keep the .lock file on disk afterwards — unlinking
+	// it would break mutual exclusion for any other process that's already
+	// flocked the old inode (a fresh OpenFile would get a new inode and lock
+	// it independently).
+	f, err := s.acquireProjectLock(id)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 	path := s.projectPath(id)
 	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		return ErrProjectNotFound
 	}
-	return os.Remove(path)
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	_ = os.Remove(s.tmpPath(id))
+	return nil
 }
 
 type sampleTask struct {

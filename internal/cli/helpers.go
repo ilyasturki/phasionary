@@ -108,14 +108,21 @@ func loadStoreAndProject(selector string) (*data.Store, domain.Project, error) {
 }
 
 func withProject(selector string, fn func(*data.Store, *domain.Project) error) error {
-	store, project, err := loadStoreAndProject(selector)
+	store, err := storeFromViper()
 	if err != nil {
 		return err
 	}
-	if err := fn(store, &project); err != nil {
+	// Resolve the (possibly fuzzy) selector to an exact ID first, then load
+	// and save under the project flock so concurrent writes from
+	// `phasionary serve` can't clobber our update.
+	initial, err := store.LoadProject(selector)
+	if err != nil {
 		return err
 	}
-	return store.SaveProject(project)
+	_, err = store.WithProjectLocked(initial.ID, func(p *domain.Project) error {
+		return fn(store, p)
+	})
+	return err
 }
 
 func viewProject(selector string, fn func(domain.Project) error) error {

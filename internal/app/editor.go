@@ -178,7 +178,7 @@ func (m *model) applyProjectEdit(content string) {
 	m.recordHistory()
 	m.project.Name = name
 	m.project.UpdatedAt = domain.NowTimestamp()
-	if err := m.deps.Store.SaveProject(m.project); err != nil {
+	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
 		return
 	}
@@ -212,7 +212,7 @@ func (m *model) applyCategoryEdit(content string) {
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Rename failed: %v", err)
 		return
 	}
-	if err := m.deps.Store.SaveProject(m.project); err != nil {
+	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
 		return
 	}
@@ -247,7 +247,7 @@ func (m *model) applyTaskEdit(content string) {
 	task.Title = title
 	task.Description = description
 	task.UpdatedAt = domain.NowTimestamp()
-	if err := m.deps.Store.SaveProject(m.project); err != nil {
+	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
 		return
 	}

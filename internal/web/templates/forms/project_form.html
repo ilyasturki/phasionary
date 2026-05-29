@@ -1,0 +1,24 @@
+{{define "content"}}
+<header class="top-bar">
+  {{if .IsNew}}
+    <a class="back" href="/projects" aria-label="Cancel">←</a>
+    <h1>New project</h1>
+  {{else}}
+    <a class="back" href="/projects/{{.Project.ID}}" aria-label="Cancel">←</a>
+    <h1>Rename project</h1>
+  {{end}}
+</header>
+
+{{if .Error}}<p class="form-error">{{.Error}}</p>{{end}}
+
+<form class="form" method="post" action="{{if .IsNew}}/projects{{else}}/projects/{{.Project.ID}}{{end}}">
+  <label>
+    Name
+    <input type="text" name="name" required autofocus value="{{.Project.Name}}">
+  </label>
+  <div class="form-actions">
+    <a class="btn" href="{{if .IsNew}}/projects{{else}}/projects/{{.Project.ID}}{{end}}">Cancel</a>
+    <button type="submit" class="btn btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+  </div>
+</form>
+{{end}}

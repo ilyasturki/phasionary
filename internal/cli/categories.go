@@ -149,7 +149,7 @@ func newCategoryDeleteCmd() *cobra.Command {
 				return err
 			}
 
-			cat, catIdx, err := resolveCategory(project, args[0])
+			cat, _, err := resolveCategory(project, args[0])
 			if err != nil {
 				return fmt.Errorf("category %q not found", args[0])
 			}
@@ -166,10 +166,16 @@ func newCategoryDeleteCmd() *cobra.Command {
 				}
 			}
 
-			if err := project.RemoveCategory(catIdx); err != nil {
-				return err
-			}
-			if err := store.SaveProject(project); err != nil {
+			// Re-resolve under the project flock so a concurrent writer can't
+			// shift indices between the prompt and the actual delete.
+			_, err = store.WithProjectLocked(project.ID, func(p *domain.Project) error {
+				_, idx, err := resolveCategory(*p, args[0])
+				if err != nil {
+					return fmt.Errorf("category %q not found", args[0])
+				}
+				return p.RemoveCategory(idx)
+			})
+			if err != nil {
 				return err
 			}
 

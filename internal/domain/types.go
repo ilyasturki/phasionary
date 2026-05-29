@@ -21,7 +21,11 @@ const (
 
 var DefaultCategories = []string{"Feature", "Fix", "Ergonomy", "Documentation", "Research"}
 
-var ErrDuplicateCategoryName = errors.New("category name already exists")
+var (
+	ErrDuplicateCategoryName = errors.New("category name already exists")
+	ErrCategoryNotFound      = errors.New("category not found")
+	ErrTaskNotFound          = errors.New("task not found")
+)
 
 // Project is stored as a single JSON file.
 type Project struct {
@@ -226,6 +230,25 @@ func (t *Task) CycleStatus() bool {
 	return true
 }
 
+func (t *Task) CyclePriority() bool {
+	var next string
+	switch t.Priority {
+	case "":
+		next = PriorityHigh
+	case PriorityHigh:
+		next = PriorityMedium
+	case PriorityMedium:
+		next = PriorityLow
+	case PriorityLow:
+		next = ""
+	default:
+		next = ""
+	}
+	t.Priority = next
+	t.UpdatedAt = NowTimestamp()
+	return true
+}
+
 func (t *Task) CycleStatusReverse() bool {
 	var nextStatus string
 	switch t.Status {
@@ -399,6 +422,50 @@ func (p *Project) AddCategoryNamed(name string) (*Category, error) {
 	}
 	p.AddCategory(cat)
 	return &p.Categories[len(p.Categories)-1], nil
+}
+
+func (p *Project) FindCategoryByID(id string) (int, error) {
+	for i := range p.Categories {
+		if p.Categories[i].ID == id {
+			return i, nil
+		}
+	}
+	return -1, ErrCategoryNotFound
+}
+
+func (c *Category) FindTaskByID(id string) (int, error) {
+	for i := range c.Tasks {
+		if c.Tasks[i].ID == id {
+			return i, nil
+		}
+	}
+	return -1, ErrTaskNotFound
+}
+
+func (p *Project) MoveCategory(idx, delta int) error {
+	if idx < 0 || idx >= len(p.Categories) {
+		return errors.New("category index out of range")
+	}
+	dst := idx + delta
+	if dst < 0 || dst >= len(p.Categories) {
+		return errors.New("destination index out of range")
+	}
+	p.Categories[idx], p.Categories[dst] = p.Categories[dst], p.Categories[idx]
+	p.UpdatedAt = NowTimestamp()
+	return nil
+}
+
+func (c *Category) MoveTask(idx, delta int) error {
+	if idx < 0 || idx >= len(c.Tasks) {
+		return errors.New("task index out of range")
+	}
+	dst := idx + delta
+	if dst < 0 || dst >= len(c.Tasks) {
+		return errors.New("destination index out of range")
+	}
+	c.Tasks[idx], c.Tasks[dst] = c.Tasks[dst], c.Tasks[idx]
+	c.UpdatedAt = NowTimestamp()
+	return nil
 }
 
 func (p *Project) MoveTask(srcCatIdx, taskIdx, dstCatIdx int) error {

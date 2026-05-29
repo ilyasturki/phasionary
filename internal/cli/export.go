@@ -119,7 +119,7 @@ func newImportCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if err := store.SaveProject(project); err != nil {
+				if err := store.SaveProjectLocked(project); err != nil {
 					return err
 				}
 				writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Imported project: %s (%s)", project.Name, project.ID))
@@ -128,7 +128,7 @@ func newImportCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if err := store.SaveProject(project); err != nil {
+				if err := store.SaveProjectLocked(project); err != nil {
 					return err
 				}
 				writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Imported project: %s (%s)", project.Name, project.ID))
