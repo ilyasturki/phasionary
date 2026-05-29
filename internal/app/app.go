@@ -52,6 +52,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ui.Screen.WindowFocused = true
 	case tea.BlurMsg:
 		m.ui.Screen.WindowFocused = false
+	case tea.MouseWheelMsg:
+		if m.ui.Modes.Current() == modes.ModeNormal {
+			m.handleMouseWheel(msg)
+		}
+		return m, nil
 	case tea.KeyPressMsg:
 		m.ui.Screen.StatusMsg = ""
 		return m.handleKeyMsg(msg)
@@ -59,6 +64,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.forwardToInput(msg)
 	}
 	return m, nil
+}
+
+func (m *model) handleMouseWheel(msg tea.MouseWheelMsg) {
+	switch msg.Button {
+	case tea.MouseWheelUp:
+		m.scrollUp(wheelScrollStep)
+	case tea.MouseWheelDown:
+		m.scrollDown(wheelScrollStep)
+	}
 }
 
 func (m model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -351,7 +365,7 @@ func (m *model) copyCategoryContent() tea.Cmd {
 func (m model) View() tea.View {
 	v := tea.NewView(m.renderView())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeNone
+	v.MouseMode = tea.MouseModeCellMotion
 	v.ReportFocus = true
 	return v
 }

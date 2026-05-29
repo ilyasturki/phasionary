@@ -1,5 +1,30 @@
 package app
 
+const wheelScrollStep = 3
+
+func (m *model) scrollUp(amount int) {
+	if m.ui.Screen.ScrollOffset <= 0 {
+		m.ui.Screen.ScrollOffset = 0
+		return
+	}
+	m.ui.Screen.ScrollOffset -= amount
+	if m.ui.Screen.ScrollOffset < 0 {
+		m.ui.Screen.ScrollOffset = 0
+	}
+}
+
+func (m *model) scrollDown(amount int) {
+	layout := m.buildLayout()
+	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
+	for i := 0; i < amount; i++ {
+		viewport.ComputeVisibility(m.ui.Screen.ScrollOffset)
+		if !viewport.HasMoreBelow {
+			return
+		}
+		m.ui.Screen.ScrollOffset++
+	}
+}
+
 func (m model) availableHeight() int {
 	config := m.layoutConfig()
 	if m.ui.Screen.Height <= config.FooterHeight {
