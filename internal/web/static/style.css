@@ -153,21 +153,19 @@
     color: var(--color-muted-foreground);
     text-decoration: line-through;
   }
-  .task-main { display: flex; gap: 8px; align-items: center; }
-  /* Title + edit ✎ wrapper: title shrinks with ellipsis, ✎ stays put
+  .task-main { display: flex; gap: 8px; align-items: flex-start; }
+  /* Title + edit ✎ wrapper: title wraps over multiple lines, ✎ stays put
      right next to the title text. */
   .task-label {
     flex: 1;
     min-width: 0;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 4px;
   }
   .task-title {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
     padding: 6px 0;
     font-size: 15px;
     color: var(--color-foreground);
@@ -234,7 +232,7 @@
   /* Task description disclosure */
   .task-description { margin-top: 4px; font-size: 14px; color: var(--color-muted-foreground); }
   .task-description summary { cursor: pointer; padding: 4px 0; }
-  .task-description > div { white-space: pre-wrap; padding-top: 6px; }
+  .task-description > div { white-space: pre-wrap; overflow-wrap: anywhere; padding-top: 6px; }
 
   /* Forms: stack fields with comfortable vertical rhythm */
   .form {
