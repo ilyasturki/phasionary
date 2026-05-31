@@ -187,6 +187,40 @@ func (s *Store) CreateProject(name string) (domain.Project, error) {
 	return project, nil
 }
 
+// ImportProject persists a fully-formed project parsed from an external file
+// as a new project on disk. Unlike SaveProjectLocked it does not require the
+// project to already exist, and unlike CreateProject it keeps the caller's
+// categories and tasks instead of seeding defaults. The global lock is held
+// across the duplicate-name check and the write so a concurrent create can't
+// slip in with the same name. A blank ID or CreatedAt is filled in so imports
+// of hand-written files still produce a valid record; an existing project with
+// the same ID is overwritten.
+func (s *Store) ImportProject(project domain.Project) (domain.Project, error) {
+	g, err := s.acquireGlobalLock()
+	if err != nil {
+		return domain.Project{}, err
+	}
+	defer g.Close()
+
+	if err := s.checkProjectNameAvailableLocked(project.Name, project.ID); err != nil {
+		return domain.Project{}, err
+	}
+	if project.ID == "" {
+		id, err := domain.NewID()
+		if err != nil {
+			return domain.Project{}, err
+		}
+		project.ID = id
+	}
+	if project.CreatedAt == "" {
+		project.CreatedAt = domain.NowTimestamp()
+	}
+	if err := s.saveNewProjectLocked(project); err != nil {
+		return domain.Project{}, err
+	}
+	return project, nil
+}
+
 // RenameProject updates a project's display name while holding the global
 // lock, so the unique-name invariant survives concurrent renames/creates
 // from other processes. excludeID lets the duplicate check skip the

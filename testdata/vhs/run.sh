@@ -16,9 +16,6 @@ DATA="/tmp/phas-vt/data"
 CFG="/tmp/phas-vt/cfg"
 OUT="/tmp/phas-vt/vhs-out"
 
-# Tapes that mutate state need a fresh seed before they run.
-MUTATING_TAPES=(03_add_task 04_toggle_and_filter 05_options 06_reorder_across_categories 07_open_url 09_visual_select 10_reload 12_undo_redo 13_status_cycle 14_shortcut_bar)
-
 rm -rf "$OUT" && mkdir -p "$OUT"
 go build -o phasionary ./cmd/phasionary
 
@@ -33,21 +30,16 @@ mapfile -t TAPES < <(
     fi
 )
 
+# Re-seed a pristine data dir before every tape so state never bleeds between
+# them. Import is cheap, and an unconditional reset can't go stale the way a
+# hand-maintained "these tapes mutate" list does.
 seed() { BIN="$(pwd)/phasionary" ./testdata/vhs/seed.sh "$DATA" "$CFG" >/dev/null; }
-is_mutating() {
-    local t=$1 m
-    for m in "${MUTATING_TAPES[@]}"; do [[ $t == "$m" ]] && return 0; done
-    return 1
-}
 
-dirty=1
 for tape in "${TAPES[@]}"; do
     echo
     echo "=== $(basename "$tape") ==="
-    name=$(basename "$tape" .tape)
-    (( dirty )) && seed && dirty=0
+    seed
     vhs "$tape"
-    is_mutating "$name" && dirty=1
 done
 
 echo

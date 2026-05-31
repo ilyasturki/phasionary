@@ -119,19 +119,21 @@ func newImportCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if err := store.SaveProjectLocked(project); err != nil {
+				saved, err := store.ImportProject(project)
+				if err != nil {
 					return err
 				}
-				writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Imported project: %s (%s)", project.Name, project.ID))
+				writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Imported project: %s (%s)", saved.Name, saved.ID))
 			case "markdown", "md":
 				project, err := export.ImportMarkdown(f, name)
 				if err != nil {
 					return err
 				}
-				if err := store.SaveProjectLocked(project); err != nil {
+				saved, err := store.ImportProject(project)
+				if err != nil {
 					return err
 				}
-				writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Imported project: %s (%s)", project.Name, project.ID))
+				writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Imported project: %s (%s)", saved.Name, saved.ID))
 			default:
 				return fmt.Errorf("unsupported format: %s (use json or markdown)", format)
 			}
