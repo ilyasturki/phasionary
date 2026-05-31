@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"phasionary/internal/domain"
 )
 
 func TestDeleteProject(t *testing.T) {
@@ -98,6 +100,58 @@ func TestSaveProjectLocked_RejectsMissing(t *testing.T) {
 
 	_, statErr := os.Stat(filepath.Join(tmpDir, p.ID+".json"))
 	assert.True(t, os.IsNotExist(statErr), "deleted project must not be resurrected by SaveProjectLocked")
+}
+
+func TestImportProject_RejectsDuplicateName(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+	require.NoError(t, store.Ensure())
+
+	original, err := store.CreateProject("Roadmap")
+	require.NoError(t, err)
+
+	// Re-importing a project that still exists must not silently overwrite it;
+	// the duplicate-name check rejects it (a different ID doesn't help).
+	_, err = store.ImportProject(domain.Project{ID: "some-other-id", Name: "Roadmap"})
+	assert.ErrorIs(t, err, ErrDuplicateProjectName)
+
+	reloaded, err := store.LoadProjectByID(original.ID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, reloaded.Categories, "the original project must be left intact")
+}
+
+func TestImportProject_CollidingIDGetsFreshID(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+	require.NoError(t, store.Ensure())
+
+	original, err := store.CreateProject("Alpha")
+	require.NoError(t, err)
+
+	// An import whose ID collides with a live project (but whose name is
+	// unique) must be saved under a fresh ID rather than clobbering the
+	// existing file.
+	imported, err := store.ImportProject(domain.Project{ID: original.ID, Name: "Beta"})
+	require.NoError(t, err)
+	assert.NotEqual(t, original.ID, imported.ID, "colliding import ID must be replaced")
+
+	reloaded, err := store.LoadProjectByID(original.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Alpha", reloaded.Name, "the original project must survive the import")
+}
+
+func TestImportProject_FillsBlankIDAndTimestamp(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+	require.NoError(t, store.Ensure())
+
+	imported, err := store.ImportProject(domain.Project{Name: "Hand-written"})
+	require.NoError(t, err)
+	assert.NotEmpty(t, imported.ID, "a blank ID must be filled in")
+	assert.NotEmpty(t, imported.CreatedAt, "a blank CreatedAt must be filled in")
+
+	_, err = store.LoadProjectByID(imported.ID)
+	require.NoError(t, err)
 }
 
 func TestLoadProjectByID_RejectsBlankIDFile(t *testing.T) {

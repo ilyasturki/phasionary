@@ -33,7 +33,12 @@ mapfile -t TAPES < <(
 # Re-seed a pristine data dir before every tape so state never bleeds between
 # them. Import is cheap, and an unconditional reset can't go stale the way a
 # hand-maintained "these tapes mutate" list does.
-seed() { BIN="$(pwd)/phasionary" ./testdata/vhs/seed.sh "$DATA" "$CFG" >/dev/null; }
+seed() {
+    if ! BIN="$(pwd)/phasionary" ./testdata/vhs/seed.sh "$DATA" "$CFG" >/dev/null; then
+        echo "seed failed for $DATA; aborting" >&2
+        exit 1
+    fi
+}
 
 for tape in "${TAPES[@]}"; do
     echo

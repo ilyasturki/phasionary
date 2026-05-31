@@ -408,11 +408,138 @@ func TestTaskCreateRejectsNegativeEstimate(t *testing.T) {
 	}
 }
 
-func TestAuthMissingToken401(t *testing.T) {
+func TestAuthMissingTokenRedirectsToLogin(t *testing.T) {
 	srv, _ := newTestServer(t, "secret-token")
 	resp := do(t, srv, newRequest(t, "GET", "/projects", nil))
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status: want 303 (redirect to login), got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Location"); got != "/login?next=%2Fprojects" {
+		t.Fatalf("Location: want /login?next=%%2Fprojects, got %q", got)
+	}
+}
+
+func TestAuthMissingBearerTokenStill401(t *testing.T) {
+	// A client that attempts Bearer auth is a script/API caller, not a
+	// browser, so a bad token gets a plain 401 rather than an HTML login page.
+	srv, _ := newTestServer(t, "secret-token")
+	req := newRequest(t, "GET", "/projects", nil)
+	req.Header.Set("Authorization", "Bearer wrong-token")
+	resp := do(t, srv, req)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status: want 401 for a bad Bearer token, got %d", resp.StatusCode)
+	}
+}
+
+func TestAuthHtmxUnauthSendsHXRedirect(t *testing.T) {
+	srv, _ := newTestServer(t, "secret-token")
+	req := newRequest(t, "GET", "/projects", nil)
+	req.Header.Set("HX-Request", "true")
+	resp := do(t, srv, req)
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status: want 401, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("HX-Redirect"); got != "/login?next=%2Fprojects" {
+		t.Fatalf("HX-Redirect: want /login?next=%%2Fprojects, got %q", got)
+	}
+}
+
+func TestLoginFormRendersPasswordField(t *testing.T) {
+	srv, _ := newTestServer(t, "secret-token")
+	resp := do(t, srv, newRequest(t, "GET", "/login", nil))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: want 200, got %d", resp.StatusCode)
+	}
+	body := readBody(t, resp)
+	if !strings.Contains(body, `type="password"`) || !strings.Contains(body, `name="token"`) {
+		t.Fatalf("expected a password token field, got: %s", body)
+	}
+}
+
+func TestLoginPostCorrectTokenSetsCookieAndRedirects(t *testing.T) {
+	srv, _ := newTestServer(t, "secret-token")
+	resp := do(t, srv, newRequest(t, "POST", "/login",
+		url.Values{"token": {"secret-token"}, "next": {"/projects"}}))
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status: want 303, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Location"); got != "/projects" {
+		t.Fatalf("Location: want /projects, got %q", got)
+	}
+	var found bool
+	for _, c := range resp.Cookies() {
+		if c.Name == sessionCookieName && c.Value == "secret-token" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected session cookie")
+	}
+}
+
+func TestLoginPostWrongTokenRerendersWith401(t *testing.T) {
+	srv, _ := newTestServer(t, "secret-token")
+	resp := do(t, srv, newRequest(t, "POST", "/login",
+		url.Values{"token": {"nope"}, "next": {"/projects"}}))
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status: want 401, got %d", resp.StatusCode)
+	}
+	if !strings.Contains(readBody(t, resp), "Incorrect token") {
+		t.Fatalf("expected an error message in the re-rendered form")
+	}
+}
+
+func TestLoginPostRejectsOpenRedirect(t *testing.T) {
+	srv, _ := newTestServer(t, "secret-token")
+	resp := do(t, srv, newRequest(t, "POST", "/login",
+		url.Values{"token": {"secret-token"}, "next": {"https://evil.example/"}}))
+	if got := resp.Header.Get("Location"); got != "/" {
+		t.Fatalf("Location: want / (open redirect rejected), got %q", got)
+	}
+}
+
+func TestLoginPostRejectsBackslashOpenRedirect(t *testing.T) {
+	// Browsers fold "\" to "/", so "/\evil.com" would be re-parsed as the
+	// protocol-relative "//evil.com" — safeNext must reject it.
+	srv, _ := newTestServer(t, "secret-token")
+	resp := do(t, srv, newRequest(t, "POST", "/login",
+		url.Values{"token": {"secret-token"}, "next": {`/\evil.com`}}))
+	if got := resp.Header.Get("Location"); got != "/" {
+		t.Fatalf("Location: want / (backslash open redirect rejected), got %q", got)
+	}
+}
+
+func TestLoginPostWrongTokenSetsNoCookie(t *testing.T) {
+	srv, _ := newTestServer(t, "secret-token")
+	resp := do(t, srv, newRequest(t, "POST", "/login",
+		url.Values{"token": {"nope"}, "next": {"/projects"}}))
+	for _, c := range resp.Cookies() {
+		if c.Name == sessionCookieName {
+			t.Fatalf("a wrong token must not set the session cookie, got %q", c.Value)
+		}
+	}
+}
+
+func TestAuthUnauthNonGetReturns401(t *testing.T) {
+	// A non-GET request can't be 303'd to the login form (that would demote it
+	// to GET and silently drop the body), so it gets a plain 401 instead.
+	srv, _ := newTestServer(t, "secret-token")
+	resp := do(t, srv, newRequest(t, "POST", "/projects", url.Values{"name": {"Mobile"}}))
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status: want 401 for an unauthenticated POST, got %d", resp.StatusCode)
+	}
+	if loc := resp.Header.Get("Location"); loc != "" {
+		t.Fatalf("an unauthenticated POST must not redirect, got Location %q", loc)
+	}
+}
+
+func TestAuthMissingTokenStripsFailedTokenFromNext(t *testing.T) {
+	// A wrong ?token= must not be echoed back into ?next= (and thus history
+	// and the login form's hidden field).
+	srv, _ := newTestServer(t, "secret-token")
+	resp := do(t, srv, newRequest(t, "GET", "/projects?token=wrong", nil))
+	if got := resp.Header.Get("Location"); got != "/login?next=%2Fprojects" {
+		t.Fatalf("Location: want /login?next=%%2Fprojects (token stripped), got %q", got)
 	}
 }
 

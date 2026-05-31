@@ -20,6 +20,14 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 
+	// The login endpoints only exist when a token is configured. With auth
+	// disabled there is nothing to sign in to, and authMiddleware passes every
+	// request through, so they'd be unreachable dead routes anyway.
+	if s.cfg.Token != "" {
+		mux.HandleFunc("GET /login", s.handleLoginForm)
+		mux.HandleFunc("POST /login", s.handleLogin)
+	}
+
 	mux.HandleFunc("GET /projects", s.handleProjectsList)
 	mux.HandleFunc("GET /projects/new", s.handleProjectNew)
 	mux.HandleFunc("POST /projects", s.handleProjectCreate)

@@ -159,10 +159,16 @@ func writeFileSync(path string, data []byte, perm os.FileMode) error {
 	return f.Close()
 }
 
-func (s *Store) CreateProject(name string) (domain.Project, error) {
+// createNewProjectLocked writes a brand-new project under the global lock,
+// rejecting a name that collides with any existing project. prepare builds the
+// project to save and runs while the lock is held, so it can safely consult
+// on-disk state (e.g. to dodge an ID collision). This is the shared spine of
+// CreateProject and ImportProject; keeping the lock/check/save discipline in
+// one place stops the three writers from drifting out of sync.
+func (s *Store) createNewProjectLocked(name string, prepare func() (domain.Project, error)) (domain.Project, error) {
 	// Hold the global lock across the duplicate-name check and the save so
-	// two racing CreateProject calls can't both observe a missing name and
-	// each write their own project file.
+	// two racing creates can't both observe a missing name and each write
+	// their own project file.
 	g, err := s.acquireGlobalLock()
 	if err != nil {
 		return domain.Project{}, err
@@ -172,53 +178,55 @@ func (s *Store) CreateProject(name string) (domain.Project, error) {
 	if err := s.checkProjectNameAvailableLocked(name, ""); err != nil {
 		return domain.Project{}, err
 	}
-	project, err := domain.NewProject(name)
+	project, err := prepare()
 	if err != nil {
 		return domain.Project{}, err
 	}
-	project.Categories, err = s.defaultCategories()
-	if err != nil {
-		return domain.Project{}, err
-	}
-	project.Categories = populateSampleTasks(project.Categories)
 	if err := s.saveNewProjectLocked(project); err != nil {
 		return domain.Project{}, err
 	}
 	return project, nil
 }
 
+func (s *Store) CreateProject(name string) (domain.Project, error) {
+	return s.createNewProjectLocked(name, func() (domain.Project, error) {
+		project, err := domain.NewProject(name)
+		if err != nil {
+			return domain.Project{}, err
+		}
+		project.Categories, err = s.defaultCategories()
+		if err != nil {
+			return domain.Project{}, err
+		}
+		project.Categories = populateSampleTasks(project.Categories)
+		return project, nil
+	})
+}
+
 // ImportProject persists a fully-formed project parsed from an external file
-// as a new project on disk. Unlike SaveProjectLocked it does not require the
+// as a NEW project on disk. Unlike SaveProjectLocked it does not require the
 // project to already exist, and unlike CreateProject it keeps the caller's
 // categories and tasks instead of seeding defaults. The global lock is held
 // across the duplicate-name check and the write so a concurrent create can't
 // slip in with the same name. A blank ID or CreatedAt is filled in so imports
-// of hand-written files still produce a valid record; an existing project with
-// the same ID is overwritten.
+// of hand-written files still produce a valid record; an ID that collides with
+// an existing project is replaced with a fresh one so an import can never
+// silently overwrite (and destroy) another project — re-importing a project
+// that still exists is rejected by the duplicate-name check instead.
 func (s *Store) ImportProject(project domain.Project) (domain.Project, error) {
-	g, err := s.acquireGlobalLock()
-	if err != nil {
-		return domain.Project{}, err
-	}
-	defer g.Close()
-
-	if err := s.checkProjectNameAvailableLocked(project.Name, project.ID); err != nil {
-		return domain.Project{}, err
-	}
-	if project.ID == "" {
-		id, err := domain.NewID()
-		if err != nil {
-			return domain.Project{}, err
+	return s.createNewProjectLocked(project.Name, func() (domain.Project, error) {
+		if project.ID == "" || s.projectExists(project.ID) {
+			id, err := domain.NewID()
+			if err != nil {
+				return domain.Project{}, err
+			}
+			project.ID = id
 		}
-		project.ID = id
-	}
-	if project.CreatedAt == "" {
-		project.CreatedAt = domain.NowTimestamp()
-	}
-	if err := s.saveNewProjectLocked(project); err != nil {
-		return domain.Project{}, err
-	}
-	return project, nil
+		if project.CreatedAt == "" {
+			project.CreatedAt = domain.NowTimestamp()
+		}
+		return project, nil
+	})
 }
 
 // RenameProject updates a project's display name while holding the global
@@ -316,6 +324,13 @@ func (s *Store) loadProjectFile(path string) (domain.Project, error) {
 
 func (s *Store) projectPath(id string) string {
 	return filepath.Join(s.Dir, fmt.Sprintf("%s.json", id))
+}
+
+// projectExists reports whether a project file with the given ID is already on
+// disk. Callers that need a stable answer must hold the relevant lock.
+func (s *Store) projectExists(id string) bool {
+	_, err := os.Stat(s.projectPath(id))
+	return err == nil
 }
 
 func (s *Store) lockPath(id string) string { return s.projectPath(id) + ".lock" }

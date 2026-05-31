@@ -26,6 +26,10 @@ func (s *Server) parseTemplates() error {
 	}
 
 	pages := map[string][]string{
+		"login": {
+			"templates/base.html",
+			"templates/pages/login.html",
+		},
 		"projects": {
 			"templates/base.html",
 			"templates/pages/projects.html",
@@ -78,12 +82,21 @@ func (s *Server) parseTemplates() error {
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data any) {
+	s.renderStatus(w, http.StatusOK, name, data)
+}
+
+// renderStatus renders the named page with an explicit status code. It sets the
+// Content-Type and writes the header before the body, so callers needing a
+// non-200 page (e.g. the 401 login re-render) don't have to juggle
+// WriteHeader ordering — setting a header after WriteHeader is a silent no-op.
+func (s *Server) renderStatus(w http.ResponseWriter, status int, name string, data any) {
 	tmpl, ok := s.pages[name]
 	if !ok {
 		http.Error(w, "template not found: "+name, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
 		log.Printf("template render error (%s): %v", name, err)
 	}
