@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -15,10 +17,12 @@ import (
 )
 
 const (
-	envServeAddr  = "PHASIONARY_SERVE_ADDR"
+	envServeHost  = "PHASIONARY_SERVE_HOST"
+	envServePort  = "PHASIONARY_SERVE_PORT"
 	envServeToken = "PHASIONARY_SERVE_TOKEN"
 
-	defaultServeAddr = "127.0.0.1:7777"
+	defaultServeHost = "127.0.0.1"
+	defaultServePort = 7777
 )
 
 func newServeCmd() *cobra.Command {
@@ -27,21 +31,27 @@ func newServeCmd() *cobra.Command {
 		Short: "Serve a touch-friendly web UI for mobile access",
 		Long: `Serve a touch-friendly htmx web UI for accessing Phasionary from a phone or tablet.
 
-By default the server binds to ` + defaultServeAddr + ` only. Reach it from your phone
+By default the server binds to 127.0.0.1:7777 only. Reach it from your phone
 via an SSH tunnel:
 
     ssh -L 7777:localhost:7777 your-server
 
 then open http://localhost:7777 in the phone's browser.
 
-To expose on a LAN/Tailscale interface, pass --addr explicitly. A --token is
-required for any non-loopback bind. The first request with ?token=... receives
-a session cookie so the secret isn't carried in URLs after that.`,
+To expose on a LAN/Tailscale interface, pass --host explicitly (e.g.
+--host 0.0.0.0). A --token is required for any non-loopback bind. The first
+request with ?token=... receives a session cookie so the secret isn't carried
+in URLs after that.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			addr := viper.GetString("serve.addr")
-			if addr == "" {
-				addr = defaultServeAddr
+			host := viper.GetString("serve.host")
+			if host == "" {
+				host = defaultServeHost
 			}
+			port := viper.GetInt("serve.port")
+			if port == 0 {
+				port = defaultServePort
+			}
+			addr := net.JoinHostPort(host, strconv.Itoa(port))
 			token := viper.GetString("serve.token")
 
 			if !web.IsLoopbackAddr(addr) && token == "" {
@@ -71,12 +81,15 @@ a session cookie so the secret isn't carried in URLs after that.`,
 		},
 	}
 
-	cmd.Flags().String("addr", defaultServeAddr, "listen address (host:port)")
+	cmd.Flags().String("host", defaultServeHost, "listen host/IP")
+	cmd.Flags().Int("port", defaultServePort, "listen port")
 	cmd.Flags().String("token", "", "auth token; required for non-loopback bind")
 
-	_ = viper.BindPFlag("serve.addr", cmd.Flags().Lookup("addr"))
+	_ = viper.BindPFlag("serve.host", cmd.Flags().Lookup("host"))
+	_ = viper.BindPFlag("serve.port", cmd.Flags().Lookup("port"))
 	_ = viper.BindPFlag("serve.token", cmd.Flags().Lookup("token"))
-	_ = viper.BindEnv("serve.addr", envServeAddr)
+	_ = viper.BindEnv("serve.host", envServeHost)
+	_ = viper.BindEnv("serve.port", envServePort)
 	_ = viper.BindEnv("serve.token", envServeToken)
 
 	return cmd

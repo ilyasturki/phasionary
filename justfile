@@ -11,9 +11,9 @@ run-app *ARGS:
     ./phasionary --data ./data {{ARGS}}
 
 # Serve the web UI with token auth (random token unless one is given).
-serve token=`openssl rand -hex 16` addr="127.0.0.1:7777": build
-    @echo "Web UI: http://{{addr}}/?token={{token}}"
-    ./phasionary serve --addr "{{addr}}" --token "{{token}}"
+serve token=`openssl rand -hex 16` host="127.0.0.1" port="7777": build
+    @echo "Web UI: http://{{host}}:{{port}}/?token={{token}}"
+    ./phasionary serve --host "{{host}}" --port "{{port}}" --token "{{token}}"
 
 # Build the CLI binary using Nix.
 build-nix:

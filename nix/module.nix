@@ -10,23 +10,10 @@ let
   serveCfg = cfg.serve;
   defaultPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.phasionary;
 
-  parsedAddr =
-    let
-      bracketed = builtins.match "[[](.+)[]]:([0-9]+)" serveCfg.addr;
-      parts = lib.splitString ":" serveCfg.addr;
-    in
-    if bracketed != null then {
-      host = lib.elemAt bracketed 0;
-      port = lib.toInt (lib.elemAt bracketed 1);
-    } else {
-      host = lib.head parts;
-      port = lib.toInt (lib.last parts);
-    };
-
   isLoopback =
-    parsedAddr.host == "127.0.0.1"
-    || parsedAddr.host == "::1"
-    || parsedAddr.host == "localhost";
+    serveCfg.host == "127.0.0.1"
+    || serveCfg.host == "::1"
+    || serveCfg.host == "localhost";
 in
 {
   options.services.phasionary = {
@@ -40,13 +27,21 @@ in
     serve = {
       enable = lib.mkEnableOption "Phasionary htmx web server";
 
-      addr = lib.mkOption {
+      host = lib.mkOption {
         type = lib.types.str;
-        default = "127.0.0.1:7777";
-        example = "0.0.0.0:7777";
+        default = "127.0.0.1";
+        example = "0.0.0.0";
         description = ''
-          Listen address (host:port) passed to `phasionary serve --addr`.
+          Host/IP the server binds to, passed to `phasionary serve --host`.
           A token is required for any non-loopback bind.
+        '';
+      };
+
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 7777;
+        description = ''
+          TCP port the server listens on, passed to `phasionary serve --port`.
         '';
       };
 
@@ -57,7 +52,7 @@ in
         description = ''
           Path to a file containing the auth token. The file is read by systemd
           via `LoadCredential` and exposed to the service as
-          `PHASIONARY_SERVE_TOKEN`. Required when `addr` is not loopback.
+          `PHASIONARY_SERVE_TOKEN`. Required when `host` is not loopback.
         '';
       };
 
@@ -86,8 +81,8 @@ in
         type = lib.types.bool;
         default = false;
         description = ''
-          Whether to open the TCP port in `addr` in the firewall. Only takes
-          effect for non-loopback binds.
+          Whether to open `port` in the firewall. Only takes effect for
+          non-loopback binds.
         '';
       };
     };
@@ -97,7 +92,7 @@ in
     assertions = [
       {
         assertion = isLoopback || serveCfg.tokenFile != null;
-        message = "services.phasionary.serve.tokenFile must be set when addr is not loopback.";
+        message = "services.phasionary.serve.tokenFile must be set when host is not loopback.";
       }
     ];
 
@@ -114,7 +109,7 @@ in
     };
 
     networking.firewall = lib.mkIf serveCfg.openFirewall {
-      allowedTCPPorts = [ parsedAddr.port ];
+      allowedTCPPorts = [ serveCfg.port ];
     };
 
     systemd.services.phasionary-serve = {
@@ -124,7 +119,8 @@ in
 
       environment = {
         PHASIONARY_DATA_PATH = serveCfg.dataDir;
-        PHASIONARY_SERVE_ADDR = serveCfg.addr;
+        PHASIONARY_SERVE_HOST = serveCfg.host;
+        PHASIONARY_SERVE_PORT = toString serveCfg.port;
       };
 
       serviceConfig = {
