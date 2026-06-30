@@ -198,7 +198,8 @@ type OptionsState struct {
 
 type ProjectPickerState struct {
 	projects     []domain.Project
-	selected     int
+	selected     int  // index into projects; meaningful only when !onNew
+	onNew        bool // the pinned "+ New Project" affordance is selected
 	scrollOffset int
 	isAdding     bool
 	input        textinput.Model
@@ -207,6 +208,7 @@ type ProjectPickerState struct {
 func (p *ProjectPickerState) reset() {
 	p.projects = nil
 	p.selected = 0
+	p.onNew = false
 	p.scrollOffset = 0
 	p.isAdding = false
 	p.input = textinput.Model{}
@@ -234,12 +236,34 @@ func (c *ConfirmDeleteState) reset() {
 	c.CategoryIDs = nil
 }
 
-func (p *ProjectPickerState) totalItems() int {
-	return len(p.projects) + 1
+func (p *ProjectPickerState) isOnNewProject() bool {
+	return p.onNew
 }
 
-func (p *ProjectPickerState) isOnAddButton() bool {
-	return p.selected == len(p.projects)
+// virtualIndex flattens the cursor onto a single list where 0 is the pinned
+// New Project row and 1..n are the projects, which makes relative moves (j/k,
+// paging) uniform across the boundary.
+func (p *ProjectPickerState) virtualIndex() int {
+	if p.onNew {
+		return 0
+	}
+	return p.selected + 1
+}
+
+// setVirtual maps a virtual index back onto the (onNew, selected) pair,
+// clamping to range. Index 0 (or an empty list) lands on New Project.
+func (p *ProjectPickerState) setVirtual(v int) {
+	n := len(p.projects)
+	if v <= 0 || n == 0 {
+		p.onNew = true
+		p.selected = 0
+		return
+	}
+	p.onNew = false
+	p.selected = v - 1
+	if p.selected >= n {
+		p.selected = n - 1
+	}
 }
 
 func (p *ProjectPickerState) startAdding() {

@@ -9,7 +9,10 @@ import (
 	"phasionary/internal/domain"
 )
 
-const pickerVisibleItems = 10
+// pickerScrollOff keeps a small margin of context rows between the cursor and
+// the top/bottom edges of the scrolled window, like vim's scrolloff. It's
+// clamped to the window size, so it disengages near the list ends.
+const pickerScrollOff = 1
 
 func (m *model) openProjectPicker() {
 	projects, err := m.deps.Store.ListProjects()
@@ -32,9 +35,10 @@ func (m *model) openProjectPicker() {
 	m.ui.Picker = ProjectPickerState{
 		projects:     projects,
 		selected:     currentIdx,
+		onNew:        len(projects) == 0,
 		scrollOffset: 0,
 	}
-	m.ui.Picker.ensureVisible()
+	m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 	m.ui.Modes.ToProjectPicker()
 }
 
@@ -74,17 +78,30 @@ func (m model) handleProjectPickerKey(msg tea.KeyPressMsg) (model, tea.Cmd) {
 	if m.ui.Picker.isAdding {
 		return m.handlePickerAddKey(msg)
 	}
+	visible := m.pickerVisibleCount()
 	switch msg.String() {
 	case "j", "down":
-		m.ui.Picker.moveSelection(1)
+		m.ui.Picker.moveSelection(1, visible)
 	case "k", "up":
-		m.ui.Picker.moveSelection(-1)
+		m.ui.Picker.moveSelection(-1, visible)
+	case "ctrl+d":
+		m.ui.Picker.moveSelection(halfPage(visible), visible)
+	case "ctrl+u":
+		m.ui.Picker.moveSelection(-halfPage(visible), visible)
+	case "ctrl+f", "pgdown":
+		m.ui.Picker.moveSelection(visible, visible)
+	case "ctrl+b", "pgup":
+		m.ui.Picker.moveSelection(-visible, visible)
+	case "g", "home":
+		m.ui.Picker.jumpToFirst(visible)
+	case "G", "end":
+		m.ui.Picker.jumpToLast(visible)
 	case "J":
 		m.moveProjectDown()
 	case "K":
 		m.moveProjectUp()
 	case "enter":
-		if m.ui.Picker.isOnAddButton() {
+		if m.ui.Picker.isOnNewProject() {
 			m.ui.Picker.startAdding()
 		} else {
 			m.selectProject()
@@ -102,7 +119,7 @@ func (m model) handleProjectPickerKey(msg tea.KeyPressMsg) (model, tea.Cmd) {
 }
 
 func (m *model) initiateProjectDelete() {
-	if m.ui.Picker.isOnAddButton() {
+	if m.ui.Picker.isOnNewProject() {
 		return
 	}
 	if len(m.ui.Picker.projects) <= 1 {
@@ -174,7 +191,7 @@ func (m *model) confirmDeleteProject() {
 		if m.ui.Picker.selected < 0 {
 			m.ui.Picker.selected = 0
 		}
-		m.ui.Picker.ensureVisible()
+		m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 	}
 
 	m.ui.Screen.StatusMsg = fmt.Sprintf("Deleted project: %s", deletedProjectName)
@@ -274,46 +291,89 @@ func (m *model) selectProject() {
 	m.ui.Modes.ToNormal()
 }
 
-func (p *ProjectPickerState) moveSelection(delta int) {
-	total := p.totalItems()
-	p.selected += delta
-	if p.selected < 0 {
-		p.selected = 0
+// halfPage is the slot delta for a half-page jump, never less than one row.
+func halfPage(visible int) int {
+	if visible < 2 {
+		return 1
 	}
-	if p.selected >= total {
-		p.selected = total - 1
-	}
-	p.ensureVisible()
+	return visible / 2
 }
 
-func (p *ProjectPickerState) ensureVisible() {
-	if p.selected < p.scrollOffset {
-		p.scrollOffset = p.selected
+// moveSelection moves the cursor by delta over the flattened list (New Project
+// then projects), so j/k and paging cross the New Project boundary uniformly.
+func (p *ProjectPickerState) moveSelection(delta, visible int) {
+	p.setVirtual(p.virtualIndex() + delta)
+	p.ensureVisible(visible)
+}
+
+// jumpToFirst/jumpToLast target the first/last project (not the pinned New
+// Project row, which is reached by arrowing up past the top), mirroring g/G on
+// the main list.
+func (p *ProjectPickerState) jumpToFirst(visible int) {
+	p.setVirtual(1)
+	p.ensureVisible(visible)
+}
+
+func (p *ProjectPickerState) jumpToLast(visible int) {
+	p.setVirtual(len(p.projects))
+	p.ensureVisible(visible)
+}
+
+// ensureVisible scrolls the projects window so the selected project stays
+// visible, keeping a pickerScrollOff margin of context rows from the edges
+// where the list is long enough to allow it. New Project is pinned outside the
+// window, so selecting it leaves the scroll position untouched (just clamped).
+func (p *ProjectPickerState) ensureVisible(visible int) {
+	if visible < 1 {
+		visible = 1
 	}
-	if p.selected >= p.scrollOffset+pickerVisibleItems {
-		p.scrollOffset = p.selected - pickerVisibleItems + 1
+	n := len(p.projects)
+
+	if !p.onNew {
+		scrollOff := pickerScrollOff
+		if maxOff := (visible - 1) / 2; scrollOff > maxOff {
+			scrollOff = maxOff
+		}
+
+		if p.selected < p.scrollOffset+scrollOff {
+			p.scrollOffset = p.selected - scrollOff
+		}
+		if p.selected > p.scrollOffset+visible-1-scrollOff {
+			p.scrollOffset = p.selected - visible + 1 + scrollOff
+		}
+	}
+
+	maxOffset := n - visible
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if p.scrollOffset > maxOffset {
+		p.scrollOffset = maxOffset
+	}
+	if p.scrollOffset < 0 {
+		p.scrollOffset = 0
 	}
 }
 
 func (m *model) moveProjectDown() {
-	if m.ui.Picker.isOnAddButton() || m.ui.Picker.selected >= len(m.ui.Picker.projects)-1 {
+	if m.ui.Picker.isOnNewProject() || m.ui.Picker.selected >= len(m.ui.Picker.projects)-1 {
 		return
 	}
 	idx := m.ui.Picker.selected
 	m.ui.Picker.projects[idx], m.ui.Picker.projects[idx+1] =
 		m.ui.Picker.projects[idx+1], m.ui.Picker.projects[idx]
-	m.ui.Picker.moveSelection(1)
+	m.ui.Picker.moveSelection(1, m.pickerVisibleCount())
 	m.saveProjectOrder()
 }
 
 func (m *model) moveProjectUp() {
-	if m.ui.Picker.isOnAddButton() || m.ui.Picker.selected <= 0 {
+	if m.ui.Picker.isOnNewProject() || m.ui.Picker.selected <= 0 {
 		return
 	}
 	idx := m.ui.Picker.selected
 	m.ui.Picker.projects[idx], m.ui.Picker.projects[idx-1] =
 		m.ui.Picker.projects[idx-1], m.ui.Picker.projects[idx]
-	m.ui.Picker.moveSelection(-1)
+	m.ui.Picker.moveSelection(-1, m.pickerVisibleCount())
 	m.saveProjectOrder()
 }
 

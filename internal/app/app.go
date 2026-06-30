@@ -37,6 +37,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ui.Screen.Width = msg.Width
 		m.ui.Screen.Height = msg.Height
 		m.ensureVisible()
+		if m.ui.Modes.IsProjectPicker() {
+			m.ui.Picker.ensureVisible(m.pickerVisibleCount())
+		}
 	case clipboardResultMsg:
 		if msg.err != nil {
 			m.ui.Screen.StatusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
@@ -603,7 +606,7 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 			selected:     selected,
 			scrollOffset: 0,
 		}
-		m.ui.Picker.ensureVisible()
+		m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 	}
 
 	program := tea.NewProgram(m)
