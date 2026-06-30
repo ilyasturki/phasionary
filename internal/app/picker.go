@@ -256,9 +256,7 @@ func (m *model) selectProject() {
 	// Switching to an existing project is a transient, session-only view change:
 	// only establish a directory link when none exists yet, never override one.
 	// The link is changed deliberately via `project link`/`add`.
-	if m.deps.StateManager.GetProjectForDir() == "" {
-		_ = m.deps.StateManager.SetProjectForDir(project.ID)
-	}
+	linkDirIfUnset(m.deps.StateManager, project.ID)
 
 	m.project = project
 	m.ui.Filter = NewFilterState()

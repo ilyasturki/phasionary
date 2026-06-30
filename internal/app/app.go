@@ -508,6 +508,16 @@ func (m model) renderLayoutItemTruncated(item LayoutItem, maxRows int) string {
 	return strings.Join(rendered[:maxRows], "\n")
 }
 
+// linkDirIfUnset establishes the directory→project link only when the directory
+// has none yet, so a session-only project switch (--project, picker select)
+// never overrides an existing link. Deliberate relinking (`project link`/`add`)
+// calls SetProjectForDir directly.
+func linkDirIfUnset(sm data.StateRepository, projectID string) {
+	if sm.GetProjectForDir() == "" {
+		_ = sm.SetProjectForDir(projectID)
+	}
+}
+
 func Run(dataDir string, projectSelector string, cfgManager config.Reader, workingDir string, forcePicker bool) error {
 	store := data.NewStore(dataDir)
 	if err := store.Ensure(); err != nil {
@@ -544,9 +554,7 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 		}
 		// --project opens a project for this session only: link the directory
 		// when it has no link yet, but never override an existing one.
-		if stateManager.GetProjectForDir() == "" {
-			_ = stateManager.SetProjectForDir(project.ID)
-		}
+		linkDirIfUnset(stateManager, project.ID)
 	} else if linkedID := stateManager.GetProjectForDir(); linkedID != "" {
 		project, err = store.LoadProject(linkedID)
 		if err != nil {
