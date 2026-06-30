@@ -351,9 +351,12 @@ func (m *model) removeTaskByIDIfExists(id string) bool {
 // visualMoveDown shifts the visual selection block one position down,
 // preserving the block's contents and the anchor/cursor orientation.
 // Categories shift across the whole project; tasks shift within their
-// category. No-op if the selection has no room to move, spans multiple
-// categories (tasks only), or is not source-contiguous in task indices
-// (e.g. a filter excludes interleaving tasks).
+// category, and at a category boundary the whole block crosses into the
+// adjacent category (top when moving down, bottom when moving up), mirroring
+// the single-task moveTaskDown/moveTaskUp behavior. No-op if the selection has
+// no room to move, the block already spans multiple categories (tasks only),
+// or it is not source-contiguous in task indices (e.g. a filter excludes
+// interleaving tasks).
 func (m *model) visualMoveDown() {
 	m.visualShift(+1)
 }
@@ -418,12 +421,14 @@ func (m *model) visualShiftTasks(selPositions []selection.Position, dir int) {
 	var neighbor, dst int
 	if dir > 0 {
 		if taskHi >= len(cat.Tasks)-1 {
+			m.visualShiftTasksAcross(catIdx, taskLo, taskHi, dir)
 			return
 		}
 		neighbor = taskHi + 1
 		dst = taskLo
 	} else {
 		if taskLo <= 0 {
+			m.visualShiftTasksAcross(catIdx, taskLo, taskHi, dir)
 			return
 		}
 		neighbor = taskLo - 1
@@ -436,6 +441,64 @@ func (m *model) visualShiftTasks(selPositions []selection.Position, dir int) {
 	m.project.UpdatedAt = domain.NowTimestamp()
 	m.rebuildPositions()
 	m.ui.Selection.MoveBy(dir)
+	m.ensureVisible()
+	m.storeTaskUpdate()
+}
+
+// visualShiftTasksAcross moves the contiguous task block [taskLo, taskHi] out
+// of category catIdx and into the adjacent category in direction dir: moving
+// down drops the block at the top of the next category, moving up at the
+// bottom of the previous one. The cursor follows its task by ID, and the
+// ID-based anchor re-resolves so the range still covers the moved block. No-op
+// when there is no adjacent category.
+func (m *model) visualShiftTasksAcross(catIdx, taskLo, taskHi, dir int) {
+	var dstCatIdx int
+	if dir > 0 {
+		dstCatIdx = catIdx + 1
+		if dstCatIdx >= len(m.project.Categories) {
+			return
+		}
+	} else {
+		dstCatIdx = catIdx - 1
+		if dstCatIdx < 0 {
+			return
+		}
+	}
+
+	cursorID := ""
+	if cur, ok := m.ui.Selection.SelectedPosition(); ok && cur.Kind == selection.FocusTask {
+		cursorID = m.project.Categories[cur.CategoryIndex].Tasks[cur.TaskIndex].ID
+	}
+
+	m.recordHistory()
+	src := &m.project.Categories[catIdx]
+	moved := make([]domain.Task, taskHi-taskLo+1)
+	copy(moved, src.Tasks[taskLo:taskHi+1])
+	// Remove from the bottom up so earlier indices stay valid.
+	for i := taskHi; i >= taskLo; i-- {
+		_ = src.RemoveTask(i)
+	}
+
+	dst := &m.project.Categories[dstCatIdx]
+	insertAt := 0
+	if dir < 0 {
+		insertAt = len(dst.Tasks)
+	}
+	for i, t := range moved {
+		dst.InsertTask(insertAt+i, t)
+	}
+
+	m.project.UpdatedAt = domain.NowTimestamp()
+	// The anchor task crossed with the block, so its recorded category ID must
+	// follow or resolveVisualAnchor can no longer find it.
+	m.ui.Visual.AnchorCategoryID = m.project.Categories[dstCatIdx].ID
+	m.rebuildPositions()
+	if cursorID != "" {
+		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			return p.Kind == selection.FocusTask &&
+				m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == cursorID
+		})
+	}
 	m.ensureVisible()
 	m.storeTaskUpdate()
 }

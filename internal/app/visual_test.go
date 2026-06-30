@@ -33,6 +33,14 @@ func newTestModel(t *testing.T, project domain.Project) *model {
 	return m
 }
 
+func taskIDs(cat domain.Category) []string {
+	ids := make([]string, len(cat.Tasks))
+	for i, t := range cat.Tasks {
+		ids[i] = t.ID
+	}
+	return ids
+}
+
 func sampleProject() domain.Project {
 	return domain.Project{
 		ID:   "p1",
@@ -340,21 +348,63 @@ func TestVisualMoveUp_ShiftsTaskBlockWithinCategory(t *testing.T) {
 		})
 }
 
-func TestVisualMoveDown_NoOpAtBottomOfCategory(t *testing.T) {
+func TestVisualMoveDown_NoOpAtBottomOfLastCategory(t *testing.T) {
 	m := newTestModel(t, sampleProject())
-	m.ui.Selection.MoveTo(3) // t2
+	// Select t4, t5 — the whole of Cat B, the final category.
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusTask && p.CategoryIndex == 1 && p.TaskIndex == 0
+	})
 	m.enterVisualMode()
-	m.visualMoveCursor(1) // include t3 → block reaches end of Cat A
+	m.visualMoveCursor(1) // include t5 → block reaches end of last category
 
 	m.visualMoveDown()
 
-	// Order unchanged.
-	assert.Equal(t, []string{"t1", "t2", "t3"},
+	// No category below to receive the block: order unchanged.
+	assert.Equal(t, []string{"t4", "t5"},
 		[]string{
-			m.project.Categories[0].Tasks[0].ID,
-			m.project.Categories[0].Tasks[1].ID,
-			m.project.Categories[0].Tasks[2].ID,
+			m.project.Categories[1].Tasks[0].ID,
+			m.project.Categories[1].Tasks[1].ID,
 		})
+}
+
+func TestVisualMoveDown_CrossesBlockIntoNextCategory(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(3) // t2
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t3 → block [t2, t3] at end of Cat A
+
+	m.visualMoveDown()
+
+	// Block lands at the top of Cat B, in order.
+	assert.Equal(t, []string{"t1"}, taskIDs(m.project.Categories[0]))
+	assert.Equal(t, []string{"t2", "t3", "t4", "t5"}, taskIDs(m.project.Categories[1]))
+
+	// Cursor follows t3; anchor (t2) still anchors the range.
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusTask, pos.Kind)
+	assert.Equal(t, "t3", m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].ID)
+	assert.Equal(t, "t2", m.ui.Visual.AnchorTaskID)
+	selPositions := m.visualSelectedPositions()
+	require.Len(t, selPositions, 2)
+	assert.Equal(t, "t2", m.project.Categories[selPositions[0].CategoryIndex].Tasks[selPositions[0].TaskIndex].ID)
+	assert.Equal(t, "t3", m.project.Categories[selPositions[1].CategoryIndex].Tasks[selPositions[1].TaskIndex].ID)
+}
+
+func TestVisualMoveUp_CrossesBlockIntoPrevCategory(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	// Select t4, t5 — the whole of Cat B, anchored at its top.
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusTask && p.CategoryIndex == 1 && p.TaskIndex == 0
+	})
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t5
+
+	m.visualMoveUp()
+
+	// Block lands at the bottom of Cat A, in order; Cat B is now empty.
+	assert.Equal(t, []string{"t1", "t2", "t3", "t4", "t5"}, taskIDs(m.project.Categories[0]))
+	assert.Empty(t, m.project.Categories[1].Tasks)
 }
 
 func TestVisualMoveDown_NoOpAcrossCategories(t *testing.T) {
