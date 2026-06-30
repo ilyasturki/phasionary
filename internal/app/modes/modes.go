@@ -16,6 +16,7 @@ const (
 	ModeURLPicker
 	ModeVisual
 	ModeDescriptionEdit
+	ModeYankPicker
 	ModeSearch
 )
 
@@ -124,6 +125,8 @@ func (m *Machine) canTransition(target Mode) bool {
 	case ModeVisual:
 		return target == ModeNormal
 	case ModeDescriptionEdit:
+		return target == ModeNormal
+	case ModeYankPicker:
 		return target == ModeNormal
 	case ModeSearch:
 		return target == ModeNormal
@@ -235,6 +238,14 @@ func (m *Machine) IsDescriptionEdit() bool {
 
 func (m *Machine) ToDescriptionEdit() bool {
 	return m.TransitionTo(ModeDescriptionEdit)
+}
+
+func (m *Machine) IsYankPicker() bool {
+	return m.current == ModeYankPicker
+}
+
+func (m *Machine) ToYankPicker() bool {
+	return m.TransitionTo(ModeYankPicker)
 }
 
 func (m *Machine) IsSearch() bool {

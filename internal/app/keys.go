@@ -131,6 +131,8 @@ var normalBindings = []keyBinding{
 		action: void((*model).redo)},
 	{keys: []string{"x"}, prefix: 'g', display: "gx", desc: "open URL in focused task", section: sectionActions,
 		action: func(m *model) tea.Cmd { return m.openLinksForSelected() }},
+	{keys: []string{"y"}, prefix: 'g', display: "gy", desc: "yank a part of focused item (uuid, url, title…)", section: sectionActions,
+		action: func(m *model) tea.Cmd { return m.yankPartForSelected() }},
 	{keys: []string{","}, desc: "options", section: sectionActions,
 		action: func(m *model) tea.Cmd {
 			m.ui.Modes.ToOptions()

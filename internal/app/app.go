@@ -19,7 +19,12 @@ import (
 	"phasionary/internal/ui"
 )
 
-type clipboardResultMsg struct{ err error }
+type clipboardResultMsg struct {
+	err error
+	// label, when set, names what was copied (e.g. "UUID: 550e..."); empty
+	// falls back to a generic "Copied!".
+	label string
+}
 
 type model struct {
 	project domain.Project
@@ -43,6 +48,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clipboardResultMsg:
 		if msg.err != nil {
 			m.ui.Screen.StatusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
+		} else if msg.label != "" {
+			m.ui.Screen.StatusMsg = "Copied " + msg.label
 		} else {
 			m.ui.Screen.StatusMsg = "Copied!"
 		}
@@ -96,6 +103,8 @@ func (m model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleEstimatePickerKey(msg), nil
 	case modes.ModeURLPicker:
 		return m.handleURLPickerKey(msg)
+	case modes.ModeYankPicker:
+		return m.handleYankPickerKey(msg)
 	case modes.ModeSearch:
 		return m.handleSearchKey(msg)
 	case modes.ModeVisual:
@@ -281,6 +290,28 @@ func (m model) handleURLPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m model) handleYankPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "esc":
+		m.ui.Modes.ToNormal()
+		return m, nil
+	case "j", "down":
+		m.ui.YankPicker.MoveDown()
+		return m, nil
+	case "k", "up":
+		m.ui.YankPicker.MoveUp()
+		return m, nil
+	case "enter", "y":
+		it, ok := m.ui.YankPicker.SelectedItem()
+		m.ui.Modes.ToNormal()
+		if !ok {
+			return m, nil
+		}
+		return m, copyYankItem(it)
+	}
+	return m, nil
+}
+
 func (m *model) toggleSelectedOption() {
 	switch m.ui.Options.selectedOption {
 	case 0: // StatusDisplay
@@ -440,6 +471,8 @@ func (m model) renderView() string {
 		return modal.Render(content, m.estimatePickerView())
 	case modes.ModeURLPicker:
 		return modal.Render(content, m.urlPickerView())
+	case modes.ModeYankPicker:
+		return modal.Render(content, m.yankPickerView())
 	case modes.ModeDescriptionEdit:
 		return modal.Render(content, m.descriptionEditView())
 	}

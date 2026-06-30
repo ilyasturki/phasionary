@@ -65,6 +65,7 @@ type UIState struct {
 	ExternalEdit      ExternalEditState
 	EstimatePicker    components.EstimatePickerState
 	URLPicker         components.URLPickerState
+	YankPicker        components.YankPickerState
 	Help              HelpState
 	Clipboard         ClipboardState
 	Visual            VisualState
