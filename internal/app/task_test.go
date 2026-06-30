@@ -136,6 +136,50 @@ func TestMoveTaskUp_NoopAtVeryStart(t *testing.T) {
 	assert.Equal(t, "t1", m.project.Categories[0].Tasks[0].ID)
 }
 
+func TestMoveTaskDown_FollowsTaskPastDescriptionRow(t *testing.T) {
+	p := sampleProject()
+	p.Categories[0].Tasks[1].Description = "beta details" // t2 has a description row
+	m := newTestModel(t, p)
+	m.ui.Screen.ExpandDescriptions = true
+	m.rebuildPositions()
+	require.True(t, m.ui.Selection.SelectByPredicate(func(pp selection.Position) bool {
+		return pp.Kind == selection.FocusTask && pp.CategoryIndex == 0 && pp.TaskIndex == 0
+	}), "focus t1 (no description)")
+
+	m.moveTaskDown()
+
+	assert.Equal(t, "t2", m.project.Categories[0].Tasks[0].ID)
+	assert.Equal(t, "t1", m.project.Categories[0].Tasks[1].ID)
+	// Selection must follow t1, not land on t2's description row.
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusTask, pos.Kind)
+	assert.Equal(t, 0, pos.CategoryIndex)
+	assert.Equal(t, 1, pos.TaskIndex)
+}
+
+func TestMoveTaskUp_FollowsTaskPastDescriptionRow(t *testing.T) {
+	p := sampleProject()
+	p.Categories[0].Tasks[0].Description = "alpha details" // t1 has a description row
+	m := newTestModel(t, p)
+	m.ui.Screen.ExpandDescriptions = true
+	m.rebuildPositions()
+	require.True(t, m.ui.Selection.SelectByPredicate(func(pp selection.Position) bool {
+		return pp.Kind == selection.FocusTask && pp.CategoryIndex == 0 && pp.TaskIndex == 1
+	}), "focus t2 (no description), below t1's description row")
+
+	m.moveTaskUp()
+
+	assert.Equal(t, "t2", m.project.Categories[0].Tasks[0].ID)
+	assert.Equal(t, "t1", m.project.Categories[0].Tasks[1].ID)
+	// Selection must follow t2 to index 0, not land on t1's row/description.
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusTask, pos.Kind)
+	assert.Equal(t, 0, pos.CategoryIndex)
+	assert.Equal(t, 0, pos.TaskIndex)
+}
+
 func TestMoveCategoryDown_SwapsCategories(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(1) // Cat A

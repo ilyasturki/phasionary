@@ -228,7 +228,11 @@ func (m *model) moveTaskDown() {
 		_ = m.project.Categories[catIndex].MoveTask(taskIndex, 1)
 		m.project.UpdatedAt = domain.NowTimestamp()
 		m.rebuildPositions()
-		m.ui.Selection.MoveBy(1)
+		// Reselect the moved task by its new index rather than shifting the
+		// selection by one slot: with descriptions expanded, a neighbouring
+		// task contributes an extra description row, so a fixed +1 step would
+		// land on that row instead of following the task.
+		m.selectTaskOrCategory(catIndex, taskIndex+1)
 		m.ensureVisible()
 		m.storeTaskUpdate()
 		return
@@ -263,7 +267,11 @@ func (m *model) moveTaskUp() {
 		_ = m.project.Categories[catIndex].MoveTask(taskIndex, -1)
 		m.project.UpdatedAt = domain.NowTimestamp()
 		m.rebuildPositions()
-		m.ui.Selection.MoveBy(-1)
+		// Reselect the moved task by its new index rather than shifting the
+		// selection by one slot: with descriptions expanded, a neighbouring
+		// task contributes an extra description row, so a fixed -1 step would
+		// land on that row instead of following the task.
+		m.selectTaskOrCategory(catIndex, taskIndex-1)
 		m.ensureVisible()
 		m.storeTaskUpdate()
 		return
