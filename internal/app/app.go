@@ -542,7 +542,11 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 			}
 			return err
 		}
-		_ = stateManager.SetProjectForDir(project.ID)
+		// --project opens a project for this session only: link the directory
+		// when it has no link yet, but never override an existing one.
+		if stateManager.GetProjectForDir() == "" {
+			_ = stateManager.SetProjectForDir(project.ID)
+		}
 	} else if linkedID := stateManager.GetProjectForDir(); linkedID != "" {
 		project, err = store.LoadProject(linkedID)
 		if err != nil {
