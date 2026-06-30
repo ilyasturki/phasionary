@@ -69,6 +69,12 @@ var normalBindings = []keyBinding{
 		action: void((*model).toggleExpandDescriptions)},
 	{keys: []string{"ctrl+p"}, desc: "switch project", section: sectionNavigation,
 		action: void((*model).openProjectPicker)},
+	{keys: []string{"/"}, desc: "search text", section: sectionNavigation,
+		action: func(m *model) tea.Cmd { return m.startSearch() }},
+	{keys: []string{"n"}, display: "n/N", desc: "next/previous search match", section: sectionNavigation,
+		action: void((*model).searchNext)},
+	{keys: []string{"N"}, section: sectionNavigation,
+		action: void((*model).searchPrev)},
 
 	// Actions
 	{keys: []string{"a"}, desc: "add new task", section: sectionActions,
@@ -185,6 +191,15 @@ func matchBinding(prefix rune, key string) *keyBinding {
 }
 
 func (m *model) dispatchNormalKey(key string) tea.Cmd {
+	// Esc cancels a pending chord and clears an active search highlight (the
+	// vim `:nohlsearch` gesture). It otherwise stays a no-op in normal mode.
+	if key == "esc" {
+		m.ui.Screen.PendingKey = 0
+		if m.ui.Search.query != "" {
+			m.clearSearch()
+		}
+		return nil
+	}
 	if m.ui.Screen.PendingKey != 0 {
 		if b := matchBinding(m.ui.Screen.PendingKey, key); b != nil {
 			m.ui.Screen.PendingKey = 0

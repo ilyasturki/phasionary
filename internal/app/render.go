@@ -72,7 +72,7 @@ func (m model) renderEditProjectLine() string {
 	)
 }
 
-func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string, selected bool, folded bool, width int, focused bool, visualMode bool, isCursor bool, cut bool) string {
+func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string, selected bool, folded bool, width int, focused bool, visualMode bool, isCursor bool, cut bool, searchQuery string, searchMatch lipgloss.Style) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
@@ -143,7 +143,7 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 	suffix := cutBadge + statusBadge + estimateBadge
 
 	if width <= 0 {
-		return style.Render(prefix+foldIndicator+name) + suffix
+		return style.Render(prefix+foldIndicator) + ui.HighlightMatches(name, searchQuery, style, searchMatch) + suffix
 	}
 
 	suffixWidth := len(statusBadgeText) + len(estimateBadgeText) + ansi.StringWidth(cutBadgeText)
@@ -155,7 +155,7 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 
 	var result []string
 	for i, line := range lines {
-		styledLine := style.Render(line)
+		styledLine := ui.HighlightMatches(line, searchQuery, style, searchMatch)
 		if i == 0 {
 			result = append(result, style.Render(prefix+foldIndicator)+styledLine+suffix)
 		} else {
@@ -191,6 +191,9 @@ func (m model) renderTaskLine(task domain.Task, selected bool, width int, focuse
 		WithCursor(isCursor).
 		WithCut(cut).
 		WithDescriptionExpanded(m.ui.Screen.ExpandDescriptions)
+	if q := m.searchQuery(); q != "" {
+		renderer = renderer.WithSearch(q, m.searchMatchStyle(isCursor))
+	}
 	return renderer.Render(task, selected)
 }
 
@@ -198,6 +201,9 @@ func (m model) renderTaskDescription(task domain.Task, selected bool, width int,
 	cfg := m.deps.CfgManager.Get()
 	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).
 		WithCut(cut)
+	if q := m.searchQuery(); q != "" {
+		renderer = renderer.WithSearch(q, m.searchMatchStyle(selected))
+	}
 	indent := taskTitleColumn(task, cfg.StatusDisplay)
 	return renderer.RenderDescription(task.Description, indent, selected)
 }

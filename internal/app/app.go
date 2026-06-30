@@ -96,6 +96,8 @@ func (m model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleEstimatePickerKey(msg), nil
 	case modes.ModeURLPicker:
 		return m.handleURLPickerKey(msg)
+	case modes.ModeSearch:
+		return m.handleSearchKey(msg)
 	case modes.ModeVisual:
 		return m.handleVisualKey(msg)
 	case modes.ModeEdit:
@@ -403,7 +405,7 @@ func (m model) renderView() string {
 	}
 
 	content := strings.Join(lines, "\n")
-	if bar := m.renderShortcutBar(); bar != "" {
+	if bar := m.renderBottomBar(); bar != "" {
 		// Push the bar to the bottom row even when content is shorter than the
 		// screen. The viewport already reserved this row via FooterHeight, so
 		// the gap calculation below accounts for the bar itself.
@@ -468,7 +470,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		}
 		folded := m.ui.Fold.IsFolded(category.ID)
 		cut := m.isCategoryCut(category.ID)
-		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Screen.Width, focused, inVisualRange, isCursor, cut)
+		return renderCategoryLine(category.Name, category.EstimateMinutes, category.AggregateStatus(), isSelected, folded, m.ui.Screen.Width, focused, inVisualRange, isCursor, cut, m.searchQuery(), m.searchMatchStyle(isCursor))
 
 	case LayoutTask:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]

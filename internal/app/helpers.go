@@ -58,12 +58,12 @@ const (
 )
 
 func (m model) footerHeight() int {
-	return footerHeight + m.shortcutBarHeight()
+	return footerHeight + m.bottomBarHeight()
 }
 
 func (m model) layoutConfig() LayoutConfig {
 	cfg := DefaultLayoutConfig()
-	cfg.FooterHeight += m.shortcutBarHeight()
+	cfg.FooterHeight += m.bottomBarHeight()
 	return cfg
 }
 

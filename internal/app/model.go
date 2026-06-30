@@ -70,6 +70,7 @@ type UIState struct {
 	Visual            VisualState
 	DescriptionEdit   DescriptionEditState
 	History           HistoryState
+	Search            SearchState
 }
 
 type Dependencies struct {

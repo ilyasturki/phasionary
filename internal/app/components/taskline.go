@@ -20,6 +20,8 @@ type TaskLineRenderer struct {
 	isCursor            bool
 	cut                 bool
 	descriptionExpanded bool
+	searchQuery         string
+	searchMatch         lipgloss.Style
 }
 
 func NewTaskLineRenderer(width int, statusDisplay, priorityColor string, focused bool) *TaskLineRenderer {
@@ -49,6 +51,24 @@ func (r *TaskLineRenderer) WithCut(c bool) *TaskLineRenderer {
 func (r *TaskLineRenderer) WithDescriptionExpanded(v bool) *TaskLineRenderer {
 	r.descriptionExpanded = v
 	return r
+}
+
+// WithSearch enables search-match highlighting: occurrences of query within the
+// title/description are rendered with match instead of the base text style.
+func (r *TaskLineRenderer) WithSearch(query string, match lipgloss.Style) *TaskLineRenderer {
+	r.searchQuery = query
+	r.searchMatch = match
+	return r
+}
+
+// highlightLine styles one already-wrapped plain line with base, emphasizing any
+// active search match within it. With no active query it is just
+// base.Render(line).
+func (r *TaskLineRenderer) highlightLine(line string, base lipgloss.Style) string {
+	if r.searchQuery == "" {
+		return base.Render(line)
+	}
+	return ui.HighlightMatches(line, r.searchQuery, base, r.searchMatch)
 }
 
 func (r *TaskLineRenderer) maybeCut(s lipgloss.Style) lipgloss.Style {
@@ -154,24 +174,18 @@ func (r *TaskLineRenderer) RenderDescription(description string, indent int, sel
 func (r *TaskLineRenderer) styleDescriptionLine(indentStr, text string, textStyle, barStyle lipgloss.Style, selected, shouldPad bool) string {
 	if selected {
 		sel := r.selectedStyle()
-		line := indentStr + descriptionBar + text
+		prefix := indentStr + descriptionBar
+		// Render the bar and text separately so a search match keeps its own
+		// styling inside the selection band; pad with the band style to width.
+		rendered := sel.Render(prefix) + r.highlightLine(text, sel)
 		if shouldPad {
-			line = padDescriptionLine(line, r.width, true)
+			if gap := r.width - ansi.StringWidth(prefix) - ansi.StringWidth(text); gap > 0 {
+				rendered += sel.Render(strings.Repeat(" ", gap))
+			}
 		}
-		return sel.Render(line)
+		return rendered
 	}
-	return indentStr + barStyle.Render(descriptionBar) + textStyle.Render(text)
-}
-
-func padDescriptionLine(s string, width int, pad bool) string {
-	if !pad {
-		return s
-	}
-	gap := width - ansi.StringWidth(s)
-	if gap <= 0 {
-		return s
-	}
-	return s + strings.Repeat(" ", gap)
+	return indentStr + barStyle.Render(descriptionBar) + r.highlightLine(text, textStyle)
 }
 
 func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIcon string) string {
@@ -196,7 +210,7 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 	prefixPart := fmt.Sprintf("%s[%s] ", prefix, status)
 
 	if r.width <= 0 {
-		return prefixPart + iconStyled + titleStyle.Render(task.Title) + suffix
+		return prefixPart + iconStyled + r.highlightLine(task.Title, titleStyle) + suffix
 	}
 
 	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, iconStyled, iconWidth, titleStyle, suffix, suffixText)
@@ -226,7 +240,7 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 		selectedStyle.Render("] ")
 
 	if r.width <= 0 {
-		return prefixPart + iconStyled + priorityStyle.Render(task.Title) + suffix
+		return prefixPart + iconStyled + r.highlightLine(task.Title, priorityStyle) + suffix
 	}
 
 	overhead := ansi.StringWidth(prefix + "[" + statusText + "] ")
@@ -244,7 +258,7 @@ func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, iconStyl
 
 	var result []string
 	for i, line := range wrapLines {
-		styledLine := titleStyle.Render(line)
+		styledLine := r.highlightLine(line, titleStyle)
 		var rendered string
 		if i == 0 {
 			rendered = prefixPart + iconStyled + styledLine
@@ -270,7 +284,7 @@ func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart, icon
 
 	var result []string
 	for i, line := range wrapLines {
-		styledTitle := titleStyle.Render(line)
+		styledTitle := r.highlightLine(line, titleStyle)
 		var rendered string
 		if i == 0 {
 			rendered = prefixPart + iconStyled + styledTitle

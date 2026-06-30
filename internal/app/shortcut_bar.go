@@ -13,6 +13,7 @@ var normalShortcuts = []ui.Hint{
 	{Key: "a", Label: "add"},
 	{Key: "A", Label: "category"},
 	{Key: "f", Label: "filter"},
+	{Key: "/", Label: "search"},
 	{Key: "v", Label: "visual"},
 	{Key: "y/x/p", Label: "copy/cut/paste"},
 	{Key: "gx", Label: "open url"},
@@ -58,4 +59,22 @@ func (m model) renderShortcutBar() string {
 		hints = visualShortcuts
 	}
 	return ui.RenderHintsToWidth(hints, m.ui.Screen.Width)
+}
+
+// bottomBarHeight is the rows reserved at the bottom of the screen: the search
+// prompt while searching, otherwise the shortcut bar (when enabled).
+func (m model) bottomBarHeight() int {
+	if m.ui.Modes.IsSearch() {
+		return 1
+	}
+	return m.shortcutBarHeight()
+}
+
+// renderBottomBar draws the search prompt while searching, otherwise the
+// shortcut bar. The two never show at once (search isn't normal/visual mode).
+func (m model) renderBottomBar() string {
+	if m.ui.Modes.IsSearch() {
+		return m.renderSearchBar()
+	}
+	return m.renderShortcutBar()
 }

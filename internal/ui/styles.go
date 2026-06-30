@@ -40,6 +40,14 @@ var (
 	// CutBadgeStyle marks rows whose item is staged for cut/paste.
 	CutBadgeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true)
 
+	// Search highlight: matched substrings during `/` search read as black on
+	// yellow — the conventional search-highlight look, legible on both light and
+	// dark terminals (the ANSI palette tracks the active theme). The current
+	// match adds bold + underline so it stands out from the other matches and
+	// from the cursor's reverse band.
+	SearchMatchStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3"))
+	SearchCurrentMatchStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3")).Bold(true).Underline(true)
+
 	// Description rendering uses italic text with a faint left bar glyph — a
 	// markdown-blockquote treatment that visually distinguishes descriptions
 	// from completed-task rows (which use Faint).

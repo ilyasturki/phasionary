@@ -236,6 +236,12 @@ func (m model) forwardToInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		sanitizeInput(&m.ui.Edit.input)
 		return m, cmd
 	}
+	if m.ui.Modes.IsSearch() {
+		var cmd tea.Cmd
+		m.ui.Search.input, cmd = m.ui.Search.input.Update(msg)
+		sanitizeInput(&m.ui.Search.input)
+		return m, cmd
+	}
 	if m.ui.Picker.isAdding {
 		var cmd tea.Cmd
 		m.ui.Picker.input, cmd = m.ui.Picker.input.Update(msg)
