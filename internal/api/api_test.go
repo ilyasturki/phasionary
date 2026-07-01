@@ -1,4 +1,4 @@
-package web
+package api
 
 import (
 	"bytes"
@@ -94,7 +94,7 @@ func TestAPIProjectsList(t *testing.T) {
 func TestAPIAuthNoTokenReturnsJSON401(t *testing.T) {
 	srv, _ := newTestServer(t, "secret-token")
 	resp := do(t, srv, newRequest(t, "GET", "/api/v1/projects", nil))
-	// API auth failures return JSON, never an HTML login redirect.
+	// API auth failures return JSON, never a redirect.
 	assertStatus(t, resp, http.StatusUnauthorized)
 	if loc := resp.Header.Get("Location"); loc != "" {
 		t.Fatalf("API auth failure must not redirect, got Location %q", loc)

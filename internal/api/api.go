@@ -1,4 +1,4 @@
-package web
+package api
 
 import (
 	"encoding/json"
@@ -40,9 +40,9 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, v any) error {
 	return nil
 }
 
-// apiError renders err as JSON using the shared errorStatus classifier, so the
-// JSON and HTML (mutationError) surfaces always agree on which errors are 404
-// vs 500. Only unexpected 500s are logged; expected 404s are not.
+// apiError renders err as JSON using the shared errorStatus classifier, which
+// maps not-found errors to 404 and anything unexpected to 500. Only unexpected
+// 500s are logged; expected 404s are not.
 func (s *Server) apiError(w http.ResponseWriter, err error) {
 	status, msg := errorStatus(err)
 	if status == http.StatusInternalServerError {

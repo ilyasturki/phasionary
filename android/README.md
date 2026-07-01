@@ -122,7 +122,7 @@ justfile          task runner (sdk / run / install / apk / logs / test)
 
 - **Token storage:** plaintext DataStore — acceptable for a single-user, private
   (Tailscale-only) setup. Move to an encrypted store before any wider use.
-- **Task order:** rendered as the server returns it (matches the web UI); no
+- **Task order:** rendered as the server returns it (matches the TUI); no
   client-side re-sort in v1.
 - **Font:** system monospace (`FontFamily.Monospace`). Drop a JetBrains Mono
   `.ttf` into `app/src/main/res/font` and point `ui/theme/Type.kt` at it to

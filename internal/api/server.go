@@ -1,16 +1,12 @@
-// Package web serves the htmx-based mobile companion UI for Phasionary.
+// Package api serves the JSON HTTP API that the Phasionary mobile app talks to.
 //
-// It binds to localhost by default. Set Config.Token to require token auth
-// for any non-static request; the token can be supplied via ?token=… (which
-// the middleware exchanges for a session cookie) or Authorization: Bearer.
-package web
+// It binds to localhost by default. Set Config.Token to require token auth on
+// every request, supplied as an "Authorization: Bearer <token>" header.
+package api
 
 import (
 	"context"
-	"embed"
 	"errors"
-	"html/template"
-	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -20,12 +16,6 @@ import (
 	"phasionary/internal/data"
 )
 
-//go:embed templates
-var templatesFS embed.FS
-
-//go:embed static
-var staticFS embed.FS
-
 type Config struct {
 	Addr  string
 	Token string
@@ -34,27 +24,10 @@ type Config struct {
 type Server struct {
 	store data.ProjectRepository
 	cfg   Config
-
-	pages    map[string]*template.Template
-	partials map[string]*template.Template
-
-	staticHandler http.Handler
 }
 
-func New(store data.ProjectRepository, cfg Config) (*Server, error) {
-	sub, err := fs.Sub(staticFS, "static")
-	if err != nil {
-		return nil, err
-	}
-	s := &Server{
-		store:         store,
-		cfg:           cfg,
-		staticHandler: http.StripPrefix("/static/", http.FileServerFS(sub)),
-	}
-	if err := s.parseTemplates(); err != nil {
-		return nil, err
-	}
-	return s, nil
+func New(store data.ProjectRepository, cfg Config) *Server {
+	return &Server{store: store, cfg: cfg}
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -76,9 +49,9 @@ func (s *Server) Run(ctx context.Context) error {
 		errCh <- nil
 	}()
 
-	log.Printf("phasionary serve listening on http://%s", displayAddr(s.cfg.Addr))
+	log.Printf("phasionary serve listening on http://%s (JSON API)", displayAddr(s.cfg.Addr))
 	if s.cfg.Token != "" {
-		log.Printf("auth enabled; first visit must supply ?token=… (e.g. http://%s/?token=%s)", displayAddr(s.cfg.Addr), redact(s.cfg.Token))
+		log.Printf("auth enabled; send requests with Authorization: Bearer <token> (token %s)", redact(s.cfg.Token))
 	} else {
 		log.Printf("auth disabled (no --token); only safe on localhost")
 	}

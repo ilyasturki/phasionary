@@ -1,8 +1,0 @@
-{{define "categories"}}
-<div class="categories" id="categories">
-  {{$proj := .Project}}
-  {{range .Categories}}
-    {{template "category" (dict "Project" $proj "Category" .)}}
-  {{end}}
-</div>
-{{end}}

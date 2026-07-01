@@ -25,7 +25,7 @@ in
     };
 
     serve = {
-      enable = lib.mkEnableOption "Phasionary htmx web server";
+      enable = lib.mkEnableOption "Phasionary JSON API server";
 
       host = lib.mkOption {
         type = lib.types.str;
@@ -113,7 +113,7 @@ in
     };
 
     systemd.services.phasionary-serve = {
-      description = "Phasionary htmx web server";
+      description = "Phasionary JSON API server";
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
 

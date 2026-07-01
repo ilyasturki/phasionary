@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"phasionary/internal/web"
+	"phasionary/internal/api"
 )
 
 const (
@@ -28,20 +28,19 @@ const (
 func newServeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
-		Short: "Serve a touch-friendly web UI for mobile access",
-		Long: `Serve a touch-friendly htmx web UI for accessing Phasionary from a phone or tablet.
+		Short: "Serve the JSON API for the mobile app",
+		Long: `Serve the JSON API (/api/v1) that the Phasionary mobile app talks to.
 
 By default the server binds to 127.0.0.1:7777 only. Reach it from your phone
 via an SSH tunnel:
 
     ssh -L 7777:localhost:7777 your-server
 
-then open http://localhost:7777 in the phone's browser.
+then point the app at http://localhost:7777.
 
 To expose on a LAN/Tailscale interface, pass --host explicitly (e.g.
---host 0.0.0.0). A --token is required for any non-loopback bind. The first
-request with ?token=... receives a session cookie so the secret isn't carried
-in URLs after that.`,
+--host 0.0.0.0). A --token is required for any non-loopback bind; clients send
+it as an "Authorization: Bearer <token>" header.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			host := viper.GetString("serve.host")
 			if host == "" {
@@ -54,7 +53,7 @@ in URLs after that.`,
 			addr := net.JoinHostPort(host, strconv.Itoa(port))
 			token := viper.GetString("serve.token")
 
-			if !web.IsLoopbackAddr(addr) && token == "" {
+			if !api.IsLoopbackAddr(addr) && token == "" {
 				return fmt.Errorf("--token is required when binding to a non-loopback address (got %q)", addr)
 			}
 
@@ -66,10 +65,7 @@ in URLs after that.`,
 				return err
 			}
 
-			srv, err := web.New(store, web.Config{Addr: addr, Token: token})
-			if err != nil {
-				return err
-			}
+			srv := api.New(store, api.Config{Addr: addr, Token: token})
 
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
