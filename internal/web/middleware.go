@@ -54,6 +54,13 @@ func isPublicPath(p string) bool {
 	return strings.HasPrefix(p, "/static/") || p == "/login"
 }
 
+// isAPIPath reports whether p targets the JSON API. Auth failures on these
+// paths return a JSON 401 instead of an HTML login redirect, so a script
+// client never has to parse a login page to discover it lacks credentials.
+func isAPIPath(p string) bool {
+	return strings.HasPrefix(p, "/api/")
+}
+
 // requestToken extracts a caller-supplied token, preferring the ?token= query
 // param and falling back to an "Authorization: Bearer" header. viaBearer
 // reports that the token came from the header, which marks the caller as a
@@ -116,9 +123,16 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		// Unauthenticated. htmx swaps response bodies into the page, so a normal
-		// redirect would drop the login form into a fragment; HX-Redirect tells
-		// htmx to do a full client-side navigation instead (for any method).
+		// Unauthenticated. API clients get a JSON 401 for any auth failure —
+		// never an HTML login redirect or a plain-text body — regardless of
+		// method or whether a (bad) Bearer token was supplied.
+		if isAPIPath(r.URL.Path) {
+			writeJSONError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		// htmx swaps response bodies into the page, so a normal redirect would
+		// drop the login form into a fragment; HX-Redirect tells htmx to do a
+		// full client-side navigation instead (for any method).
 		target := loginTarget(r)
 		if r.Header.Get("HX-Request") == "true" {
 			w.Header().Set("HX-Redirect", target)

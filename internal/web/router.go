@@ -55,4 +55,16 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /projects/{pid}/categories/{cid}/tasks/{tid}/status", s.handleTaskStatus)
 	mux.HandleFunc("POST /projects/{pid}/categories/{cid}/tasks/{tid}/priority", s.handleTaskPriority)
 	mux.HandleFunc("POST /projects/{pid}/categories/{cid}/tasks/{tid}/move", s.handleTaskMove)
+
+	s.registerAPIRoutes(mux)
+}
+
+// registerAPIRoutes wires the /api/v1 JSON API. These share the mux (and thus
+// the auth/panic/logging middleware) with the HTML routes; authMiddleware
+// returns JSON 401s for /api/ paths rather than redirecting to the login form.
+func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/projects", s.handleAPIProjectsList)
+	mux.HandleFunc("GET /api/v1/projects/{pid}", s.handleAPIProjectGet)
+	mux.HandleFunc("POST /api/v1/projects/{pid}/categories/{cid}/tasks", s.handleAPITaskCreate)
+	mux.HandleFunc("POST /api/v1/projects/{pid}/categories/{cid}/tasks/{tid}/status", s.handleAPITaskStatus)
 }

@@ -27,6 +27,76 @@ func parseEstimate(raw string) (int, error) {
 	return n, nil
 }
 
+// taskFields carries the writable fields of a task. It is the shared unit the
+// HTML form path and the JSON API path both build and validate, so the two
+// surfaces create tasks through identical logic and can't drift.
+type taskFields struct {
+	Title       string
+	Status      string
+	Priority    string
+	Estimate    int
+	Description string
+}
+
+// Sentinel validation errors, so each surface maps them to its own presentation
+// (an HTML form message vs. a JSON error body).
+var (
+	errTaskTitleRequired = errors.New("title is required")
+	errTaskBadStatus     = errors.New("invalid status")
+	errTaskBadPriority   = errors.New("invalid priority")
+)
+
+// validateTaskFields checks the title and the enum-like status/priority fields.
+// Status must already be defaulted by the caller (empty is invalid). Estimate is
+// validated by the caller — the form path parses it from a string, the JSON path
+// receives an int — so it is not re-checked here.
+func validateTaskFields(f taskFields) error {
+	if f.Title == "" {
+		return errTaskTitleRequired
+	}
+	if domain.ValidateStatus(f.Status) != nil {
+		return errTaskBadStatus
+	}
+	if domain.ValidatePriority(f.Priority) != nil {
+		return errTaskBadPriority
+	}
+	return nil
+}
+
+// findTask resolves cid→category and tid→task within p, returning a pointer to
+// the stored task so callers can mutate it in place under the project lock.
+func findTask(p *domain.Project, cid, tid string) (*domain.Task, error) {
+	cidx, err := p.FindCategoryByID(cid)
+	if err != nil {
+		return nil, err
+	}
+	tidx, err := p.Categories[cidx].FindTaskByID(tid)
+	if err != nil {
+		return nil, err
+	}
+	return &p.Categories[cidx].Tasks[tidx], nil
+}
+
+// applyNewTask builds a task from f and appends it to category cid in p. It
+// assumes f has already passed validateTaskFields. Returns the created task
+// (identical to the stored copy) so callers can echo it back.
+func applyNewTask(p *domain.Project, cid string, f taskFields) (domain.Task, error) {
+	idx, err := p.FindCategoryByID(cid)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	task, err := domain.NewTask(f.Title)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	_ = task.SetStatus(f.Status)
+	_ = task.SetPriority(f.Priority)
+	task.SetEstimate(f.Estimate)
+	task.Description = f.Description
+	p.Categories[idx].AddTask(task)
+	return task, nil
+}
+
 func (s *Server) handleTaskNew(w http.ResponseWriter, r *http.Request) {
 	pid := r.PathValue("pid")
 	cid := r.PathValue("cid")
@@ -92,19 +162,26 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if title == "" {
-		renderForm("Title is required.")
-		return
+	fields := taskFields{
+		Title:       title,
+		Status:      status,
+		Priority:    priority,
+		Estimate:    estimate,
+		Description: description,
 	}
 	// Validate enum-like fields up-front so a tampered <select> shows a form
 	// error rather than a 500.
-	probe := domain.Task{}
-	if err := probe.SetStatus(status); err != nil {
-		renderForm("Invalid status.")
-		return
-	}
-	if err := probe.SetPriority(priority); err != nil {
-		renderForm("Invalid priority.")
+	if err := validateTaskFields(fields); err != nil {
+		switch {
+		case errors.Is(err, errTaskTitleRequired):
+			renderForm("Title is required.")
+		case errors.Is(err, errTaskBadStatus):
+			renderForm("Invalid status.")
+		case errors.Is(err, errTaskBadPriority):
+			renderForm("Invalid priority.")
+		default:
+			renderForm(err.Error())
+		}
 		return
 	}
 	if estErr != nil {
@@ -113,20 +190,8 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err := s.withProject(pid, func(p *domain.Project) error {
-		idx, err := p.FindCategoryByID(cid)
-		if err != nil {
-			return err
-		}
-		task, err := domain.NewTask(title)
-		if err != nil {
-			return err
-		}
-		_ = task.SetStatus(status)
-		_ = task.SetPriority(priority)
-		task.SetEstimate(estimate)
-		task.Description = description
-		p.Categories[idx].AddTask(task)
-		return nil
+		_, err := applyNewTask(p, cid, fields)
+		return err
 	})
 	if err != nil {
 		s.mutationError(w, err)

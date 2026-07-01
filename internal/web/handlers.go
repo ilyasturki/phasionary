@@ -46,19 +46,32 @@ func (s *Server) internalError(w http.ResponseWriter, err error) {
 	http.Error(w, "internal server error", http.StatusInternalServerError)
 }
 
-// mutationError maps the well-known not-found sentinels to 404 and anything
-// else to 500. Used by every mutation handler.
-func (s *Server) mutationError(w http.ResponseWriter, err error) {
+// errorStatus classifies a store/domain error into an HTTP status and a
+// client-safe message. The HTML surface (mutationError) and the JSON surface
+// (apiError) both go through it, so the two agree on which errors are 404 vs
+// 500 without each maintaining its own copy of the mapping.
+func errorStatus(err error) (int, string) {
 	switch {
 	case errors.Is(err, data.ErrProjectNotFound):
-		s.notFound(w, "project not found")
+		return http.StatusNotFound, "project not found"
 	case errors.Is(err, domain.ErrCategoryNotFound):
-		s.notFound(w, "category not found")
+		return http.StatusNotFound, "category not found"
 	case errors.Is(err, domain.ErrTaskNotFound):
-		s.notFound(w, "task not found")
+		return http.StatusNotFound, "task not found"
 	default:
-		s.internalError(w, err)
+		return http.StatusInternalServerError, "internal server error"
 	}
+}
+
+// mutationError renders err as an HTML error using the shared errorStatus
+// classifier. Used by every mutation handler.
+func (s *Server) mutationError(w http.ResponseWriter, err error) {
+	status, msg := errorStatus(err)
+	if status == http.StatusInternalServerError {
+		s.internalError(w, err)
+		return
+	}
+	http.Error(w, msg, status)
 }
 
 func parseMoveDir(r *http.Request) (int, error) {
