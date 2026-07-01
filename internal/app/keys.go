@@ -101,6 +101,8 @@ var normalBindings = []keyBinding{
 		action: void(moveDown)},
 	{keys: []string{"K"}, section: sectionActions,
 		action: void(moveUp)},
+	{keys: []string{"S"}, desc: "reverse category order", section: sectionActions,
+		action: void((*model).reverseCategories)},
 	{keys: []string{"f"}, desc: "filter tasks", section: sectionActions,
 		action: func(m *model) tea.Cmd { m.ui.Modes.ToFilter(); return nil }},
 	{keys: []string{"h"}, display: "h/l", desc: "change priority", section: sectionActions,

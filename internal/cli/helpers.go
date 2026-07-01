@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -131,42 +129,6 @@ func viewProject(selector string, fn func(domain.Project) error) error {
 		return err
 	}
 	return fn(project)
-}
-
-var timeEstimateRe = regexp.MustCompile(`^(?:(\d+(?:\.\d+)?)h)?(?:(\d+)m?)?$`)
-
-func parseTimeEstimate(input string) (int, error) {
-	input = strings.TrimSpace(strings.ToLower(input))
-	if input == "" {
-		return 0, nil
-	}
-
-	if mins, err := strconv.Atoi(input); err == nil {
-		return mins, nil
-	}
-
-	m := timeEstimateRe.FindStringSubmatch(input)
-	if m == nil {
-		return 0, fmt.Errorf("invalid time estimate format: %s", input)
-	}
-
-	var total float64
-	if m[1] != "" {
-		hours, err := strconv.ParseFloat(m[1], 64)
-		if err != nil {
-			return 0, err
-		}
-		total += hours * 60
-	}
-	if m[2] != "" {
-		mins, err := strconv.Atoi(m[2])
-		if err != nil {
-			return 0, err
-		}
-		total += float64(mins)
-	}
-
-	return int(total), nil
 }
 
 type TaskRef struct {

@@ -76,6 +76,70 @@ func TestIncreasePriority_NoopOnCategory(t *testing.T) {
 	assert.Equal(t, originalPriority, m.project.Categories[0].Tasks[0].Priority)
 }
 
+func TestReverseCategories_FlipsOrder(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.reverseCategories()
+	assert.Equal(t, "c2", m.project.Categories[0].ID)
+	assert.Equal(t, "c1", m.project.Categories[1].ID)
+	// Tasks within a category keep their order.
+	assert.Equal(t, []string{"t1", "t2", "t3"}, taskIDs(m.project.Categories[1]))
+}
+
+func TestReverseCategories_KeepsSelectedCategory(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(1) // Cat A header (c1)
+	m.reverseCategories()
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusCategory, pos.Kind)
+	// c1 is now the last category; selection tracks it rather than the header slot.
+	assert.Equal(t, 1, pos.CategoryIndex)
+	assert.Equal(t, "c1", m.project.Categories[pos.CategoryIndex].ID)
+}
+
+func TestReverseCategories_KeepsSelectedTask(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1 in Cat A
+	m.reverseCategories()
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusTask, pos.Kind)
+	assert.Equal(t, 1, pos.CategoryIndex)
+	assert.Equal(t, 0, pos.TaskIndex)
+	assert.Equal(t, "t1", m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].ID)
+}
+
+func TestReverseCategories_RecordsHistory(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	require.Equal(t, 0, m.ui.History.UndoDepth())
+	m.reverseCategories()
+	assert.Equal(t, 1, m.ui.History.UndoDepth())
+	m.undo()
+	assert.Equal(t, "c1", m.project.Categories[0].ID)
+	assert.Equal(t, "c2", m.project.Categories[1].ID)
+}
+
+func TestReverseCategories_KeepsProjectHeaderSelected(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(0) // project header, which never moves on a flip
+	m.reverseCategories()
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusProject, pos.Kind)
+	// Order still flipped despite the header staying selected.
+	assert.Equal(t, "c2", m.project.Categories[0].ID)
+}
+
+func TestReverseCategories_NoopWithSingleCategory(t *testing.T) {
+	p := domain.Project{Categories: []domain.Category{
+		{ID: "only", Tasks: []domain.Task{{ID: "x"}}},
+	}}
+	m := newTestModel(t, p)
+	m.reverseCategories()
+	assert.Equal(t, 0, m.ui.History.UndoDepth(), "no history recorded for a no-op")
+	assert.Equal(t, "only", m.project.Categories[0].ID)
+}
+
 func TestMoveTaskDown_SwapsWithinCategory(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(2) // t1

@@ -3,40 +3,11 @@ package web
 import (
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"phasionary/internal/domain"
+	"phasionary/internal/operations"
 )
-
-// parseEstimate accepts a non-negative minute count or empty (= 0). Reject
-// negatives and non-numerics so a tampered <input min="0"> can't poison the
-// stored value.
-func parseEstimate(raw string) (int, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, nil
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, errors.New("estimate must be a whole number of minutes")
-	}
-	if n < 0 {
-		return 0, errors.New("estimate must be zero or greater")
-	}
-	return n, nil
-}
-
-// taskFields carries the writable fields of a task. It is the shared unit the
-// HTML form path and the JSON API path both build and validate, so the two
-// surfaces create tasks through identical logic and can't drift.
-type taskFields struct {
-	Title       string
-	Status      string
-	Priority    string
-	Estimate    int
-	Description string
-}
 
 // Sentinel validation errors, so each surface maps them to its own presentation
 // (an HTML form message vs. a JSON error body).
@@ -50,7 +21,7 @@ var (
 // Status must already be defaulted by the caller (empty is invalid). Estimate is
 // validated by the caller — the form path parses it from a string, the JSON path
 // receives an int — so it is not re-checked here.
-func validateTaskFields(f taskFields) error {
+func validateTaskFields(f operations.TaskFields) error {
 	if f.Title == "" {
 		return errTaskTitleRequired
 	}
@@ -61,40 +32,6 @@ func validateTaskFields(f taskFields) error {
 		return errTaskBadPriority
 	}
 	return nil
-}
-
-// findTask resolves cid→category and tid→task within p, returning a pointer to
-// the stored task so callers can mutate it in place under the project lock.
-func findTask(p *domain.Project, cid, tid string) (*domain.Task, error) {
-	cidx, err := p.FindCategoryByID(cid)
-	if err != nil {
-		return nil, err
-	}
-	tidx, err := p.Categories[cidx].FindTaskByID(tid)
-	if err != nil {
-		return nil, err
-	}
-	return &p.Categories[cidx].Tasks[tidx], nil
-}
-
-// applyNewTask builds a task from f and appends it to category cid in p. It
-// assumes f has already passed validateTaskFields. Returns the created task
-// (identical to the stored copy) so callers can echo it back.
-func applyNewTask(p *domain.Project, cid string, f taskFields) (domain.Task, error) {
-	idx, err := p.FindCategoryByID(cid)
-	if err != nil {
-		return domain.Task{}, err
-	}
-	task, err := domain.NewTask(f.Title)
-	if err != nil {
-		return domain.Task{}, err
-	}
-	_ = task.SetStatus(f.Status)
-	_ = task.SetPriority(f.Priority)
-	task.SetEstimate(f.Estimate)
-	task.Description = f.Description
-	p.Categories[idx].AddTask(task)
-	return task, nil
 }
 
 func (s *Server) handleTaskNew(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +69,7 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 		status = domain.StatusTodo
 	}
 	priority := r.FormValue("priority")
-	estimate, estErr := parseEstimate(r.FormValue("estimate"))
+	estimate, estErr := operations.ParseEstimate(r.FormValue("estimate"))
 	description := strings.TrimRight(r.FormValue("description"), "\n")
 
 	renderForm := func(errMsg string) {
@@ -162,7 +99,7 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	fields := taskFields{
+	fields := operations.TaskFields{
 		Title:       title,
 		Status:      status,
 		Priority:    priority,
@@ -190,7 +127,7 @@ func (s *Server) handleTaskCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err := s.withProject(pid, func(p *domain.Project) error {
-		_, err := applyNewTask(p, cid, fields)
+		_, err := operations.CreateTask(p, cid, fields)
 		return err
 	})
 	if err != nil {
@@ -239,7 +176,7 @@ func (s *Server) handleTaskUpdate(w http.ResponseWriter, r *http.Request) {
 	title := strings.TrimSpace(r.FormValue("title"))
 	status := r.FormValue("status")
 	priority := r.FormValue("priority")
-	estimate, estErr := parseEstimate(r.FormValue("estimate"))
+	estimate, estErr := operations.ParseEstimate(r.FormValue("estimate"))
 	description := strings.TrimRight(r.FormValue("description"), "\n")
 
 	renderForm := func(errMsg string) {
@@ -405,28 +342,16 @@ func (s *Server) handleTaskMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	project, err := s.withProject(pid, func(p *domain.Project) error {
-		cidx, err := p.FindCategoryByID(cid)
-		if err != nil {
-			return err
-		}
-		tidx, err := p.Categories[cidx].FindTaskByID(tid)
-		if err != nil {
-			return err
-		}
-		// Swallow edge errors so tapping past the boundary doesn't error,
-		// and skip the save so we don't bump UpdatedAt for nothing.
-		if mvErr := p.Categories[cidx].MoveTask(tidx, delta); mvErr != nil {
-			return errNoChange
-		}
-		return nil
+		_, e := operations.MoveTaskWithinCategory(p, cid, tid, delta)
+		return e
 	})
 	if err != nil {
 		s.mutationError(w, err)
 		return
 	}
 	// Re-resolve the category index against the post-call project — the
-	// errNoChange branch of withProject reloads from disk without the
-	// project flock, so any closure-captured cidx may be stale.
+	// ErrNoChange branch of withProject reloads from disk without the
+	// project flock, so any closure-captured index may be stale.
 	cidx, err := project.FindCategoryByID(cid)
 	if err != nil {
 		s.mutationError(w, err)

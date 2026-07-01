@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 )
@@ -453,6 +454,17 @@ func (p *Project) MoveCategory(idx, delta int) error {
 	p.Categories[idx], p.Categories[dst] = p.Categories[dst], p.Categories[idx]
 	p.UpdatedAt = NowTimestamp()
 	return nil
+}
+
+// ReverseCategories flips the order of the categories in place. It is its own
+// inverse: invoking it twice restores the original order. Tasks within each
+// category keep their order.
+func (p *Project) ReverseCategories() {
+	if len(p.Categories) < 2 {
+		return
+	}
+	slices.Reverse(p.Categories)
+	p.UpdatedAt = NowTimestamp()
 }
 
 func (c *Category) MoveTask(idx, delta int) error {

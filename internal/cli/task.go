@@ -9,6 +9,7 @@ import (
 
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
+	"phasionary/internal/operations"
 )
 
 func newTasksCmd() *cobra.Command {
@@ -135,36 +136,28 @@ func newTaskAddCmd() *cobra.Command {
 				return errors.New("title is required")
 			}
 
-			task, err := domain.NewTask(args[0])
+			minutes, err := operations.ParseEstimate(estimate)
 			if err != nil {
 				return err
 			}
-			if priority != "" {
-				if err := domain.ValidatePriority(priority); err != nil {
-					return err
-				}
-				task.Priority = priority
-			}
-			if estimate != "" {
-				minutes, err := parseTimeEstimate(estimate)
-				if err != nil {
-					return err
-				}
-				task.EstimateMinutes = minutes
-			}
 
+			var created domain.Task
 			err = withProject(projectSelector(nil), func(_ *data.Store, project *domain.Project) error {
-				_, catIdx, err := resolveCategory(*project, categoryName)
+				cat, _, err := resolveCategory(*project, categoryName)
 				if err != nil {
 					return fmt.Errorf("category %q not found", categoryName)
 				}
-				project.Categories[catIdx].AddTask(task)
-				return nil
+				created, err = operations.CreateTask(project, cat.ID, operations.TaskFields{
+					Title:    args[0],
+					Priority: priority,
+					Estimate: minutes,
+				})
+				return err
 			})
 			if err != nil {
 				return err
 			}
-			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Created task: %s (%s)", task.Title, task.ID))
+			writeSuccess(cmd.OutOrStdout(), fmt.Sprintf("Created task: %s (%s)", created.Title, created.ID))
 			return nil
 		},
 	}
@@ -211,7 +204,7 @@ func newTaskEditCmd() *cobra.Command {
 					}
 				}
 				if estimate != "" {
-					minutes, err := parseTimeEstimate(estimate)
+					minutes, err := operations.ParseEstimate(estimate)
 					if err != nil {
 						return err
 					}

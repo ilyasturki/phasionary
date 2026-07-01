@@ -266,6 +266,51 @@ func TestProject_RemoveCategory(t *testing.T) {
 	})
 }
 
+func TestProject_ReverseCategories(t *testing.T) {
+	t.Run("reverses order of multiple categories", func(t *testing.T) {
+		proj := Project{Categories: []Category{
+			{ID: "1"}, {ID: "2"}, {ID: "3"},
+		}}
+		proj.ReverseCategories()
+		assert.Equal(t, []string{"3", "2", "1"},
+			[]string{proj.Categories[0].ID, proj.Categories[1].ID, proj.Categories[2].ID})
+	})
+
+	t.Run("keeps task order within each category", func(t *testing.T) {
+		proj := Project{Categories: []Category{
+			{ID: "1", Tasks: []Task{{ID: "a"}, {ID: "b"}}},
+			{ID: "2", Tasks: []Task{{ID: "c"}}},
+		}}
+		proj.ReverseCategories()
+		assert.Equal(t, "2", proj.Categories[0].ID)
+		assert.Equal(t, "1", proj.Categories[1].ID)
+		assert.Equal(t, []string{"a", "b"},
+			[]string{proj.Categories[1].Tasks[0].ID, proj.Categories[1].Tasks[1].ID})
+	})
+
+	t.Run("is its own inverse", func(t *testing.T) {
+		proj := Project{Categories: []Category{
+			{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"},
+		}}
+		proj.ReverseCategories()
+		proj.ReverseCategories()
+		assert.Equal(t, []string{"1", "2", "3", "4"},
+			[]string{proj.Categories[0].ID, proj.Categories[1].ID, proj.Categories[2].ID, proj.Categories[3].ID})
+	})
+
+	t.Run("no-op for zero or one category", func(t *testing.T) {
+		empty := Project{Categories: []Category{}, UpdatedAt: "before"}
+		empty.ReverseCategories()
+		assert.Empty(t, empty.Categories)
+		assert.Equal(t, "before", empty.UpdatedAt, "UpdatedAt untouched when nothing moves")
+
+		single := Project{Categories: []Category{{ID: "1"}}, UpdatedAt: "before"}
+		single.ReverseCategories()
+		assert.Len(t, single.Categories, 1)
+		assert.Equal(t, "before", single.UpdatedAt, "UpdatedAt untouched when nothing moves")
+	})
+}
+
 func TestCategory_AggregateStatus(t *testing.T) {
 	t.Run("empty category returns empty string", func(t *testing.T) {
 		cat := Category{Tasks: []Task{}}

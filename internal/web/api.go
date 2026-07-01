@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"phasionary/internal/domain"
+	"phasionary/internal/operations"
 )
 
 // writeJSON serializes v as the response body with the given status code.
@@ -91,7 +92,7 @@ func (s *Server) handleAPITaskCreate(w http.ResponseWriter, r *http.Request) {
 	if status == "" {
 		status = domain.StatusTodo
 	}
-	fields := taskFields{
+	fields := operations.TaskFields{
 		Title:       strings.TrimSpace(req.Title),
 		Status:      status,
 		Priority:    req.Priority,
@@ -110,7 +111,7 @@ func (s *Server) handleAPITaskCreate(w http.ResponseWriter, r *http.Request) {
 	var created domain.Task
 	_, err := s.withProject(pid, func(p *domain.Project) error {
 		var e error
-		created, e = applyNewTask(p, cid, fields)
+		created, e = operations.CreateTask(p, cid, fields)
 		return e
 	})
 	if err != nil {
@@ -144,15 +145,9 @@ func (s *Server) handleAPITaskStatus(w http.ResponseWriter, r *http.Request) {
 
 	var updated domain.Task
 	_, err := s.withProject(pid, func(p *domain.Project) error {
-		task, e := findTask(p, cid, tid)
-		if e != nil {
-			return e
-		}
-		if e := task.SetStatus(req.Status); e != nil {
-			return e
-		}
-		updated = *task
-		return nil
+		var e error
+		updated, e = operations.SetTaskStatus(p, cid, tid, req.Status)
+		return e
 	})
 	if err != nil {
 		s.apiError(w, err)

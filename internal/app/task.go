@@ -289,6 +289,32 @@ func (m *model) moveTaskUp() {
 	m.storeTaskUpdate()
 }
 
+func (m *model) reverseCategories() {
+	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
+		return
+	}
+	if len(m.project.Categories) < 2 {
+		return
+	}
+	m.recordHistory()
+	// Capture the selection so the same item stays selected after the flip: a
+	// category at index i moves to len-1-i, and a task/description keeps its
+	// index within its (now relocated) category.
+	position, hasSelection := m.selectedPosition()
+	m.project.ReverseCategories()
+	m.rebuildPositions()
+	// The project header (FocusProject) stays put at the top; only category and
+	// task/description rows are relocated by the flip. selectTaskOrCategory maps
+	// a category position (TaskIndex -1, which matches no task) to its header,
+	// and a task/description to its task row at the mirrored category index.
+	if hasSelection && position.Kind != selection.FocusProject {
+		newCatIndex := len(m.project.Categories) - 1 - position.CategoryIndex
+		m.selectTaskOrCategory(newCatIndex, position.TaskIndex)
+	}
+	m.ensureVisible()
+	m.storeTaskUpdate()
+}
+
 func (m *model) selectTaskOrCategory(catIndex, taskIndex int) {
 	if m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
 		return p.Kind == selection.FocusTask && p.CategoryIndex == catIndex && p.TaskIndex == taskIndex
