@@ -1,0 +1,31 @@
+# Phasionary Android — task runner (https://github.com/casey/just)
+# Recipes run from this directory, so bare ./gradlew works.
+
+pkg  := "com.phasionary.app"   # applicationId (app/build.gradle.kts)
+port := "7777"                 # phasionary server port (see `phasionary serve`)
+
+# One-time setup: build the Nix-patched Android SDK and point Gradle at it.
+sdk:
+    nix build --impure --expr "import $PWD/nix/sdk.nix" -o .nix-android-sdk
+    echo "sdk.dir=$PWD/.nix-android-sdk/libexec/android-sdk" > local.properties
+
+# Build, install, tunnel the laptop server to the phone, launch — "test on my phone"
+run: install
+    adb reverse tcp:{{port}} tcp:{{port}}
+    adb shell monkey -p {{pkg}} -c android.intent.category.LAUNCHER 1
+
+# Build + install the debug APK onto the connected phone
+install:
+    ./gradlew :app:installDebug
+
+# Tail logcat for just this app (app must be running)
+logs:
+    adb logcat --pid=$(adb shell pidof -s {{pkg}})
+
+# JVM unit tests (serialization + Ktor repository + ViewModels)
+test:
+    ./gradlew :app:testDebugUnitTest
+
+# Debug APK without installing — lands in app/build/outputs/apk/debug/
+apk:
+    ./gradlew :app:assembleDebug

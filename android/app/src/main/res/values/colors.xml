@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher adaptive-icon background. -->
+    <color name="ic_launcher_background">#0D1117</color>
+    <!-- Window background painted before Compose draws; light default, dark in
+         values-night, so there is no wrong-mode flash on cold start. -->
+    <color name="window_background">#FDFDFD</color>
+</resources>

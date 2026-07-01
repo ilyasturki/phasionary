@@ -1,0 +1,26 @@
+# nix-built SDK (nix/sdk.nix, `just sdk`)
+/.nix-android-sdk
+/result
+/result-*
+
+# Gradle
+.gradle/
+build/
+.kotlin/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.cxx/
+
+# Local SDK path — machine specific, never commit
+local.properties
+
+# Keystores / signing — never commit secrets
+*.jks
+*.keystore
+keystore.properties
+
+# Captured API fixtures are fine to commit; build outputs are not
+captures/
