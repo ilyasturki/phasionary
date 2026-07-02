@@ -16,8 +16,6 @@ var normalShortcuts = []ui.Hint{
 	{Key: "/", Label: "search"},
 	{Key: "v", Label: "visual"},
 	{Key: "y/x/p", Label: "copy/cut/paste"},
-	{Key: "gx", Label: "open url"},
-	{Key: "gy", Label: "yank part"},
 	{Key: "u/^r", Label: "undo/redo"},
 	{Key: ",", Label: "options"},
 	{Key: "q", Label: "quit"},
