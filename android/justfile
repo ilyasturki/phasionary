@@ -29,3 +29,7 @@ test:
 # Debug APK without installing — lands in app/build/outputs/apk/debug/
 apk:
     ./gradlew :app:assembleDebug
+
+# Release APK, signed if keystore.properties exists — lands in app/build/outputs/apk/release/
+release-apk:
+    ./gradlew :app:assembleRelease

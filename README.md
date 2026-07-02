@@ -32,6 +32,8 @@ inputs.phasionary.url = "github:ilyasturki/phasionary";
 
 Grab the latest `phasionary-linux-x64` or `phasionary-linux-arm64` from the [releases page](https://github.com/ilyasturki/phasionary/releases), `chmod +x`, drop in `$PATH`.
 
+Each release also ships `phasionary-android.apk` — the [Android client](android/README.md) for the `phasionary serve` API. Sideload it on your phone.
+
 ### From source
 
 ```bash

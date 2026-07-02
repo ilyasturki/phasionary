@@ -1,9 +1,25 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// Versioned with the repo-root VERSION file (see README "Release APK"). The
+// positional versionCode encoding assumes minor/patch < 100.
+val repoVersion = rootProject.file("../VERSION").readText().trim()
+val repoVersionCode = repoVersion.split(".")
+    .map { it.toInt() }
+    .let { (major, minor, patch) -> major * 10_000 + minor * 100 + patch }
+
+// Optional release signing: keystore.properties is gitignored and may be
+// absent, in which case assembleRelease produces an unsigned APK (see README
+// "Release APK").
+val keystoreProps: Properties? = rootProject.file("keystore.properties")
+    .takeIf { it.exists() }
+    ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
 
 android {
     namespace = "com.phasionary.app"
@@ -14,12 +30,24 @@ android {
         applicationId = "com.phasionary.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = repoVersionCode
+        versionName = repoVersion
+    }
+
+    signingConfigs {
+        keystoreProps?.let { props ->
+            create("release") {
+                storeFile = rootProject.file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             // Keep v1 simple: no shrinking/obfuscation yet. Flip on with a tested
             // keep-rules pass before publishing a real release APK.
             isMinifyEnabled = false

@@ -95,6 +95,27 @@ Unit tests run on the JVM (no device/emulator) — `just test` (or
 - **ViewModel** (`TaskListViewModelTest`) — load, optimistic status cycle,
   revert-on-failure, category collapse.
 
+## Release APK
+
+Every GitHub release (tag push) attaches a signed `phasionary-android.apk`,
+built by the `build-android` job in `.github/workflows/release.yml`. How it
+fits together:
+
+- **Version:** `versionName`/`versionCode` derive from the repo-root `VERSION`
+  file (the same value as the release tag), so upgrades always install in
+  place. Nothing to bump here.
+- **Signing:** `android/release.keystore` + `android/keystore.properties`,
+  both gitignored. CI reconstructs them from the repo secrets
+  `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` (alias
+  `phasionary`).
+- **Back up the keystore.** GitHub secrets are write-only; the local
+  `release.keystore` + `keystore.properties` are the only recoverable copy.
+  Losing them means future releases get a new signature and phones refuse the
+  upgrade until the app is uninstalled.
+- **Local signed build:** with those two files present, `just release-apk`
+  produces the same signed APK. Without them the release build is unsigned
+  (debug builds are unaffected).
+
 ## Layout
 
 ```
