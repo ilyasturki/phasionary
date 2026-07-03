@@ -203,6 +203,13 @@ type ProjectPickerState struct {
 	scrollOffset int
 	isAdding     bool
 	input        textinput.Model
+	// filtering narrows the list to projects whose name matches query (fzf
+	// style). While filtering, allProjects holds the full ordered set that
+	// projects is derived from; query is the live filter text, filter its input.
+	filtering   bool
+	filter      textinput.Model
+	query       string
+	allProjects []domain.Project
 }
 
 func (p *ProjectPickerState) reset() {
@@ -212,6 +219,10 @@ func (p *ProjectPickerState) reset() {
 	p.scrollOffset = 0
 	p.isAdding = false
 	p.input = textinput.Model{}
+	p.filtering = false
+	p.filter = textinput.Model{}
+	p.query = ""
+	p.allProjects = nil
 }
 
 type ConfirmDeleteKind int
@@ -275,6 +286,43 @@ func (p *ProjectPickerState) startAdding() {
 func (p *ProjectPickerState) cancelAdding() {
 	p.isAdding = false
 	p.input = textinput.Model{}
+}
+
+// startFiltering enters the type-to-filter sub-mode, snapshotting the full
+// ordered list so clearing the filter restores it. The cursor moves onto the
+// first project (never the pinned New Project row, which isn't a filter target).
+func (p *ProjectPickerState) startFiltering() {
+	p.filtering = true
+	p.allProjects = p.projects
+	p.query = ""
+	p.filter = textinput.New()
+	p.filter.Focus()
+	p.onNew = false
+	p.selected = 0
+	p.scrollOffset = 0
+}
+
+// cancelFiltering leaves the filter sub-mode and restores the full project list,
+// keeping the highlighted project selected when it survives the restore.
+func (p *ProjectPickerState) cancelFiltering(visible int) {
+	var keep string
+	if p.selected < len(p.projects) {
+		keep = p.projects[p.selected].ID
+	}
+	p.filtering = false
+	p.filter = textinput.Model{}
+	p.query = ""
+	p.projects = p.allProjects
+	p.allProjects = nil
+	p.onNew = false
+	p.selected = 0
+	for i, pr := range p.projects {
+		if pr.ID == keep {
+			p.selected = i
+			break
+		}
+	}
+	p.ensureVisible(visible)
 }
 
 type FoldState struct {

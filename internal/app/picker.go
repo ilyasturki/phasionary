@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"phasionary/internal/domain"
+	"phasionary/internal/ui"
 )
 
 // pickerScrollOff keeps a small margin of context rows between the cursor and
@@ -78,8 +79,15 @@ func (m model) handleProjectPickerKey(msg tea.KeyPressMsg) (model, tea.Cmd) {
 	if m.ui.Picker.isAdding {
 		return m.handlePickerAddKey(msg)
 	}
+	if m.ui.Picker.filtering {
+		return m.handlePickerFilterKey(msg)
+	}
 	visible := m.pickerVisibleCount()
 	switch msg.String() {
+	case "/":
+		if len(m.ui.Picker.projects) > 0 {
+			m.ui.Picker.startFiltering()
+		}
 	case "j", "down":
 		m.ui.Picker.moveSelection(1, visible)
 	case "k", "up":
@@ -214,6 +222,37 @@ func (m model) handlePickerAddKey(msg tea.KeyPressMsg) (model, tea.Cmd) {
 	return m, cmd
 }
 
+// handlePickerFilterKey drives the type-to-filter sub-mode. Reorder (J/K) and
+// delete (d) aren't handled here — their keys are filter text — so those actions
+// stay operating on the full, unfiltered list.
+func (m model) handlePickerFilterKey(msg tea.KeyPressMsg) (model, tea.Cmd) {
+	visible := m.pickerVisibleCount()
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "esc":
+		m.ui.Picker.cancelFiltering(visible)
+		return m, nil
+	case "enter":
+		if len(m.ui.Picker.projects) > 0 {
+			m.selectProject()
+		}
+		return m, nil
+	case "down", "ctrl+n":
+		m.ui.Picker.moveWithinProjects(1, visible)
+		return m, nil
+	case "up", "ctrl+p":
+		m.ui.Picker.moveWithinProjects(-1, visible)
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.ui.Picker.filter, cmd = m.ui.Picker.filter.Update(msg)
+	sanitizeInput(&m.ui.Picker.filter)
+	m.ui.Picker.query = m.ui.Picker.filter.Value()
+	m.ui.Picker.applyFilter(visible)
+	return m, cmd
+}
+
 func (m *model) createProjectFromPicker() {
 	name := strings.TrimSpace(m.ui.Picker.input.Value())
 	if name == "" {
@@ -303,6 +342,38 @@ func halfPage(visible int) int {
 // then projects), so j/k and paging cross the New Project boundary uniformly.
 func (p *ProjectPickerState) moveSelection(delta, visible int) {
 	p.setVirtual(p.virtualIndex() + delta)
+	p.ensureVisible(visible)
+}
+
+// moveWithinProjects steps the cursor over the projects only, never the pinned
+// New Project row — used while filtering, where that row is hidden.
+func (p *ProjectPickerState) moveWithinProjects(delta, visible int) {
+	if len(p.projects) == 0 {
+		return
+	}
+	p.onNew = false
+	p.selected = max(0, min(p.selected+delta, len(p.projects)-1))
+	p.ensureVisible(visible)
+}
+
+// applyFilter recomputes the displayed projects from the snapshot in allProjects
+// and the current query (smartcase substring match on name), resetting the
+// cursor to the first match. An empty query restores the full list.
+func (p *ProjectPickerState) applyFilter(visible int) {
+	if p.query == "" {
+		p.projects = p.allProjects
+	} else {
+		filtered := make([]domain.Project, 0, len(p.allProjects))
+		for _, pr := range p.allProjects {
+			if ui.Contains(pr.Name, p.query) {
+				filtered = append(filtered, pr)
+			}
+		}
+		p.projects = filtered
+	}
+	p.onNew = false
+	p.selected = 0
+	p.scrollOffset = 0
 	p.ensureVisible(visible)
 }
 

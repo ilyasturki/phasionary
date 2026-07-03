@@ -43,6 +43,7 @@ const (
 func pickerNormalHints() []ui.Hint {
 	return []ui.Hint{
 		{Key: "⏎", Label: "select"},
+		{Key: "/", Label: "search"},
 		{Key: "J/K", Label: "reorder"},
 		{Key: "d", Label: "delete"},
 		{Key: "esc", Label: "cancel"},
@@ -107,12 +108,18 @@ func (m model) projectPickerView() string {
 	contentWidth := m.pickerContentWidth()
 
 	title := fmt.Sprintf("Select Project (%d)", len(m.ui.Picker.projects))
+	// While filtering, the query prompt takes the pinned top row's place: New
+	// Project isn't a filter target, so it's hidden until the filter is cleared.
+	topLine := m.renderNewProjectLine(m.ui.Picker.onNew, contentWidth)
+	if m.ui.Picker.filtering {
+		topLine = m.renderPickerFilterLine(contentWidth)
+	}
 	lines := []string{
 		ui.DialogTitleStyle.Render(title),
 		"",
 		// "+ New Project" is pinned above the scrolling list so it's always
-		// reachable (Tab), never scrolled away.
-		m.renderNewProjectLine(m.ui.Picker.onNew, contentWidth),
+		// reachable, never scrolled away.
+		topLine,
 		ui.DialogHintStyle.Render(strings.Repeat("─", contentWidth)),
 	}
 
@@ -123,6 +130,9 @@ func (m model) projectPickerView() string {
 		end = n
 	}
 
+	if m.ui.Picker.filtering && n == 0 {
+		lines = append(lines, ui.MutedStyle.Render("  no matches"))
+	}
 	if start > 0 {
 		lines = append(lines, ui.DialogHintStyle.Render(scrollMoreAbove))
 	}
@@ -135,10 +145,16 @@ func (m model) projectPickerView() string {
 	}
 
 	hints := pickerNormalHints()
-	if m.ui.Picker.isAdding {
+	switch {
+	case m.ui.Picker.isAdding:
 		hints = []ui.Hint{
 			{Key: "⏎", Label: "create"},
 			{Key: "esc", Label: "cancel"},
+		}
+	case m.ui.Picker.filtering:
+		hints = []ui.Hint{
+			{Key: "⏎", Label: "select"},
+			{Key: "esc", Label: "clear"},
 		}
 	}
 	lines = append(lines, "", ui.RenderHints(hints))
@@ -169,7 +185,11 @@ func (m model) renderPickerRow(i int, isSelected bool, contentWidth int) string 
 		return ui.SelectedStyle.Render(padToWidth(row, contentWidth))
 	}
 
-	row := prefix + name
+	displayName := name
+	if m.ui.Picker.filtering && m.ui.Picker.query != "" {
+		displayName = ui.HighlightMatches(name, m.ui.Picker.query, lipgloss.NewStyle(), ui.SearchMatchStyle)
+	}
+	row := prefix + displayName
 	if suffix != "" {
 		row += ui.DialogHintStyle.Render(suffix)
 	}
@@ -202,6 +222,31 @@ func (m model) renderNewProjectLine(isSelected bool, contentWidth int) string {
 	}
 	// The green "+" reads as an affordance to act, not a disabled row.
 	return prefix + ui.SuccessStyle.Render("+") + " New Project"
+}
+
+// renderPickerFilterLine draws the type-to-filter prompt that replaces the New
+// Project row while filtering: "/<query>" with a live cursor on the left and a
+// match count (or "no matches") right-aligned to the content width.
+func (m model) renderPickerFilterLine(contentWidth int) string {
+	split := splitAtCursor(m.ui.Picker.filter.Value(), m.ui.Picker.filter.Position())
+	left := "/" + split.left +
+		ui.GetCursorStyle(m.ui.Screen.WindowFocused).Render(split.cursorCh) + split.right
+
+	status := ""
+	if m.ui.Picker.query != "" {
+		if c := len(m.ui.Picker.projects); c == 0 {
+			status = ui.MutedStyle.Render("no matches")
+		} else {
+			status = ui.MutedStyle.Render(fmt.Sprintf("%d %s", c, plural(c, "match", "matches")))
+		}
+	}
+
+	leftW := lipgloss.Width(left)
+	statusW := lipgloss.Width(status)
+	if status == "" || leftW+2+statusW > contentWidth {
+		return left
+	}
+	return left + strings.Repeat(" ", contentWidth-leftW-statusW) + status
 }
 
 // pickerRowLayout truncates the project name so the row fits contentWidth with
