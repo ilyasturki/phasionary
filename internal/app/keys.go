@@ -89,7 +89,11 @@ var normalBindings = []keyBinding{
 			m.startEditing()
 			return nil
 		}},
-	{keys: []string{"shift+enter"}, desc: "edit/jump to task description", section: sectionActions,
+	// Many terminals (kitty, ghostty, …) transmit Shift+Enter as the bytes
+	// ESC+CR, which Bubble Tea decodes as "alt+enter"; others that speak the
+	// Kitty protocol send a genuine "shift+enter". Bind both so the physical
+	// Shift+Enter reaches this action regardless of terminal encoding.
+	{keys: []string{"shift+enter", "alt+enter"}, display: "shift+enter", desc: "edit/jump to task description", section: sectionActions,
 		action: func(m *model) tea.Cmd { return m.editOrFocusDescription() }},
 	{keys: []string{"e"}, desc: "edit in external editor (whole task)", section: sectionActions,
 		action: func(m *model) tea.Cmd { return m.startExternalEdit() }},
