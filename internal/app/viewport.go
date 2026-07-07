@@ -241,23 +241,33 @@ func (v *Viewport) CenterOnPosition(posIndex int) int {
 		targetSpaceAbove = 0
 	}
 
-	// Calculate cumulative heights to find ideal scroll offset
-	usedHeight := 0
-	scrollOffset := 0
-
-	for i := 0; i < targetItemIdx; i++ {
+	// Walk backward from the target, accumulating the heights of the items
+	// above it. Every selectable item we pass is a valid scroll start; pick the
+	// one whose resulting rows-above is closest to targetSpaceAbove so the
+	// target lands as near the vertical center as the layout allows.
+	scrollOffset := posIndex // fallback: target pinned to the top
+	bestDiff := targetSpaceAbove
+	rowsAbove := 0
+	for i := targetItemIdx - 1; i >= 0; i-- {
 		item := v.Layout.Items[i]
+		rowsAbove += item.Height
 		if item.PositionIndex < 0 {
-			usedHeight += item.Height
-			continue
+			continue // blanks can't be a scroll start
 		}
 
-		newHeight := usedHeight + item.Height
-		if newHeight > targetSpaceAbove && i > 0 {
+		diff := rowsAbove - targetSpaceAbove
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff <= bestDiff {
+			bestDiff = diff
 			scrollOffset = item.PositionIndex
-			usedHeight = item.Height
-		} else {
-			usedHeight = newHeight
+		}
+
+		// Once we've reached (or passed) the desired gap, scrolling further up
+		// only pushes the target lower, so stop.
+		if rowsAbove >= targetSpaceAbove {
+			break
 		}
 	}
 

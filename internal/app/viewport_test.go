@@ -200,6 +200,62 @@ func TestComputeVisibility_ScrollOffsetNonZero(t *testing.T) {
 	assert.Greater(t, viewport.VisibleStart, 0, "VisibleStart should be > 0 when scrollOffset is 1")
 }
 
+// zz (CenterOnPosition) must place the selected item at a stable vertical
+// position — near the center — regardless of which interior item is chosen.
+// Regression test for the greedy-reset offset math that made items land near
+// the top of the screen for most positions.
+func TestCenterOnPosition_ConsistentlyCentered(t *testing.T) {
+	var tasks []domain.Task
+	for i := 0; i < 40; i++ {
+		tasks = append(tasks, domain.Task{Title: "Task", Status: domain.StatusTodo})
+	}
+	project := domain.Project{
+		Name:       "P",
+		Categories: []domain.Category{{Name: "C", Tasks: tasks}},
+	}
+	positions := []selection.Position{
+		{Kind: selection.FocusProject, CategoryIndex: -1, TaskIndex: -1},
+		{Kind: selection.FocusCategory, CategoryIndex: 0, TaskIndex: -1},
+	}
+	for i := range tasks {
+		positions = append(positions, selection.Position{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: i})
+	}
+
+	config := DefaultLayoutConfig()
+	layout := NewLayoutBuilder(config, 80, "icons", nil, nil).Build(project, positions)
+	const screenHeight = 24
+
+	// rowsAbove reports the on-screen content row the target renders at, given a
+	// scroll offset (i.e. how many rows sit above it inside the content area).
+	rowsAbove := func(scrollOffset, posIndex int) int {
+		vp := NewViewport(&layout, screenHeight, config)
+		vp.ComputeVisibility(scrollOffset)
+		rows := 0
+		for i := vp.VisibleStart; i < vp.VisibleEnd; i++ {
+			if layout.Items[i].PositionIndex == posIndex {
+				return rows
+			}
+			rows += layout.Items[i].Height
+		}
+		return -1 // target not visible after centering — a bug
+	}
+
+	// Interior positions with ample content on both sides should all land at the
+	// same central row. Positions near the ends can't fully center (clamped at
+	// the content edges), so they're excluded here.
+	first := rowsAbove(NewViewport(&layout, screenHeight, config).CenterOnPosition(15), 15)
+	require.Greater(t, first, 1, "centered item should sit well below the top of the screen")
+
+	for pos := 15; pos <= 35; pos++ {
+		vp := NewViewport(&layout, screenHeight, config)
+		off := vp.CenterOnPosition(pos)
+		got := rowsAbove(off, pos)
+		require.NotEqual(t, -1, got, "pos %d must remain visible after zz", pos)
+		assert.InDelta(t, first, got, 1,
+			"pos %d should center at the same row as the others (got rowsAbove=%d, want ~%d)", pos, got, first)
+	}
+}
+
 func TestLayoutBuilder_ExpandedDescriptions_AddsSeparateRow(t *testing.T) {
 	project := domain.Project{
 		Name: "P",
