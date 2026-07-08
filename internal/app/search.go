@@ -200,6 +200,11 @@ func (m model) rowMatches(r selection.Position, query string) bool {
 	switch r.Kind {
 	case selection.FocusCategory:
 		return ui.Contains(cat.Name, query)
+	case selection.FocusSeparator:
+		if r.TaskIndex < 0 || r.TaskIndex >= len(cat.Tasks) {
+			return false
+		}
+		return ui.Contains(cat.Tasks[r.TaskIndex].Title, query)
 	case selection.FocusTask:
 		if r.TaskIndex < 0 || r.TaskIndex >= len(cat.Tasks) {
 			return false
@@ -271,7 +276,7 @@ func (m *model) landOnRow(r selection.Position) {
 	if r.CategoryIndex < 0 || r.CategoryIndex >= len(m.project.Categories) {
 		return
 	}
-	if r.Kind == selection.FocusTask || r.Kind == selection.FocusDescription {
+	if isRowKind(r.Kind) || r.Kind == selection.FocusDescription {
 		catID := m.project.Categories[r.CategoryIndex].ID
 		if m.ui.Fold.IsFolded(catID) {
 			m.ui.Fold.Toggle(catID)
@@ -282,6 +287,10 @@ func (m *model) landOnRow(r selection.Position) {
 	case selection.FocusCategory:
 		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
 			return p.Kind == selection.FocusCategory && p.CategoryIndex == r.CategoryIndex
+		})
+	case selection.FocusSeparator:
+		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			return p.Kind == selection.FocusSeparator && p.CategoryIndex == r.CategoryIndex && p.TaskIndex == r.TaskIndex
 		})
 	case selection.FocusDescription:
 		if m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {

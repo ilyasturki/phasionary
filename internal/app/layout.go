@@ -16,6 +16,7 @@ const (
 	LayoutProject LayoutItemKind = iota
 	LayoutCategory
 	LayoutTask
+	LayoutSeparator     // In-category divider row (domain.KindSeparator)
 	LayoutDescription   // Inline description block for the task above it (own focusable row)
 	LayoutEmptyCategory // "(no tasks)" placeholder
 	LayoutFolded        // "(folded)" placeholder
@@ -148,7 +149,7 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Posi
 
 		visibleTaskCount := 0
 		for _, task := range category.Tasks {
-			if b.filter == nil || b.filter.TaskVisible(task, category.ID) {
+			if taskRowVisible(b.filter, task, category.ID) {
 				visibleTaskCount++
 			}
 		}
@@ -180,7 +181,19 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Posi
 
 		// Tasks (consecutive tasks have no blank lines between them)
 		for taskIdx, task := range category.Tasks {
-			if b.filter != nil && !b.filter.TaskVisible(task, category.ID) {
+			if !taskRowVisible(b.filter, task, category.ID) {
+				continue
+			}
+			if task.IsSeparator() {
+				items = append(items, LayoutItem{
+					Kind:          LayoutSeparator,
+					Height:        1,
+					PositionIndex: posIndex,
+					CategoryIndex: catIdx,
+					TaskIndex:     taskIdx,
+				})
+				totalHeight++
+				posIndex++
 				continue
 			}
 			taskHeight := b.countTaskLines(task)

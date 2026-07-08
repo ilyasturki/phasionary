@@ -42,6 +42,9 @@ func newTasksCmd() *cobra.Command {
 						continue
 					}
 					for _, task := range cat.Tasks {
+						if task.IsSeparator() {
+							continue
+						}
 						if status != "" && task.Status != status {
 							continue
 						}

@@ -150,6 +150,9 @@ func resolveTask(project domain.Project, selector string) (TaskRef, error) {
 	for cIdx := range project.Categories {
 		for tIdx := range project.Categories[cIdx].Tasks {
 			task := &project.Categories[cIdx].Tasks[tIdx]
+			if task.IsSeparator() {
+				continue
+			}
 
 			matched := task.ID == selector ||
 				(len(selector) >= minPrefixLen && strings.HasPrefix(strings.ToLower(task.ID), strings.ToLower(selector))) ||

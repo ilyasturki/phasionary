@@ -70,6 +70,9 @@ func completeTasks(cmd *cobra.Command, args []string, toComplete string) ([]stri
 	var completions []string
 	for _, cat := range project.Categories {
 		for _, task := range cat.Tasks {
+			if task.IsSeparator() {
+				continue
+			}
 			completions = append(completions, task.ID)
 		}
 	}

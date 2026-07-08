@@ -23,6 +23,8 @@ func (m model) infoView() string {
 		lines = m.projectInfoLines()
 	case selection.FocusCategory:
 		lines = m.categoryInfoLines(pos.CategoryIndex)
+	case selection.FocusSeparator:
+		lines = m.separatorInfoLines(pos.CategoryIndex, pos.TaskIndex)
 	case selection.FocusTask, selection.FocusDescription:
 		lines = m.taskInfoLines(pos.CategoryIndex, pos.TaskIndex)
 	}
@@ -87,6 +89,26 @@ func (m model) taskInfoLines(catIdx, taskIdx int) []string {
 	return lines
 }
 
+func (m model) separatorInfoLines(catIdx, taskIdx int) []string {
+	sep := m.project.Categories[catIdx].Tasks[taskIdx]
+	category := m.project.Categories[catIdx]
+
+	label := sep.Title
+	if label == "" {
+		label = ui.MutedStyle.Render("(none)")
+	}
+
+	return []string{
+		ui.DialogTitleStyle.Render("Separator Info"),
+		"",
+		fmt.Sprintf("Label:    %s", label),
+		fmt.Sprintf("Category: %s", category.Name),
+		"",
+		fmt.Sprintf("Created:  %s", FormatDateWithRelative(sep.CreatedAt)),
+		fmt.Sprintf("Updated:  %s", FormatDateWithRelative(sep.UpdatedAt)),
+	}
+}
+
 func (m model) categoryInfoLines(catIdx int) []string {
 	category := m.project.Categories[catIdx]
 	counts := category.StatusCounts()
@@ -105,7 +127,7 @@ func (m model) categoryInfoLines(catIdx int) []string {
 
 	lines = append(lines,
 		"",
-		fmt.Sprintf("Total Tasks: %d", len(category.Tasks)),
+		fmt.Sprintf("Total Tasks: %d", category.TaskCount()),
 		"",
 	)
 	lines = append(lines, statusBreakdownLines(counts)...)

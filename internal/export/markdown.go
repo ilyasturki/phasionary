@@ -15,6 +15,11 @@ var (
 	categoryHeaderRe = regexp.MustCompile(`^##\s+(.+)$`)
 	taskLineRe       = regexp.MustCompile(`^-\s+\[([ x\-~])\]\s+(.+)$`)
 	prioritySuffixRe = regexp.MustCompile(`\s+\((high|medium|low)\)\s*$`)
+	// A labeled separator is a level-3 heading (### label); a bare one is a
+	// thematic break (--- or longer). Neither collides with the project (#) or
+	// category (##) headers, which both require whitespace after their hashes.
+	separatorLabelRe = regexp.MustCompile(`^###\s+(.+)$`)
+	separatorBreakRe = regexp.MustCompile(`^-{3,}\s*$`)
 )
 
 func statusToMarker(status string) string {
@@ -49,6 +54,14 @@ func ExportCategoryMarkdown(cat domain.Category) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "## %s\n\n", cat.Name)
 	for _, task := range cat.Tasks {
+		if task.IsSeparator() {
+			if label := strings.TrimSpace(task.Title); label != "" {
+				fmt.Fprintf(&sb, "### %s\n", label)
+			} else {
+				sb.WriteString("---\n")
+			}
+			continue
+		}
 		marker := statusToMarker(task.Status)
 		line := fmt.Sprintf("- [%s] %s", marker, task.Title)
 		if task.Priority != "" {
@@ -126,6 +139,21 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 			continue
 		}
 
+		if m := separatorLabelRe.FindStringSubmatch(line); m != nil && currentCategory != nil {
+			flushDescription()
+			currentCategory.tasks = append(currentCategory.tasks, taskData{
+				kind:  domain.KindSeparator,
+				title: strings.TrimSpace(m[1]),
+			})
+			continue
+		}
+
+		if separatorBreakRe.MatchString(line) && currentCategory != nil {
+			flushDescription()
+			currentCategory.tasks = append(currentCategory.tasks, taskData{kind: domain.KindSeparator})
+			continue
+		}
+
 		if m := taskLineRe.FindStringSubmatch(line); m != nil && currentCategory != nil {
 			flushDescription()
 			marker := m[1]
@@ -187,6 +215,15 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 			return domain.Project{}, err
 		}
 		for _, td := range cd.tasks {
+			if td.kind == domain.KindSeparator {
+				sep, err := domain.NewSeparator()
+				if err != nil {
+					return domain.Project{}, err
+				}
+				sep.Title = td.title
+				cat.Tasks = append(cat.Tasks, sep)
+				continue
+			}
 			task, err := domain.NewTask(td.title)
 			if err != nil {
 				return domain.Project{}, err
@@ -218,4 +255,5 @@ type taskData struct {
 	status      string
 	priority    string
 	description string
+	kind        string
 }

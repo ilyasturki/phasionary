@@ -19,8 +19,28 @@ func (m *model) deleteSelected() {
 		m.clearDescription(pos)
 		return
 	}
+	// Separators delete instantly (no confirm dialog): they hold no data worth a
+	// second thought, and undo covers an accidental removal.
+	if pos.Kind == selection.FocusSeparator {
+		m.deleteSeparator(pos)
+		return
+	}
 	m.ui.ConfirmDelete = ConfirmDeleteState{Kind: ConfirmDeleteSelection}
 	m.ui.Modes.ToConfirmDelete()
+}
+
+func (m *model) deleteSeparator(pos selection.Position) {
+	if pos.CategoryIndex < 0 || pos.CategoryIndex >= len(m.project.Categories) {
+		return
+	}
+	cat := &m.project.Categories[pos.CategoryIndex]
+	if pos.TaskIndex < 0 || pos.TaskIndex >= len(cat.Tasks) {
+		return
+	}
+	m.recordHistory()
+	_ = cat.RemoveTask(pos.TaskIndex)
+	m.rebuildAndClamp()
+	m.storeTaskUpdate()
 }
 
 func (m *model) clearDescription(pos selection.Position) {
@@ -171,7 +191,7 @@ func (m *model) openEstimatePicker() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind == selection.FocusProject {
+	if !ok || position.Kind == selection.FocusProject || position.Kind == selection.FocusSeparator {
 		return
 	}
 
@@ -188,7 +208,7 @@ func (m *model) openEstimatePicker() {
 
 func (m *model) selectEstimate(minutes int) {
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind == selection.FocusProject {
+	if !ok || position.Kind == selection.FocusProject || position.Kind == selection.FocusSeparator {
 		return
 	}
 
@@ -218,7 +238,7 @@ func (m *model) moveTaskDown() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != selection.FocusTask {
+	if !ok || !isRowKind(position.Kind) {
 		return
 	}
 	catIndex := position.CategoryIndex
@@ -257,7 +277,7 @@ func (m *model) moveTaskUp() {
 		return
 	}
 	position, ok := m.selectedPosition()
-	if !ok || position.Kind != selection.FocusTask {
+	if !ok || !isRowKind(position.Kind) {
 		return
 	}
 	catIndex := position.CategoryIndex
@@ -315,9 +335,18 @@ func (m *model) reverseCategories() {
 	m.storeTaskUpdate()
 }
 
+// isRowKind reports whether a focus kind addresses a row in a category's Tasks
+// slice (a task or a separator) — the kinds that share the by-index reorder and
+// selection machinery.
+func isRowKind(kind selection.FocusKind) bool {
+	return kind == selection.FocusTask || kind == selection.FocusSeparator
+}
+
 func (m *model) selectTaskOrCategory(catIndex, taskIndex int) {
+	// A given (catIndex, taskIndex) resolves to exactly one row, which is either
+	// a task or a separator; match whichever kind sits there.
 	if m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-		return p.Kind == selection.FocusTask && p.CategoryIndex == catIndex && p.TaskIndex == taskIndex
+		return isRowKind(p.Kind) && p.CategoryIndex == catIndex && p.TaskIndex == taskIndex
 	}) {
 		return
 	}
@@ -439,7 +468,7 @@ func (m *model) pasteTask() {
 	case selection.FocusCategory:
 		catIndex = position.CategoryIndex
 		taskIndex = 0
-	case selection.FocusTask, selection.FocusDescription:
+	case selection.FocusTask, selection.FocusDescription, selection.FocusSeparator:
 		catIndex = position.CategoryIndex
 		taskIndex = position.TaskIndex + 1
 	}

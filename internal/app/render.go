@@ -311,6 +311,94 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	return renderCursorLine(edited, m.ui.Edit.input.Position(), m.ui.Screen.Width, overhead, prefixPart, titleStyle, cursorStyle)
 }
 
+// separatorRule is the heavy box-drawing glyph the divider is built from.
+const separatorRule = "━"
+
+// separatorLead is the short rule that precedes a labeled separator's text.
+const separatorLead = separatorRule + separatorRule
+
+// sepContentCap caps the divider to the content column so it stops short of the
+// empty right side of the screen instead of spanning the whole terminal.
+const sepContentCap = 44
+
+// sepContentWidth caps the rule to the content column. Fixed rather than
+// computed per-category so the divider reads at a consistent width everywhere.
+// The result is always >= 1 (safeWidth floors at 1, and the avail<=0 path caps).
+func sepContentWidth(avail int) int {
+	if avail <= 0 || avail > sepContentCap {
+		return sepContentCap
+	}
+	return avail
+}
+
+// separatorLayout is a divider row split into styleable segments. A bare or
+// over-wide label collapses the whole row into left (label/right empty);
+// otherwise left is the leading rule, label the text, right the trailing rule.
+// It is the single source of the divider geometry, shared by the selected and
+// unselected render paths. width is assumed >= 1 (see sepContentWidth).
+type separatorLayout struct {
+	left  string
+	label string
+	right string
+}
+
+func layoutSeparator(prefix, label string, width int) separatorLayout {
+	if label == "" {
+		return separatorLayout{left: prefix + strings.Repeat(separatorRule, width)}
+	}
+	used := ansi.StringWidth(separatorLead) + ansi.StringWidth(" "+label+" ")
+	if used >= width {
+		return separatorLayout{left: prefix + ansi.Truncate(separatorLead+" "+label, width, "…")}
+	}
+	trailing := strings.Repeat(separatorRule, width-used)
+	return separatorLayout{left: prefix + separatorLead + " ", label: label, right: " " + trailing}
+}
+
+// renderSeparatorLine draws an in-category divider: a heavy rule capped to the
+// content column. A labeled separator reads "━━ label ━━━━" with the label set
+// off from the rule. When selected the whole row takes the selection band.
+func (m model) renderSeparatorLine(label string, selected, focused bool, width int, searchQuery string, searchMatch lipgloss.Style) string {
+	prefix := "  "
+	if selected {
+		prefix = "> "
+	}
+	avail := 0
+	if width > 0 {
+		avail = safeWidth(width, prefixWidth)
+	}
+	layout := layoutSeparator(prefix, strings.TrimSpace(label), sepContentWidth(avail))
+
+	if selected {
+		return ui.GetSelectedStyle(focused).Render(layout.left + layout.label + layout.right)
+	}
+
+	ruleStyle := ui.SeparatorStyle
+	if layout.label == "" {
+		return ruleStyle.Render(layout.left)
+	}
+	// Labeled: heavy rule with the label emphasized so it anchors the row,
+	// honoring any active search highlight (a no-op when the query is empty).
+	styledLabel := ui.HighlightMatches(layout.label, searchQuery, ui.HeaderStyle, searchMatch)
+	return ruleStyle.Render(layout.left) + styledLabel + ruleStyle.Render(layout.right)
+}
+
+// renderEditSeparatorLine draws the inline editor for a separator's label,
+// entered with Enter. An empty value shows a placeholder rather than a rule.
+func (m model) renderEditSeparatorLine() string {
+	prefix := "> " + separatorLead + " "
+	styledPrefix := ui.SeparatorStyle.Render(prefix)
+	overhead := ansi.StringWidth(prefix)
+	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
+
+	if m.ui.Edit.input.Value() == "" {
+		placeholder := ui.MutedStyle.Render("Enter separator label...")
+		styledText := cursorStyle.Render(" ") + placeholder
+		wrapped := wrapWithPrefix(styledText, m.ui.Screen.Width, overhead, styledPrefix)
+		return strings.Join(wrapped.lines, "\n")
+	}
+	return renderCursorLine(m.ui.Edit.input.Value(), m.ui.Edit.input.Position(), m.ui.Screen.Width, overhead, styledPrefix, ui.HeaderStyle, cursorStyle)
+}
+
 func (m model) statusText() string {
 	if m.ui.Screen.StatusMsg != "" {
 		return m.ui.Screen.StatusMsg

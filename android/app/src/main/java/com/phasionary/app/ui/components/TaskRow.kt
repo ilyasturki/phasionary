@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -88,6 +90,41 @@ fun TaskRow(
                 color = colors.textMuted,
                 style = MaterialTheme.typography.labelSmall,
             )
+        }
+    }
+}
+
+/**
+ * A read-only in-category divider, mirroring the TUI separator: a rule spanning
+ * the row, or "── label ──" when the separator carries a label. Not clickable.
+ */
+@Composable
+fun SeparatorRow(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val colors = PhasTheme.colors
+    val trimmed = label.trim()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 32.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (trimmed.isEmpty()) {
+            HorizontalDivider(modifier = Modifier.weight(1f), color = colors.textMuted)
+        } else {
+            HorizontalDivider(modifier = Modifier.width(16.dp), color = colors.textMuted)
+            Text(
+                text = trimmed,
+                color = colors.textMuted,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            HorizontalDivider(modifier = Modifier.weight(1f), color = colors.textMuted)
         }
     }
 }

@@ -61,6 +61,10 @@ func (m *model) startEditing() {
 		category := m.project.Categories[position.CategoryIndex]
 		m.ui.Modes.ToEdit()
 		m.ui.Edit = newEditState(category.Name, false, "", selection.FocusCategory)
+	case selection.FocusSeparator:
+		sep := m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+		m.ui.Modes.ToEdit()
+		m.ui.Edit = newEditState(sep.Title, false, "", selection.FocusSeparator)
 	}
 }
 
@@ -93,6 +97,46 @@ func (m *model) startAddingTask() {
 	})
 	m.ui.Modes.ToEdit()
 	m.ui.Edit = newEditState("", true, newTask.ID, selection.FocusTask)
+	m.ensureVisible()
+}
+
+// startAddingSeparator inserts a bare (unlabeled) separator directly below the
+// selection and lands on it. Unlike a task it opens no editor — Enter later
+// edits its label. Blocked while a filter is active, since the new separator
+// would be hidden (separators never survive a filter) and thus unreachable.
+func (m *model) startAddingSeparator() {
+	position, ok := m.selectedPosition()
+	if !ok {
+		return
+	}
+	catIndex := position.CategoryIndex
+	if catIndex < 0 || catIndex >= len(m.project.Categories) {
+		return
+	}
+	if m.ui.Filter.HasActiveFilter() {
+		m.ui.Screen.StatusMsg = "Clear the filter to add a separator"
+		return
+	}
+	sep, err := domain.NewSeparator()
+	if err != nil {
+		return
+	}
+
+	var taskIndex int
+	switch position.Kind {
+	case selection.FocusTask, selection.FocusSeparator, selection.FocusDescription:
+		taskIndex = position.TaskIndex + 1
+	default:
+		taskIndex = 0
+	}
+	m.recordHistory()
+	m.project.Categories[catIndex].InsertTask(taskIndex, sep)
+	m.storeTaskUpdate()
+
+	m.rebuildPositions()
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusSeparator && p.CategoryIndex == catIndex && p.TaskIndex == taskIndex
+	})
 	m.ensureVisible()
 }
 
@@ -161,6 +205,14 @@ func (m *model) finishEditing() {
 		return
 	}
 	trimmed := strings.TrimSpace(m.ui.Edit.input.Value())
+	// A separator label may legitimately be cleared back to bare, so it bypasses
+	// the empty-title guard that cancels task/category edits.
+	if position.Kind == selection.FocusSeparator {
+		m.finishSeparatorEditing(position, trimmed)
+		m.ui.Modes.ToNormal()
+		m.ui.Edit.reset()
+		return
+	}
 	if trimmed == "" {
 		m.cancelEditing()
 		return
@@ -191,6 +243,17 @@ func (m *model) finishEditing() {
 	}
 	m.ui.Modes.ToNormal()
 	m.ui.Edit.reset()
+}
+
+func (m *model) finishSeparatorEditing(position selection.Position, label string) {
+	sep := &m.project.Categories[position.CategoryIndex].Tasks[position.TaskIndex]
+	if sep.Title == label {
+		return
+	}
+	m.recordHistory()
+	sep.Title = label
+	sep.UpdatedAt = domain.NowTimestamp()
+	m.storeTaskUpdate()
 }
 
 func (m *model) finishCategoryEditing(position selection.Position, name string) {

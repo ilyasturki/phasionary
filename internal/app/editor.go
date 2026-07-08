@@ -89,6 +89,10 @@ func (m *model) startExternalEdit() tea.Cmd {
 	if !ok {
 		return nil
 	}
+	// Separators carry no editable body; the external editor is a no-op on them.
+	if pos.Kind == selection.FocusSeparator {
+		return nil
+	}
 
 	itemType := pos.Kind
 	var content string

@@ -16,7 +16,7 @@ func (m *model) enterVisualMode() {
 		return
 	}
 	pos, ok := m.selectedPosition()
-	if !ok || pos.Kind == selection.FocusProject || pos.Kind == selection.FocusDescription {
+	if !ok || pos.Kind == selection.FocusProject || pos.Kind == selection.FocusDescription || pos.Kind == selection.FocusSeparator {
 		m.ui.Screen.StatusMsg = "Visual mode only works on tasks or categories"
 		return
 	}
@@ -560,7 +560,7 @@ func (m *model) pasteMultiTasks() {
 	case selection.FocusCategory:
 		dstCatIndex = pos.CategoryIndex
 		dstInsertIndex = 0
-	case selection.FocusTask, selection.FocusDescription:
+	case selection.FocusTask, selection.FocusDescription, selection.FocusSeparator:
 		dstCatIndex = pos.CategoryIndex
 		dstInsertIndex = pos.TaskIndex + 1
 	}
@@ -660,7 +660,7 @@ func (m *model) pasteMultiCategories() {
 		dstIndex = 0
 	case selection.FocusCategory:
 		dstIndex = pos.CategoryIndex
-	case selection.FocusTask, selection.FocusDescription:
+	case selection.FocusTask, selection.FocusDescription, selection.FocusSeparator:
 		dstIndex = pos.CategoryIndex
 	}
 

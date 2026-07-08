@@ -18,6 +18,11 @@ const (
 	PriorityHigh   = "high"
 	PriorityMedium = "medium"
 	PriorityLow    = "low"
+
+	// KindSeparator marks a Task that is really a visual divider between tasks
+	// within a category. Its Title holds the optional label; Status/Priority/etc.
+	// are unused. An absent/empty Kind is an ordinary task.
+	KindSeparator = "separator"
 )
 
 var DefaultCategories = []string{"Feature", "Fix", "Ergonomy", "Documentation", "Research"}
@@ -56,6 +61,14 @@ type Task struct {
 	CompletionDate  string `json:"completion_date,omitempty"`
 	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
 	Description     string `json:"description,omitempty"`
+	Kind            string `json:"kind,omitempty"`
+}
+
+// IsSeparator reports whether this task is a separator row rather than a real
+// task. Separator-aware consumers (status tallies, filters, CLI listings)
+// should skip these entries.
+func (t Task) IsSeparator() bool {
+	return t.Kind == KindSeparator
 }
 
 var EstimatePresets = []int{0, 15, 30, 60, 120, 240, 480, 960, 1440, 2400}
@@ -125,6 +138,22 @@ func NewTask(title string) (Task, error) {
 		ID:        id,
 		Title:     title,
 		Status:    StatusTodo,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+
+// NewSeparator creates a bare (unlabeled) separator row. The label lives in
+// Title and is set later via editing; an empty label renders as a plain rule.
+func NewSeparator() (Task, error) {
+	id, err := NewID()
+	if err != nil {
+		return Task{}, err
+	}
+	now := NowTimestamp()
+	return Task{
+		ID:        id,
+		Kind:      KindSeparator,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
@@ -282,9 +311,24 @@ func (s StatusCounts) Total() int {
 	return s.Todo + s.InProgress + s.Completed + s.Cancelled
 }
 
+// TaskCount is the number of real tasks in the category, excluding separator
+// rows. Use it wherever a "task count" is surfaced to the user.
+func (c *Category) TaskCount() int {
+	n := 0
+	for _, task := range c.Tasks {
+		if !task.IsSeparator() {
+			n++
+		}
+	}
+	return n
+}
+
 func (c *Category) StatusCounts() StatusCounts {
 	var counts StatusCounts
 	for _, task := range c.Tasks {
+		if task.IsSeparator() {
+			continue
+		}
 		switch task.Status {
 		case StatusTodo:
 			counts.Todo++
@@ -312,13 +356,15 @@ func (p *Project) StatusCounts() StatusCounts {
 }
 
 func (c *Category) AggregateStatus() string {
-	if len(c.Tasks) == 0 {
-		return ""
-	}
 	allFinished := true
 	hasInProgress := false
 	hasFinished := false
+	hasTask := false
 	for _, t := range c.Tasks {
+		if t.IsSeparator() {
+			continue
+		}
+		hasTask = true
 		if t.Status == StatusInProgress {
 			hasInProgress = true
 		}
@@ -327,6 +373,9 @@ func (c *Category) AggregateStatus() string {
 		} else {
 			allFinished = false
 		}
+	}
+	if !hasTask {
+		return ""
 	}
 	if hasInProgress {
 		return StatusInProgress

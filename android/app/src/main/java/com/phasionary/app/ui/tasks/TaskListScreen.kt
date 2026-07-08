@@ -37,6 +37,7 @@ import com.phasionary.app.ui.components.CategoryHeader
 import com.phasionary.app.ui.components.EmptyView
 import com.phasionary.app.ui.components.ErrorView
 import com.phasionary.app.ui.components.LoadingView
+import com.phasionary.app.ui.components.SeparatorRow
 import com.phasionary.app.ui.components.TaskRow
 import com.phasionary.app.ui.theme.PhasTheme
 
@@ -152,16 +153,20 @@ private fun TaskListContent(
                     item(key = "empty-${category.id}") { EmptyCategoryHint() }
                 } else {
                     items(items = category.tasks, key = { "task-${it.id}" }) { task ->
-                        Column {
-                            TaskRow(
-                                task = task,
-                                onClick = {
-                                    if (!expanded.remove(task.id)) expanded.add(task.id)
-                                },
-                                onStatusClick = { onCycleStatus(category.id, task) },
-                            )
-                            if (task.id in expanded && task.description.isNotBlank()) {
-                                DescriptionBlock(task.description)
+                        if (task.isSeparator) {
+                            SeparatorRow(label = task.title)
+                        } else {
+                            Column {
+                                TaskRow(
+                                    task = task,
+                                    onClick = {
+                                        if (!expanded.remove(task.id)) expanded.add(task.id)
+                                    },
+                                    onStatusClick = { onCycleStatus(category.id, task) },
+                                )
+                                if (task.id in expanded && task.description.isNotBlank()) {
+                                    DescriptionBlock(task.description)
+                                }
                             }
                         }
                     }

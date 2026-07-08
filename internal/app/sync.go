@@ -108,6 +108,17 @@ func (m *model) restoreSelection(kind selection.FocusKind, catID, taskID string)
 	return false
 }
 
+// taskRowVisible is the single source of truth for whether a row in a
+// category's Tasks slice is shown. Separators are hidden whenever any filter is
+// active (they carry no status/priority to match against); ordinary tasks defer
+// to the filter's per-task rule.
+func taskRowVisible(filter *FilterState, task domain.Task, categoryID string) bool {
+	if task.IsSeparator() {
+		return filter == nil || !filter.HasActiveFilter()
+	}
+	return filter == nil || filter.TaskVisible(task, categoryID)
+}
+
 func rebuildPositions(categories []domain.Category, filter *FilterState, fold *FoldState, expandDescriptions bool) []selection.Position {
 	positions := make([]selection.Position, 0)
 	positions = append(positions, selection.Position{
@@ -125,7 +136,15 @@ func rebuildPositions(categories []domain.Category, filter *FilterState, fold *F
 			continue
 		}
 		for tIndex, task := range category.Tasks {
-			if filter != nil && !filter.TaskVisible(task, category.ID) {
+			if !taskRowVisible(filter, task, category.ID) {
+				continue
+			}
+			if task.IsSeparator() {
+				positions = append(positions, selection.Position{
+					Kind:          selection.FocusSeparator,
+					CategoryIndex: cIndex,
+					TaskIndex:     tIndex,
+				})
 				continue
 			}
 			positions = append(positions, selection.Position{

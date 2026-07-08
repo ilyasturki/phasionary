@@ -381,6 +381,10 @@ func (m *model) copySelected() tea.Cmd {
 			IsCut:    false,
 			SourceID: "",
 		}
+	case selection.FocusSeparator:
+		// Copy the label text to the system clipboard, but don't stash the
+		// separator as a paste-able item (it isn't part of the cut/paste model).
+		text = m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
 	}
 	return func() tea.Msg {
 		return clipboardResultMsg{err: clipboard.WriteAll(text)}
@@ -512,6 +516,13 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		}
 		cut := m.isTaskCut(task.ID)
 		return m.renderTaskLine(task, isSelected, m.ui.Screen.Width, focused, inVisualRange, isCursor, cut)
+
+	case LayoutSeparator:
+		if m.ui.Modes.IsEdit() && isCursor {
+			return m.renderEditSeparatorLine()
+		}
+		label := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex].Title
+		return m.renderSeparatorLine(label, isSelected, focused, m.ui.Screen.Width, m.searchQuery(), m.searchMatchStyle(isCursor))
 
 	case LayoutDescription:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]

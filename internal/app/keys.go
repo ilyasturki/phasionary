@@ -81,6 +81,8 @@ var normalBindings = []keyBinding{
 		action: void((*model).startAddingTask)},
 	{keys: []string{"A"}, desc: "add new category", section: sectionActions,
 		action: void((*model).startAddingCategory)},
+	{keys: []string{"-"}, desc: "insert separator below", section: sectionActions,
+		action: void((*model).startAddingSeparator)},
 	{keys: []string{"enter"}, desc: "edit selected item", section: sectionActions,
 		action: func(m *model) tea.Cmd {
 			if pos, ok := m.selectedPosition(); ok && pos.Kind == selection.FocusDescription {

@@ -11,9 +11,12 @@ var (
 	// render time — this tracks live light/dark theme changes, which
 	// lipgloss.AdaptiveColor cannot (background detection is cached once at
 	// startup via sync.Once and never re-queried).
-	HeaderStyle      = lipgloss.NewStyle().Bold(true)
-	MutedStyle       = lipgloss.NewStyle().Faint(true)
-	CategoryStyle    = lipgloss.NewStyle().Bold(true)
+	HeaderStyle   = lipgloss.NewStyle().Bold(true)
+	MutedStyle    = lipgloss.NewStyle().Faint(true)
+	CategoryStyle = lipgloss.NewStyle().Bold(true)
+	// SeparatorStyle draws in-category divider rules at full foreground
+	// contrast (an empty style = the terminal's default foreground).
+	SeparatorStyle   = lipgloss.NewStyle()
 	SelectedStyle    = lipgloss.NewStyle().Bold(true).Reverse(true)
 	StatusLineStyle  = lipgloss.NewStyle().Faint(true)
 	HelpDialogStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
@@ -26,7 +29,7 @@ var (
 	// VisualSelectedStyle highlights rows that are part of an active visual
 	// range. Distinct from the reverse-based cursor style so the user can
 	// tell at a glance they're in visual mode.
-	VisualSelectedStyle         = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3"))
+	VisualSelectedStyle          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3"))
 	UnfocusedVisualSelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3")).Faint(true)
 
 	// VisualCursorStyle marks the cursor row inside an active visual range.

@@ -39,7 +39,16 @@ data class Task(
     @SerialName("completion_date") val completionDate: String = "",
     @SerialName("estimate_minutes") val estimateMinutes: Int = 0,
     val description: String = "",
-)
+    val kind: String = "",
+) {
+    /** True when this row is a separator/divider rather than a real task. */
+    val isSeparator: Boolean get() = kind == Kind.SEPARATOR
+}
+
+/** Task kind wire values (must match domain.Kind* constants). "" = ordinary task. */
+object Kind {
+    const val SEPARATOR = "separator"
+}
 
 /** Status wire values (must match domain.Status* constants). */
 object Status {

@@ -102,7 +102,7 @@ func writeCategories(w io.Writer, categories []domain.Category) error {
 			output.Categories = append(output.Categories, CategoryListItem{
 				ID:              c.ID,
 				Name:            c.Name,
-				TaskCount:       len(c.Tasks),
+				TaskCount:       c.TaskCount(),
 				EstimateMinutes: c.EstimateMinutes,
 			})
 		}
@@ -120,12 +120,12 @@ func writeCategories(w io.Writer, categories []domain.Category) error {
 	if isLong() {
 		fmt.Fprintln(tw, "NAME\tID\tSTATUS\tTASKS\tESTIMATE")
 		for _, c := range categories {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\n", c.Name, c.ID, formatAggregateStatus(c.AggregateStatus()), len(c.Tasks), formatEstimateCell(c.EstimateMinutes))
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\n", c.Name, c.ID, formatAggregateStatus(c.AggregateStatus()), c.TaskCount(), formatEstimateCell(c.EstimateMinutes))
 		}
 	} else {
 		fmt.Fprintln(tw, "NAME\tSTATUS\tTASKS\tESTIMATE")
 		for _, c := range categories {
-			fmt.Fprintf(tw, "%s\t%s\t%d\t%s\n", c.Name, formatAggregateStatus(c.AggregateStatus()), len(c.Tasks), formatEstimateCell(c.EstimateMinutes))
+			fmt.Fprintf(tw, "%s\t%s\t%d\t%s\n", c.Name, formatAggregateStatus(c.AggregateStatus()), c.TaskCount(), formatEstimateCell(c.EstimateMinutes))
 		}
 	}
 	return tw.Flush()
@@ -264,7 +264,7 @@ func writeProjectDetail(w io.Writer, project domain.Project) error {
 	taskCount := 0
 	categories := make([]string, 0, len(project.Categories))
 	for _, c := range project.Categories {
-		taskCount += len(c.Tasks)
+		taskCount += c.TaskCount()
 		categories = append(categories, c.Name)
 	}
 
@@ -313,7 +313,7 @@ func writeCategoryDetail(w io.Writer, cat domain.Category) error {
 		Name:            cat.Name,
 		CreatedAt:       cat.CreatedAt,
 		UpdatedAt:       cat.UpdatedAt,
-		TaskCount:       len(cat.Tasks),
+		TaskCount:       cat.TaskCount(),
 		EstimateMinutes: cat.EstimateMinutes,
 	}
 
