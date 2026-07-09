@@ -231,13 +231,22 @@ func (r *TaskLineRenderer) tagSegment(task domain.Task, finished, selected bool)
 	if seg == "" {
 		return "", 0
 	}
-	var style lipgloss.Style
+	width := ansi.StringWidth(seg)
 	if selected {
-		style, _ = ui.TagBlockStyle(task.TagColor)
-	} else {
-		style, _ = ui.TagDotStyle(task.TagColor, finished)
+		style, _ := ui.TagBlockStyle(task.TagColor)
+		// A labeled tag's segment ends with a separator space before the title.
+		// Keep that space in the row's selection band rather than the reversed
+		// tag color so the colored block hugs the label instead of trailing one
+		// cell past it. A color-only tag has no such trailing space — its single
+		// space is the dot-to-title separator — so it stays a whole block.
+		if task.TagLabel != "" {
+			core := strings.TrimSuffix(seg, " ")
+			return r.maybeCut(style).Render(core) + r.selectedStyle().Render(" "), width
+		}
+		return r.maybeCut(style).Render(seg), width
 	}
-	return r.maybeCut(style).Render(seg), ansi.StringWidth(seg)
+	style, _ := ui.TagDotStyle(task.TagColor, finished)
+	return r.maybeCut(style).Render(seg), width
 }
 
 func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon string) string {
