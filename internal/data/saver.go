@@ -53,7 +53,7 @@ func (s *Saver) run() {
 // write. If a write is already queued but not yet started it is replaced — only
 // the newest project state needs to reach disk. Must not be called after Close.
 func (s *Saver) Enqueue(project domain.Project) {
-	data, err := s.store.MarshalProject(project)
+	data, err := s.store.marshalProject(project)
 	if err != nil {
 		select {
 		case s.results <- err:
@@ -66,14 +66,11 @@ func (s *Saver) Enqueue(project domain.Project) {
 		select {
 		case s.jobs <- job:
 			return
-		default:
+		case <-s.jobs:
 			// Queue full with a stale snapshot: drop it and retry with the newer
-			// one. A concurrent pull by the worker just means the stale write
-			// happens and is immediately superseded by this newer one.
-			select {
-			case <-s.jobs:
-			default:
-			}
+			// one, so only the latest project state reaches disk. A concurrent
+			// pull by the worker just means the stale write happens and is
+			// immediately superseded by this newer one.
 		}
 	}
 }

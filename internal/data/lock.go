@@ -58,8 +58,8 @@ func (s *Store) SaveProjectLocked(project domain.Project) error {
 // WriteProjectLocked persists pre-marshaled project bytes under the per-project
 // flock, refusing to recreate a project whose JSON file was removed (same
 // guarantee as SaveProjectLocked). It is the write half of the asynchronous
-// save: the caller runs MarshalProject to snapshot state on its own thread, and
-// this absorbs the fsync off that thread. Bytes must come from MarshalProject
+// save: the caller runs marshalProject to snapshot state on its own thread, and
+// this absorbs the fsync off that thread. Bytes must come from marshalProject
 // for the same id.
 func (s *Store) WriteProjectLocked(id string, data []byte) error {
 	f, err := s.acquireProjectLock(id)

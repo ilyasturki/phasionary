@@ -125,19 +125,14 @@ func (s *Store) LoadProject(selector string) (domain.Project, error) {
 	return domain.Project{}, ErrProjectNotFound
 }
 
-// marshalProject stamps UpdatedAt and returns the JSON bytes to persist.
+// marshalProject snapshots a project to the exact bytes a save would persist,
+// stamping UpdatedAt. It does no I/O and is cheap, so a latency-sensitive caller
+// (e.g. the TUI event loop, via the async Saver) can run it to capture an
+// immutable snapshot, then hand the bytes to WriteProjectLocked on a background
+// goroutine where the fsync cost is hidden from the UI.
 func (s *Store) marshalProject(project domain.Project) ([]byte, error) {
 	project.UpdatedAt = domain.NowTimestamp()
 	return json.MarshalIndent(project, "", "  ")
-}
-
-// MarshalProject snapshots a project to the exact bytes a save would persist,
-// stamping UpdatedAt. It does no I/O and is cheap, so a latency-sensitive
-// caller (e.g. the TUI event loop) can run it to capture an immutable snapshot,
-// then hand the bytes to WriteProjectLocked on a background goroutine where the
-// fsync cost is hidden from the UI.
-func (s *Store) MarshalProject(project domain.Project) ([]byte, error) {
-	return s.marshalProject(project)
 }
 
 // writeProjectBytes atomically writes pre-marshaled bytes for id: an fsync'd

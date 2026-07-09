@@ -111,10 +111,10 @@ type projectSaver interface {
 
 // layoutCache memoizes the built Layout so navigation and scroll math don't
 // rewalk every task each frame (buildLayout runs on every render and on every
-// ensureVisible). Invalidated on any content or structural change; keyed on
-// width, the only screen dimension the layout depends on.
+// ensureVisible). A nil layout means "no cached value"; invalidated on any
+// content or structural change. Keyed on width, the only screen dimension the
+// layout depends on.
 type layoutCache struct {
-	valid  bool
 	width  int
 	layout *Layout
 }

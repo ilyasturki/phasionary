@@ -247,10 +247,10 @@ func TestRedo_InvalidatedByNewMutation(t *testing.T) {
 
 func TestUndo_NoopActionDoesNotPushHistory(t *testing.T) {
 	p := sampleProject()
-	p.Categories[0].Tasks[0].Priority = domain.PriorityHigh
+	p.Categories[0].Tasks[0].Priority = domain.PriorityCritical
 	m := newTestModel(t, p)
 	m.ui.Selection.MoveTo(2)
-	// IncreasePriority is a no-op when already high.
+	// IncreasePriority is a no-op when already at the ceiling (critical).
 	m.increasePriority()
 	assert.False(t, m.ui.History.CanUndo(), "no-op should not record history")
 }

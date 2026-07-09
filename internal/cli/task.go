@@ -71,7 +71,7 @@ func newTasksCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&status, "status", "s", "", "filter by status (todo, in_progress, completed, cancelled)")
 	cmd.Flags().StringVarP(&category, "category", "C", "", "filter by category name")
-	cmd.Flags().StringVar(&priority, "priority", "", "filter by priority (high, medium, low)")
+	cmd.Flags().StringVar(&priority, "priority", "", "filter by priority (critical, high, medium, low, trivial)")
 
 	_ = cmd.RegisterFlagCompletionFunc("status", completeStatuses)
 	_ = cmd.RegisterFlagCompletionFunc("category", completeCategories)
@@ -168,7 +168,7 @@ func newTaskAddCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&categoryName, "category", "C", "", "category name (required)")
-	cmd.Flags().StringVar(&priority, "priority", "", "priority: high|medium|low")
+	cmd.Flags().StringVar(&priority, "priority", "", "priority: critical|high|medium|low|trivial")
 	cmd.Flags().StringVarP(&estimate, "estimate", "e", "", "time estimate: 30, 2h, 1.5h, 2h30m")
 
 	_ = cmd.RegisterFlagCompletionFunc("category", completeCategories)
@@ -227,7 +227,7 @@ func newTaskEditCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&title, "title", "t", "", "new title")
-	cmd.Flags().StringVar(&priority, "priority", "", "priority: high|medium|low")
+	cmd.Flags().StringVar(&priority, "priority", "", "priority: critical|high|medium|low|trivial")
 	cmd.Flags().StringVarP(&estimate, "estimate", "e", "", "time estimate: 30, 2h, 1.5h, 2h30m")
 
 	_ = cmd.RegisterFlagCompletionFunc("priority", completePriorities)

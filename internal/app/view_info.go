@@ -194,12 +194,16 @@ func formatTagInfo(task domain.Task) string {
 
 func formatPriorityLabel(priority string) string {
 	switch priority {
+	case domain.PriorityCritical:
+		return "Critical"
 	case domain.PriorityHigh:
 		return "High"
 	case domain.PriorityMedium:
 		return "Medium"
 	case domain.PriorityLow:
 		return "Low"
+	case domain.PriorityTrivial:
+		return "Trivial"
 	case "":
 		return "None"
 	default:

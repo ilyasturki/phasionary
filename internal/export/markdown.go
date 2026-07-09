@@ -14,7 +14,7 @@ var (
 	projectHeaderRe  = regexp.MustCompile(`^#\s+(.+)$`)
 	categoryHeaderRe = regexp.MustCompile(`^##\s+(.+)$`)
 	taskLineRe       = regexp.MustCompile(`^-\s+\[([ x\-~])\]\s+(.+)$`)
-	prioritySuffixRe = regexp.MustCompile(`\s+\((high|medium|low)\)\s*$`)
+	prioritySuffixRe = regexp.MustCompile(`\s+\((critical|high|medium|low|trivial)\)\s*$`)
 	// A trailing " #label" carries the tag label as a single hashtag-style token,
 	// so a priority suffix after it still parses and only a title literally ending
 	// in " #word" is misread (the same lossy trade-off the priority suffix makes).

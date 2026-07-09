@@ -33,7 +33,6 @@ func (m *model) storeTaskUpdate() {
 // invalidateLayout drops the memoized layout so the next render/scroll rebuilds
 // it. Call after any change that alters what rows exist or how tall they are.
 func (m *model) invalidateLayout() {
-	m.ui.layout.valid = false
 	m.ui.layout.layout = nil
 }
 

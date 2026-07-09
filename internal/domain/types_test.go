@@ -8,6 +8,13 @@ import (
 )
 
 func TestTask_IncreasePriority(t *testing.T) {
+	t.Run("increases from trivial to low", func(t *testing.T) {
+		task := Task{Priority: PriorityTrivial}
+		changed := task.IncreasePriority()
+		assert.True(t, changed)
+		assert.Equal(t, PriorityLow, task.Priority)
+	})
+
 	t.Run("increases from low to medium", func(t *testing.T) {
 		task := Task{Priority: PriorityLow}
 		changed := task.IncreasePriority()
@@ -22,11 +29,18 @@ func TestTask_IncreasePriority(t *testing.T) {
 		assert.Equal(t, PriorityHigh, task.Priority)
 	})
 
-	t.Run("cannot increase from high", func(t *testing.T) {
+	t.Run("increases from high to critical", func(t *testing.T) {
 		task := Task{Priority: PriorityHigh}
 		changed := task.IncreasePriority()
+		assert.True(t, changed)
+		assert.Equal(t, PriorityCritical, task.Priority)
+	})
+
+	t.Run("cannot increase from critical", func(t *testing.T) {
+		task := Task{Priority: PriorityCritical}
+		changed := task.IncreasePriority()
 		assert.False(t, changed)
-		assert.Equal(t, PriorityHigh, task.Priority)
+		assert.Equal(t, PriorityCritical, task.Priority)
 	})
 
 	t.Run("empty priority increases as medium", func(t *testing.T) {
@@ -38,6 +52,13 @@ func TestTask_IncreasePriority(t *testing.T) {
 }
 
 func TestTask_DecreasePriority(t *testing.T) {
+	t.Run("decreases from critical to high", func(t *testing.T) {
+		task := Task{Priority: PriorityCritical}
+		changed := task.DecreasePriority()
+		assert.True(t, changed)
+		assert.Equal(t, PriorityHigh, task.Priority)
+	})
+
 	t.Run("decreases from high to medium", func(t *testing.T) {
 		task := Task{Priority: PriorityHigh}
 		changed := task.DecreasePriority()
@@ -52,11 +73,18 @@ func TestTask_DecreasePriority(t *testing.T) {
 		assert.Equal(t, PriorityLow, task.Priority)
 	})
 
-	t.Run("cannot decrease from low", func(t *testing.T) {
+	t.Run("decreases from low to trivial", func(t *testing.T) {
 		task := Task{Priority: PriorityLow}
 		changed := task.DecreasePriority()
+		assert.True(t, changed)
+		assert.Equal(t, PriorityTrivial, task.Priority)
+	})
+
+	t.Run("cannot decrease from trivial", func(t *testing.T) {
+		task := Task{Priority: PriorityTrivial}
+		changed := task.DecreasePriority()
 		assert.False(t, changed)
-		assert.Equal(t, PriorityLow, task.Priority)
+		assert.Equal(t, PriorityTrivial, task.Priority)
 	})
 
 	t.Run("empty priority decreases as medium", func(t *testing.T) {
@@ -406,11 +434,37 @@ func TestTask_SetPriority(t *testing.T) {
 		assert.NotEmpty(t, task.UpdatedAt)
 	})
 
+	t.Run("accepts critical and trivial", func(t *testing.T) {
+		task := Task{Priority: ""}
+		require.NoError(t, task.SetPriority(PriorityCritical))
+		assert.Equal(t, PriorityCritical, task.Priority)
+		require.NoError(t, task.SetPriority(PriorityTrivial))
+		assert.Equal(t, PriorityTrivial, task.Priority)
+	})
+
 	t.Run("returns error for invalid priority", func(t *testing.T) {
 		task := Task{Priority: ""}
 		err := task.SetPriority("invalid")
 		assert.Error(t, err)
 	})
+}
+
+func TestTask_CyclePriority(t *testing.T) {
+	// none → critical → high → medium → low → trivial → none
+	want := []string{
+		PriorityCritical,
+		PriorityHigh,
+		PriorityMedium,
+		PriorityLow,
+		PriorityTrivial,
+		"",
+	}
+	task := Task{Priority: ""}
+	for i, expected := range want {
+		changed := task.CyclePriority()
+		assert.True(t, changed, "step %d should report a change", i)
+		assert.Equal(t, expected, task.Priority, "step %d", i)
+	}
 }
 
 func TestTask_CycleTag(t *testing.T) {

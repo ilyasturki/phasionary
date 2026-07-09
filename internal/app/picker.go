@@ -180,10 +180,8 @@ func (m *model) confirmDeleteProject() {
 			m.ui.Filter = NewFilterState()
 			m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(m.project.ID))
 			m.ui.History.Reset()
-			positions := rebuildPositions(m.project.Categories, &m.ui.Filter, &m.ui.Fold, m.ui.Screen.ExpandDescriptions)
-			initialSelection := findFirstTaskIndex(positions)
-			m.ui.Selection.SetPositions(positions)
-			m.ui.Selection.SetSelected(initialSelection)
+			m.rebuildPositions()
+			m.ui.Selection.SetSelected(findFirstTaskIndex(m.ui.Selection.Positions()))
 			m.ui.Screen.ScrollOffset = 0
 		}
 	}
@@ -275,10 +273,8 @@ func (m *model) createProjectFromPicker() {
 	m.ui.Filter = NewFilterState()
 	m.ui.Fold = NewFoldState()
 	m.ui.History.Reset()
-	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold, m.ui.Screen.ExpandDescriptions)
-	initialSelection := findFirstTaskIndex(positions)
-	m.ui.Selection.SetPositions(positions)
-	m.ui.Selection.SetSelected(initialSelection)
+	m.rebuildPositions()
+	m.ui.Selection.SetSelected(findFirstTaskIndex(m.ui.Selection.Positions()))
 	m.ui.Screen.ScrollOffset = 0
 
 	m.ensureVisible()
@@ -318,10 +314,8 @@ func (m *model) selectProject() {
 	m.ui.Filter = NewFilterState()
 	m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(project.ID))
 	m.ui.History.Reset()
-	positions := rebuildPositions(project.Categories, &m.ui.Filter, &m.ui.Fold, m.ui.Screen.ExpandDescriptions)
-	initialSelection := findFirstTaskIndex(positions)
-	m.ui.Selection.SetPositions(positions)
-	m.ui.Selection.SetSelected(initialSelection)
+	m.rebuildPositions()
+	m.ui.Selection.SetSelected(findFirstTaskIndex(m.ui.Selection.Positions()))
 	m.ui.Screen.ScrollOffset = 0
 
 	m.ensureVisible()

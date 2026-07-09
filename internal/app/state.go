@@ -14,12 +14,9 @@ var filterStatuses = []string{
 	domain.StatusCancelled,
 }
 
-var filterPriorities = []string{
-	domain.PriorityHigh,
-	domain.PriorityMedium,
-	domain.PriorityLow,
-	"",
-}
+// filterPriorities lists the priority filter rows: every level highest-first,
+// followed by a trailing "" "none" bucket matching tasks with no priority.
+var filterPriorities = append(append([]string{}, domain.PriorityOrder...), "")
 
 // filterTagColors lists the tag filter rows: the palette followed by a trailing
 // "" "untagged" bucket, which matches tasks that carry no tag color.

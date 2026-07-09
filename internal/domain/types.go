@@ -15,9 +15,11 @@ const (
 	StatusCompleted  = "completed"
 	StatusCancelled  = "cancelled"
 
-	PriorityHigh   = "high"
-	PriorityMedium = "medium"
-	PriorityLow    = "low"
+	PriorityCritical = "critical"
+	PriorityHigh     = "high"
+	PriorityMedium   = "medium"
+	PriorityLow      = "low"
+	PriorityTrivial  = "trivial"
 
 	// KindSeparator marks a Task that is really a visual divider between tasks
 	// within a category. Its Title holds the optional label; Status/Priority/etc.
@@ -39,6 +41,14 @@ const (
 // source of truth the other tag-color lists derive from: NextTagColor walks it,
 // and the editor/filter build their rows by adding the "no tag" sentinel.
 var TagColorCycle = []string{TagGreen, TagBlue, TagMagenta, TagCyan}
+
+// PriorityOrder lists the priority levels highest-first and is the single source
+// of truth the priority lists derive from: ValidatePriority checks membership
+// against it, and the filter/completion rows build from it (the filter appends
+// the "" no-priority sentinel). The empty "" level is not part of the order. The
+// Increase/Decrease/Cycle transition methods keep their own switches because
+// they also fold in the "" level with level-specific behavior.
+var PriorityOrder = []string{PriorityCritical, PriorityHigh, PriorityMedium, PriorityLow, PriorityTrivial}
 
 var DefaultCategories = []string{"Feature", "Fix", "Ergonomy", "Documentation", "Research"}
 
@@ -186,12 +196,10 @@ func ValidateStatus(status string) error {
 }
 
 func ValidatePriority(priority string) error {
-	switch priority {
-	case "", PriorityHigh, PriorityMedium, PriorityLow:
+	if priority == "" || slices.Contains(PriorityOrder, priority) {
 		return nil
-	default:
-		return errors.New("invalid priority")
 	}
+	return errors.New("invalid priority")
 }
 
 func (t *Task) SetStatus(status string) error {
@@ -220,11 +228,15 @@ func (t *Task) SetPriority(priority string) error {
 func (t *Task) IncreasePriority() bool {
 	var newPriority string
 	switch t.Priority {
+	case PriorityTrivial:
+		newPriority = PriorityLow
 	case PriorityLow:
 		newPriority = PriorityMedium
 	case PriorityMedium, "":
 		newPriority = PriorityHigh
 	case PriorityHigh:
+		newPriority = PriorityCritical
+	case PriorityCritical:
 		return false
 	default:
 		newPriority = PriorityMedium
@@ -237,11 +249,15 @@ func (t *Task) IncreasePriority() bool {
 func (t *Task) DecreasePriority() bool {
 	var newPriority string
 	switch t.Priority {
+	case PriorityCritical:
+		newPriority = PriorityHigh
 	case PriorityHigh:
 		newPriority = PriorityMedium
 	case PriorityMedium, "":
 		newPriority = PriorityLow
 	case PriorityLow:
+		newPriority = PriorityTrivial
+	case PriorityTrivial:
 		return false
 	default:
 		newPriority = PriorityMedium
@@ -281,12 +297,16 @@ func (t *Task) CyclePriority() bool {
 	var next string
 	switch t.Priority {
 	case "":
+		next = PriorityCritical
+	case PriorityCritical:
 		next = PriorityHigh
 	case PriorityHigh:
 		next = PriorityMedium
 	case PriorityMedium:
 		next = PriorityLow
 	case PriorityLow:
+		next = PriorityTrivial
+	case PriorityTrivial:
 		next = ""
 	default:
 		next = ""

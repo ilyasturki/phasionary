@@ -105,11 +105,7 @@ func completeStatuses(cmd *cobra.Command, args []string, toComplete string) ([]s
 }
 
 func completePriorities(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return []string{
-		domain.PriorityHigh,
-		domain.PriorityMedium,
-		domain.PriorityLow,
-	}, cobra.ShellCompDirectiveNoFileComp
+	return append([]string{}, domain.PriorityOrder...), cobra.ShellCompDirectiveNoFileComp
 }
 
 func completeExportFormats(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

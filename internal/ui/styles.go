@@ -104,9 +104,9 @@ func StatusStyle(status string) lipgloss.Style {
 
 func priorityColor(priority string) (color.Color, bool) {
 	switch priority {
-	case "high":
+	case "critical", "high":
 		return lipgloss.Color("1"), true
-	case "low":
+	case "low", "trivial":
 		return lipgloss.Color("6"), true
 	default:
 		return nil, false
@@ -239,12 +239,20 @@ func TaskTitleStyle(priority, status, colorMode string) lipgloss.Style {
 	return base
 }
 
+// PriorityIcon returns the glyph drawn before a task title for the given
+// priority. The critical/trivial glyphs are single-cell arrows (U+21C8/U+21CA)
+// so every priority row aligns identically — unlike the double-triangle emoji
+// (U+23EB/EC), whose column advance varies by terminal.
 func PriorityIcon(priority string) string {
 	switch priority {
+	case "critical":
+		return "⇈"
 	case "high":
 		return "▲"
 	case "low":
 		return "▼"
+	case "trivial":
+		return "⇊"
 	default:
 		return ""
 	}
