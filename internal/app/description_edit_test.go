@@ -119,6 +119,39 @@ func TestHandleDescriptionEditKey_EscCancels(t *testing.T) {
 	assert.Equal(t, "", m.project.Categories[0].Tasks[0].Description)
 }
 
+func TestHandleDescriptionEditKey_EnterSaves(t *testing.T) {
+	p := sampleProject()
+	p.Categories[0].Tasks[0].Description = "existing body"
+	m := newTestModel(t, p)
+	_ = m.startDescriptionInlineEdit(0, 0)
+
+	_, _ = m.handleDescriptionEditKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	assert.True(t, m.ui.Modes.IsNormal(), "plain enter saves and leaves edit mode")
+	assert.Equal(t, "existing body", m.project.Categories[0].Tasks[0].Description)
+}
+
+func TestHandleDescriptionEditKey_ShiftEnterInsertsNewline(t *testing.T) {
+	// Both wire encodings of Shift+Enter must insert a newline without saving:
+	// a genuine "shift+enter" and the "alt+enter" (ESC+CR) that kitty/ghostty
+	// deliver.
+	for _, key := range []tea.KeyPressMsg{
+		{Code: tea.KeyEnter, Mod: tea.ModShift},
+		{Code: tea.KeyEnter, Mod: tea.ModAlt},
+	} {
+		p := sampleProject()
+		p.Categories[0].Tasks[0].Description = "abc" // cursor starts at end
+		m := newTestModel(t, p)
+		_ = m.startDescriptionInlineEdit(0, 0)
+
+		_, _ = m.handleDescriptionEditKey(key)
+
+		assert.True(t, m.ui.Modes.IsDescriptionEdit(), "%s must not save", key.String())
+		assert.Equal(t, "abc\n", m.ui.DescriptionEdit.textarea.Value(),
+			"%s must insert a newline at the cursor", key.String())
+	}
+}
+
 func TestHandleDescriptionEditKey_CtrlSSaves(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	_ = m.startDescriptionInlineEdit(0, 0)

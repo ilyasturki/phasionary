@@ -113,9 +113,15 @@ func (m *model) handleDescriptionEditKey(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 	case "esc":
 		m.cancelDescriptionEdit()
 		return m, nil
-	case "ctrl+s", "ctrl+enter":
+	case "enter", "ctrl+s", "ctrl+enter":
 		m.finishDescriptionEdit()
 		return m, nil
+	case "shift+enter", "alt+enter":
+		// Shift+Enter inserts a newline. Terminals disagree on its wire
+		// encoding: kitty/ghostty send ESC+CR ("alt+enter"), Kitty-protocol
+		// terminals a genuine "shift+enter". Accept both and forward a plain
+		// Enter, which the textarea maps to its InsertNewline binding.
+		msg = tea.KeyPressMsg{Code: tea.KeyEnter}
 	}
 	var cmd tea.Cmd
 	m.ui.DescriptionEdit.textarea, cmd = m.ui.DescriptionEdit.textarea.Update(msg)
@@ -219,9 +225,9 @@ func (m model) descriptionEditView() string {
 		body,
 		"",
 		ui.RenderHints([]ui.Hint{
-			{Key: "ctrl+s", Label: "save"},
+			{Key: "enter", Label: "save"},
+			{Key: "shift+enter", Label: "newline"},
 			{Key: "esc", Label: "cancel"},
-			{Key: "enter", Label: "newline"},
 		}),
 	}
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
