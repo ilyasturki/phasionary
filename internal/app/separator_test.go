@@ -80,6 +80,27 @@ func TestStartAddingSeparatorInsertsBelow(t *testing.T) {
 	assert.Equal(t, 1, pos.TaskIndex)
 }
 
+func TestStartAddingTaskBelowSeparator(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	// Land on the separator (index 1), then press "a" to add a task.
+	require.True(t, m.selectSeparator(0, 1))
+	m.startAddingTask()
+
+	tasks := m.project.Categories[0].Tasks
+	require.Len(t, tasks, 4)
+	// New task must sit directly below the separator, not jump to the top.
+	assert.True(t, tasks[1].IsSeparator(), "separator stays at index 1")
+	assert.False(t, tasks[2].IsSeparator(), "new task lands right after the separator")
+	assert.Equal(t, "", tasks[2].Title, "new task starts blank")
+
+	// Editor opens on the freshly inserted task.
+	assert.True(t, m.ui.Modes.IsEdit())
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusTask, pos.Kind)
+	assert.Equal(t, 2, pos.TaskIndex)
+}
+
 func TestStartAddingSeparatorBlockedWhileFiltered(t *testing.T) {
 	m := newTestModel(t, separatorProject())
 	m.ui.Filter = NewFilterState()

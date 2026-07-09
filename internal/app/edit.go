@@ -82,10 +82,14 @@ func (m *model) startAddingTask() {
 		return
 	}
 
+	// Insert directly below the current row when it shares the category's
+	// Tasks addressing (a task, its description line, or a separator); otherwise
+	// (e.g. focus on the category header) land at the top of the category.
 	var taskIndex int
-	if position.Kind == selection.FocusTask {
+	switch position.Kind {
+	case selection.FocusTask, selection.FocusDescription, selection.FocusSeparator:
 		taskIndex = position.TaskIndex + 1
-	} else {
+	default:
 		taskIndex = 0
 	}
 	m.recordHistory()
