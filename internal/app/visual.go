@@ -11,25 +11,73 @@ import (
 	"phasionary/internal/domain"
 )
 
+// visualTaskLevel reports whether kind is a row that belongs to the unified
+// task-level visual domain — a real task or a separator divider. Task-level
+// selections cover both, so a separator caught between two tasks (or chosen as
+// an endpoint) highlights, travels, and deletes with the block.
+func visualTaskLevel(kind selection.FocusKind) bool {
+	return kind == selection.FocusTask || kind == selection.FocusSeparator
+}
+
+// matchesVisualDomain reports whether a row of kind k belongs to the same
+// visual-selection domain as an anchor whose normalized kind is visualKind
+// (either FocusCategory or FocusTask). Category anchors select only category
+// rows; task-level anchors select the whole task+separator domain.
+func matchesVisualDomain(k, visualKind selection.FocusKind) bool {
+	if visualKind == selection.FocusCategory {
+		return k == selection.FocusCategory
+	}
+	return visualTaskLevel(k)
+}
+
+// countRealTasks returns how many of the positions are real tasks, ignoring any
+// separators swept into a task-level range — so status counts report the number
+// of tasks the user acted on rather than the raw row span.
+func countRealTasks(positions []selection.Position) int {
+	n := 0
+	for _, p := range positions {
+		if p.Kind == selection.FocusTask {
+			n++
+		}
+	}
+	return n
+}
+
+// rowCountLabel phrases a mixed task/separator batch for a status message. It
+// counts real tasks, only falling back to a separator count when the batch was
+// dividers alone, so a separator caught in a range never inflates "N task(s)".
+func rowCountLabel(realTasks, separators int) string {
+	if realTasks > 0 || separators == 0 {
+		return fmt.Sprintf("%d task(s)", realTasks)
+	}
+	return fmt.Sprintf("%d separator(s)", separators)
+}
+
 func (m *model) enterVisualMode() {
 	if !m.ui.Modes.IsNormal() {
 		return
 	}
 	pos, ok := m.selectedPosition()
-	if !ok || pos.Kind == selection.FocusProject || pos.Kind == selection.FocusDescription || pos.Kind == selection.FocusSeparator {
-		m.ui.Screen.StatusMsg = "Visual mode only works on tasks or categories"
+	if !ok || pos.Kind == selection.FocusProject || pos.Kind == selection.FocusDescription {
+		m.ui.Screen.StatusMsg = "Visual mode only works on tasks, separators, or categories"
 		return
 	}
 	if !m.ui.Modes.ToVisual() {
 		return
 	}
 	cat := m.project.Categories[pos.CategoryIndex]
+	// Normalize a separator anchor to the task-level kind so the whole selection
+	// (tasks and separators alike) shares one navigable domain.
+	kind := selection.FocusCategory
+	if visualTaskLevel(pos.Kind) {
+		kind = selection.FocusTask
+	}
 	anchor := VisualState{
 		Active:           true,
-		Kind:             pos.Kind,
+		Kind:             kind,
 		AnchorCategoryID: cat.ID,
 	}
-	if pos.Kind == selection.FocusTask {
+	if visualTaskLevel(pos.Kind) {
 		anchor.AnchorTaskID = cat.Tasks[pos.TaskIndex].ID
 	}
 	m.ui.Visual = anchor
@@ -65,7 +113,7 @@ func (m *model) visualSwap() {
 	cat := m.project.Categories[curPos.CategoryIndex]
 	m.ui.Visual.AnchorCategoryID = cat.ID
 	m.ui.Visual.AnchorTaskID = ""
-	if curPos.Kind == selection.FocusTask {
+	if visualTaskLevel(curPos.Kind) {
 		if curPos.TaskIndex < 0 || curPos.TaskIndex >= len(cat.Tasks) {
 			return
 		}
@@ -102,7 +150,7 @@ func (m *model) visualMoveCursor(delta int) {
 func nextVisualPosition(positions []selection.Position, from, step int, kind selection.FocusKind) int {
 	i := from + step
 	for i >= 0 && i < len(positions) {
-		if positions[i].Kind == kind {
+		if matchesVisualDomain(positions[i].Kind, kind) {
 			return i
 		}
 		i += step
@@ -138,7 +186,7 @@ func (m model) visualRange() (lo, hi int, active bool) {
 func (m model) resolveVisualAnchor() int {
 	positions := m.ui.Selection.Positions()
 	for i, p := range positions {
-		if p.Kind != m.ui.Visual.Kind {
+		if !matchesVisualDomain(p.Kind, m.ui.Visual.Kind) {
 			continue
 		}
 		if p.CategoryIndex < 0 || p.CategoryIndex >= len(m.project.Categories) {
@@ -148,16 +196,15 @@ func (m model) resolveVisualAnchor() int {
 		if cat.ID != m.ui.Visual.AnchorCategoryID {
 			continue
 		}
-		switch p.Kind {
-		case selection.FocusCategory:
+		if m.ui.Visual.Kind == selection.FocusCategory {
 			return i
-		case selection.FocusTask:
-			if p.TaskIndex < 0 || p.TaskIndex >= len(cat.Tasks) {
-				continue
-			}
-			if cat.Tasks[p.TaskIndex].ID == m.ui.Visual.AnchorTaskID {
-				return i
-			}
+		}
+		// Task-level: match the anchor by its stable task/separator ID.
+		if p.TaskIndex < 0 || p.TaskIndex >= len(cat.Tasks) {
+			continue
+		}
+		if cat.Tasks[p.TaskIndex].ID == m.ui.Visual.AnchorTaskID {
+			return i
 		}
 	}
 	return -1
@@ -171,7 +218,7 @@ func (m model) visualSelectedPositions() []selection.Position {
 	positions := m.ui.Selection.Positions()
 	var result []selection.Position
 	for i := lo; i <= hi && i < len(positions); i++ {
-		if positions[i].Kind == m.ui.Visual.Kind {
+		if matchesVisualDomain(positions[i].Kind, m.ui.Visual.Kind) {
 			result = append(result, positions[i])
 		}
 	}
@@ -190,7 +237,7 @@ func (m model) isInVisualRange(index int) bool {
 	if index < 0 || index >= len(positions) {
 		return false
 	}
-	return positions[index].Kind == m.ui.Visual.Kind
+	return matchesVisualDomain(positions[index].Kind, m.ui.Visual.Kind)
 }
 
 func (m *model) visualCopyTitles() tea.Cmd {
@@ -199,6 +246,18 @@ func (m *model) visualCopyTitles() tea.Cmd {
 		m.exitVisualMode()
 		return nil
 	}
+	text := m.visualTitleText(selPositions)
+	m.stashVisualClipboard(selPositions, false)
+	m.exitVisualMode()
+	return func() tea.Msg {
+		return clipboardResultMsg{err: clipboard.WriteAll(text)}
+	}
+}
+
+// visualTitleText joins the plain titles of the selection. Separators carry no
+// task content, so they are omitted from the copied text (the internal
+// clipboard still keeps them for a faithful paste).
+func (m model) visualTitleText(selPositions []selection.Position) string {
 	titles := make([]string, 0, len(selPositions))
 	for _, pos := range selPositions {
 		switch pos.Kind {
@@ -208,12 +267,7 @@ func (m *model) visualCopyTitles() tea.Cmd {
 			titles = append(titles, m.project.Categories[pos.CategoryIndex].Name)
 		}
 	}
-	text := strings.Join(titles, "\n")
-	m.stashVisualClipboard(selPositions, false)
-	m.exitVisualMode()
-	return func() tea.Msg {
-		return clipboardResultMsg{err: clipboard.WriteAll(text)}
-	}
+	return strings.Join(titles, "\n")
 }
 
 func (m *model) visualCopyChecklist() tea.Cmd {
@@ -222,6 +276,17 @@ func (m *model) visualCopyChecklist() tea.Cmd {
 		m.exitVisualMode()
 		return nil
 	}
+	text := m.visualChecklistText(selPositions)
+	m.stashVisualClipboard(selPositions, false)
+	m.exitVisualMode()
+	return func() tea.Msg {
+		return clipboardResultMsg{err: clipboard.WriteAll(text)}
+	}
+}
+
+// visualChecklistText renders the selection as a markdown checklist. As with
+// visualTitleText, separators are omitted from the copied text.
+func (m model) visualChecklistText(selPositions []selection.Position) string {
 	lines := make([]string, 0, len(selPositions))
 	for _, pos := range selPositions {
 		switch pos.Kind {
@@ -236,12 +301,7 @@ func (m *model) visualCopyChecklist() tea.Cmd {
 			lines = append(lines, "## "+m.project.Categories[pos.CategoryIndex].Name)
 		}
 	}
-	text := strings.Join(lines, "\n")
-	m.stashVisualClipboard(selPositions, false)
-	m.exitVisualMode()
-	return func() tea.Msg {
-		return clipboardResultMsg{err: clipboard.WriteAll(text)}
-	}
+	return strings.Join(lines, "\n")
 }
 
 func (m *model) stashVisualClipboard(selPositions []selection.Position, isCut bool) {
@@ -249,17 +309,7 @@ func (m *model) stashVisualClipboard(selPositions []selection.Position, isCut bo
 		return
 	}
 	m.ui.TagCopiedLast = false
-	kind := selPositions[0].Kind
-	switch kind {
-	case selection.FocusTask:
-		tasks := make([]domain.Task, 0, len(selPositions))
-		ids := make([]string, 0, len(selPositions))
-		for _, pos := range selPositions {
-			t := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
-			tasks = append(tasks, t)
-			ids = append(ids, t.ID)
-		}
-		m.ui.Clipboard = ClipboardState{Tasks: tasks, TaskIDs: ids, IsCut: isCut}
+	switch m.ui.Visual.Kind {
 	case selection.FocusCategory:
 		cats := make([]domain.Category, 0, len(selPositions))
 		ids := make([]string, 0, len(selPositions))
@@ -269,6 +319,17 @@ func (m *model) stashVisualClipboard(selPositions []selection.Position, isCut bo
 			ids = append(ids, c.ID)
 		}
 		m.ui.Clipboard = ClipboardState{Categories: cats, CategoryIDs: ids, IsCut: isCut}
+	default:
+		// Task-level: stash the tasks and any interleaved separators so a paste
+		// reproduces the block, dividers and all.
+		tasks := make([]domain.Task, 0, len(selPositions))
+		ids := make([]string, 0, len(selPositions))
+		for _, pos := range selPositions {
+			t := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
+			tasks = append(tasks, t)
+			ids = append(ids, t.ID)
+		}
+		m.ui.Clipboard = ClipboardState{Tasks: tasks, TaskIDs: ids, IsCut: isCut}
 	}
 }
 
@@ -301,12 +362,24 @@ func (m *model) confirmDeleteVisualRange() {
 	m.ui.Modes.ToNormal()
 
 	m.recordHistory()
-	deleted := 0
+	// Track real tasks and separators separately so the message reflects tasks,
+	// while `removed` still gates whether the edit is worth keeping in history.
+	deletedTasks, deletedSeps, removed := 0, 0, 0
 	for _, id := range taskIDs {
+		isSep := false
+		if t := m.taskByID(id); t != nil {
+			isSep = t.IsSeparator()
+		}
 		if m.removeTaskByIDIfExists(id) {
-			deleted++
+			removed++
+			if isSep {
+				deletedSeps++
+			} else {
+				deletedTasks++
+			}
 		}
 	}
+	deletedCats := 0
 	if len(catIDs) > 0 {
 		idSet := make(map[string]struct{}, len(catIDs))
 		for _, id := range catIDs {
@@ -315,7 +388,8 @@ func (m *model) confirmDeleteVisualRange() {
 		kept := m.project.Categories[:0]
 		for _, c := range m.project.Categories {
 			if _, drop := idSet[c.ID]; drop {
-				deleted++
+				deletedCats++
+				removed++
 				continue
 			}
 			kept = append(kept, c)
@@ -324,16 +398,16 @@ func (m *model) confirmDeleteVisualRange() {
 		m.project.UpdatedAt = domain.NowTimestamp()
 	}
 
-	if deleted == 0 {
+	if removed == 0 {
 		m.discardLastHistory()
 		return
 	}
 	m.rebuildAndClamp()
 	m.storeTaskUpdate()
 	if len(catIDs) > 0 {
-		m.ui.Screen.StatusMsg = fmt.Sprintf("Deleted %d categor%s", deleted, plural(deleted, "y", "ies"))
+		m.ui.Screen.StatusMsg = fmt.Sprintf("Deleted %d categor%s", deletedCats, plural(deletedCats, "y", "ies"))
 	} else {
-		m.ui.Screen.StatusMsg = fmt.Sprintf("Deleted %d task(s)", deleted)
+		m.ui.Screen.StatusMsg = "Deleted " + rowCountLabel(deletedTasks, deletedSeps)
 	}
 }
 
@@ -467,7 +541,7 @@ func (m *model) visualShiftTasksAcross(catIdx, taskLo, taskHi, dir int) {
 	}
 
 	cursorID := ""
-	if cur, ok := m.ui.Selection.SelectedPosition(); ok && cur.Kind == selection.FocusTask {
+	if cur, ok := m.ui.Selection.SelectedPosition(); ok && visualTaskLevel(cur.Kind) {
 		cursorID = m.project.Categories[cur.CategoryIndex].Tasks[cur.TaskIndex].ID
 	}
 
@@ -496,7 +570,7 @@ func (m *model) visualShiftTasksAcross(catIdx, taskLo, taskHi, dir int) {
 	m.rebuildPositions()
 	if cursorID != "" {
 		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-			return p.Kind == selection.FocusTask &&
+			return visualTaskLevel(p.Kind) &&
 				m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == cursorID
 		})
 	}
@@ -515,7 +589,8 @@ func (m *model) visualCut() {
 		n := len(selPositions)
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Marked %d categor%s for cut", n, plural(n, "y", "ies"))
 	} else {
-		m.ui.Screen.StatusMsg = fmt.Sprintf("Marked %d task(s) for cut", len(selPositions))
+		tasks := countRealTasks(selPositions)
+		m.ui.Screen.StatusMsg = "Marked " + rowCountLabel(tasks, len(selPositions)-tasks) + " for cut"
 	}
 	m.exitVisualMode()
 }
@@ -622,6 +697,7 @@ func (m *model) pasteMultiTasks() {
 			CompletionDate:  src.CompletionDate,
 			EstimateMinutes: src.EstimateMinutes,
 			Description:     src.Description,
+			Kind:            src.Kind,
 			TagColor:        src.TagColor,
 			TagLabel:        src.TagLabel,
 		}
@@ -631,13 +707,19 @@ func (m *model) pasteMultiTasks() {
 		}
 	}
 
-	count := len(m.ui.Clipboard.Tasks)
+	pastedTasks := 0
+	for _, t := range m.ui.Clipboard.Tasks {
+		if !t.IsSeparator() {
+			pastedTasks++
+		}
+	}
+	pastedSeps := len(m.ui.Clipboard.Tasks) - pastedTasks
 	wasCut := m.ui.Clipboard.IsCut
 	m.ui.Clipboard = ClipboardState{}
 	m.rebuildPositions()
 	if firstNewID != "" {
 		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-			if p.Kind != selection.FocusTask {
+			if !visualTaskLevel(p.Kind) {
 				return false
 			}
 			return m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == firstNewID
@@ -649,7 +731,7 @@ func (m *model) pasteMultiTasks() {
 	if wasCut {
 		verb = "Moved"
 	}
-	m.ui.Screen.StatusMsg = fmt.Sprintf("%s %d task(s)", verb, count)
+	m.ui.Screen.StatusMsg = verb + " " + rowCountLabel(pastedTasks, pastedSeps)
 }
 
 func (m *model) pasteMultiCategories() {

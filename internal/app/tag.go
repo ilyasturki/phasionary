@@ -310,6 +310,19 @@ func (m *model) applyTagClip(task *domain.Task) {
 	}
 }
 
+// visualTaskPositions keeps only real task rows from a visual selection,
+// dropping any separators caught in the range so tag actions — which have no
+// meaning on a divider — apply to tasks alone.
+func visualTaskPositions(positions []selection.Position) []selection.Position {
+	var out []selection.Position
+	for _, p := range positions {
+		if p.Kind == selection.FocusTask {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // visualPasteTag paints the copied tag onto every task in the visual selection.
 func (m *model) visualPasteTag() {
 	if !m.ui.TagClip.Set {
@@ -321,7 +334,7 @@ func (m *model) visualPasteTag() {
 		m.exitVisualMode()
 		return
 	}
-	selPositions := m.visualSelectedPositions()
+	selPositions := visualTaskPositions(m.visualSelectedPositions())
 	if len(selPositions) == 0 {
 		m.exitVisualMode()
 		return
@@ -367,7 +380,7 @@ func (m *model) visualCycleTag() {
 	if m.ui.Visual.Kind != selection.FocusTask {
 		return
 	}
-	selPositions := m.visualSelectedPositions()
+	selPositions := visualTaskPositions(m.visualSelectedPositions())
 	if len(selPositions) == 0 {
 		return
 	}
@@ -388,7 +401,7 @@ func (m *model) visualStartTagEdit() tea.Cmd {
 		m.exitVisualMode()
 		return nil
 	}
-	selPositions := m.visualSelectedPositions()
+	selPositions := visualTaskPositions(m.visualSelectedPositions())
 	ids := make([]string, 0, len(selPositions))
 	color := ""
 	if len(selPositions) > 0 {

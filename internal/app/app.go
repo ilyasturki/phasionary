@@ -543,7 +543,7 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 			return m.renderEditSeparatorLine()
 		}
 		label := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex].Title
-		return m.renderSeparatorLine(label, isSelected, focused, m.ui.Screen.Width, m.searchQuery(), m.searchMatchStyle(isCursor))
+		return m.renderSeparatorLine(label, isSelected, focused, visualMode, isCursor, m.ui.Screen.Width, m.searchQuery(), m.searchMatchStyle(isCursor))
 
 	case LayoutDescription:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]

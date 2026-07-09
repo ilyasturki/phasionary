@@ -182,8 +182,169 @@ func TestSeparatorTaskActionsAreNoOps(t *testing.T) {
 	m.openEstimatePicker()
 	assert.False(t, m.ui.Modes.IsEstimatePicker())
 	assert.True(t, m.ui.Modes.Current() == modes.ModeNormal)
+}
 
-	// Visual mode: refuses to start on a separator.
+// selectTaskIdx lands the cursor on the task at (catIdx, taskIdx).
+func (m *model) selectTaskIdx(catIdx, taskIdx int) bool {
+	return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusTask && p.CategoryIndex == catIdx && p.TaskIndex == taskIdx
+	})
+}
+
+func TestEnterVisualMode_StartsOnSeparator(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	require.True(t, m.selectSeparator(0, 1))
+
 	m.enterVisualMode()
-	assert.False(t, m.ui.Modes.IsVisual())
+
+	require.True(t, m.ui.Modes.IsVisual(), "visual mode should start on a separator")
+	// A separator anchor normalizes to the task-level domain.
+	assert.Equal(t, selection.FocusTask, m.ui.Visual.Kind)
+	assert.Equal(t, "s1", m.ui.Visual.AnchorTaskID)
+}
+
+func TestVisualCursor_StopsOnSeparator(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	require.True(t, m.selectTaskIdx(0, 0)) // Alpha
+	m.enterVisualMode()
+
+	m.visualMoveCursor(1) // should land on the separator, not skip it
+
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusSeparator, pos.Kind)
+	assert.Equal(t, 1, pos.TaskIndex)
+}
+
+func TestVisualRange_SweepsInteriorSeparator(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	require.True(t, m.selectTaskIdx(0, 0)) // Alpha
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // Alpha .. Beta, crossing the separator
+
+	sel := m.visualSelectedPositions()
+	require.Len(t, sel, 3, "range covers Alpha, separator, Beta")
+	assert.Equal(t, selection.FocusTask, sel[0].Kind)
+	assert.Equal(t, selection.FocusSeparator, sel[1].Kind)
+	assert.Equal(t, selection.FocusTask, sel[2].Kind)
+
+	// The separator's own row reports as in-range so it renders inside the band.
+	sepIdx := m.ui.Selection.FindPositionIndex(func(p selection.Position) bool {
+		return p.Kind == selection.FocusSeparator
+	})
+	require.GreaterOrEqual(t, sepIdx, 0)
+	assert.True(t, m.isInVisualRange(sepIdx))
+}
+
+func TestVisualCopyText_SkipsSeparatorButClipboardKeepsIt(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	require.True(t, m.selectTaskIdx(0, 0))
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // Alpha .. Beta
+
+	sel := m.visualSelectedPositions()
+	// Copied text omits the divider row entirely.
+	assert.Equal(t, "Alpha\nBeta", m.visualTitleText(sel))
+	assert.Equal(t, "- [ ] Alpha\n- [ ] Beta", m.visualChecklistText(sel))
+
+	// The internal clipboard still carries the separator for a faithful paste.
+	_ = m.visualCopyTitles()
+	require.Len(t, m.ui.Clipboard.Tasks, 3)
+	assert.True(t, m.ui.Clipboard.Tasks[1].IsSeparator())
+}
+
+func TestVisualCounts_ExcludeSeparators(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	require.True(t, m.selectTaskIdx(0, 0))
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // Alpha .. Beta, separator swept in
+
+	// Header reports the two real tasks, not the 3-row span.
+	assert.Equal(t, "-- VISUAL -- 2 tasks selected", m.statusText())
+
+	m.visualCut()
+	assert.Equal(t, "Marked 2 task(s) for cut", m.ui.Screen.StatusMsg)
+}
+
+func TestVisualDelete_RemovesInteriorSeparator(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	require.True(t, m.selectTaskIdx(0, 0))
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // Alpha .. Beta
+
+	m.visualDelete()
+	require.True(t, m.ui.Modes.IsConfirmDelete())
+	assert.Equal(t, []string{"t1", "s1", "t2"}, m.ui.ConfirmDelete.TaskIDs)
+
+	m.confirmDeleteVisualRange()
+	assert.Empty(t, m.project.Categories[0].Tasks, "block including the separator is gone")
+	// The message counts the two real tasks, not the swept-in separator.
+	assert.Equal(t, "Deleted 2 task(s)", m.ui.Screen.StatusMsg)
+}
+
+func TestVisualCutPaste_PreservesSeparator(t *testing.T) {
+	project := domain.Project{
+		ID:   "p1",
+		Name: "P",
+		Categories: []domain.Category{
+			{
+				ID:   "c1",
+				Name: "Cat A",
+				Tasks: []domain.Task{
+					{ID: "t1", Title: "Alpha", Status: domain.StatusTodo},
+					{ID: "s1", Kind: domain.KindSeparator, Title: "mid"},
+					{ID: "t2", Title: "Beta", Status: domain.StatusTodo},
+				},
+			},
+			{ID: "c2", Name: "Cat B", Tasks: []domain.Task{{ID: "t3", Title: "Gamma", Status: domain.StatusTodo}}},
+		},
+	}
+	m := newTestModel(t, project)
+	require.True(t, m.selectTaskIdx(0, 0))
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // Alpha .. Beta
+	m.visualCut()
+
+	require.True(t, m.selectTaskIdx(1, 0)) // Gamma in Cat B
+	m.pasteFromClipboard()
+
+	// Source category is emptied; the block lands after Gamma, divider intact.
+	assert.Empty(t, m.project.Categories[0].Tasks)
+	got := m.project.Categories[1].Tasks
+	require.Len(t, got, 4)
+	assert.Equal(t, "Gamma", got[0].Title)
+	assert.Equal(t, "Alpha", got[1].Title)
+	assert.True(t, got[2].IsSeparator(), "pasted separator keeps its Kind")
+	assert.Equal(t, "mid", got[2].Title)
+	assert.Equal(t, "Beta", got[3].Title)
+	// Move message counts the two real tasks, not the separator.
+	assert.Equal(t, "Moved 2 task(s)", m.ui.Screen.StatusMsg)
+}
+
+func TestVisualMoveDown_CarriesInteriorSeparator(t *testing.T) {
+	project := domain.Project{
+		ID:   "p1",
+		Name: "P",
+		Categories: []domain.Category{
+			{
+				ID:   "c1",
+				Name: "Cat A",
+				Tasks: []domain.Task{
+					{ID: "t1", Title: "Alpha", Status: domain.StatusTodo},
+					{ID: "s1", Kind: domain.KindSeparator, Title: "mid"},
+					{ID: "t2", Title: "Beta", Status: domain.StatusTodo},
+					{ID: "t3", Title: "Gamma", Status: domain.StatusTodo},
+				},
+			},
+		},
+	}
+	m := newTestModel(t, project)
+	require.True(t, m.selectTaskIdx(0, 0)) // Alpha
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // Alpha + separator → block [t1, s1]
+
+	m.visualMoveDown() // Beta (the neighbor) hops above the block
+
+	assert.Equal(t, []string{"t2", "t1", "s1", "t3"}, taskIDs(m.project.Categories[0]),
+		"the separator travels with its block, staying adjacent to Alpha")
 }

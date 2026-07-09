@@ -363,8 +363,10 @@ func layoutSeparator(prefix, label string, width int) separatorLayout {
 
 // renderSeparatorLine draws an in-category divider: a heavy rule capped to the
 // content column. A labeled separator reads "━━ label ━━━━" with the label set
-// off from the rule. When selected the whole row takes the selection band.
-func (m model) renderSeparatorLine(label string, selected, focused bool, width int, searchQuery string, searchMatch lipgloss.Style) string {
+// off from the rule. When selected the whole row takes the selection band; in
+// visual mode it takes the visual cursor or visual range band so a divider
+// swept into a task selection reads as part of the block.
+func (m model) renderSeparatorLine(label string, selected, focused, visualMode, isCursor bool, width int, searchQuery string, searchMatch lipgloss.Style) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
@@ -376,7 +378,14 @@ func (m model) renderSeparatorLine(label string, selected, focused bool, width i
 	layout := layoutSeparator(prefix, strings.TrimSpace(label), sepContentWidth(avail))
 
 	if selected {
-		return ui.GetSelectedStyle(focused).Render(layout.left + layout.label + layout.right)
+		style := ui.GetSelectedStyle(focused)
+		switch {
+		case visualMode && isCursor:
+			style = ui.GetVisualCursorStyle(focused)
+		case visualMode:
+			style = ui.GetVisualSelectedStyle(focused)
+		}
+		return style.Render(layout.left + layout.label + layout.right)
 	}
 
 	ruleStyle := ui.SeparatorStyle
@@ -411,10 +420,13 @@ func (m model) statusText() string {
 		return m.ui.Screen.StatusMsg
 	}
 	if m.ui.Modes.IsVisual() {
-		count := len(m.visualSelectedPositions())
-		noun := plural(count, "task", "tasks")
-		if m.ui.Visual.Kind == selection.FocusCategory {
-			noun = plural(count, "category", "categories")
+		positions := m.visualSelectedPositions()
+		count := len(positions)
+		noun := plural(count, "category", "categories")
+		if m.ui.Visual.Kind != selection.FocusCategory {
+			// Task-level: count real tasks so a swept-in divider never inflates it.
+			count = countRealTasks(positions)
+			noun = plural(count, "task", "tasks")
 		}
 		return fmt.Sprintf("-- VISUAL -- %d %s selected", count, noun)
 	}
