@@ -85,7 +85,21 @@ func (m *model) handleMouseWheel(msg tea.MouseWheelMsg) {
 	}
 }
 
+// normalizeKey rewrites Shift+Backspace to a plain Backspace so it deletes a
+// character wherever the user types. Terminals speaking the enhanced keyboard
+// protocol deliver Shift+Backspace as a distinct key, but bubbles' text inputs
+// bind delete-backward to "backspace"/"ctrl+h" only, so the modified form is
+// otherwise silently ignored. Normal mode binds nothing to backspace, so this
+// is a no-op outside the text-entry modes.
+func normalizeKey(msg tea.KeyPressMsg) tea.KeyPressMsg {
+	if msg.Code == tea.KeyBackspace && msg.Mod&tea.ModShift != 0 {
+		msg.Mod &^= tea.ModShift
+	}
+	return msg
+}
+
 func (m model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	msg = normalizeKey(msg)
 	switch m.ui.Modes.Current() {
 	case modes.ModeHelp:
 		return m.handleHelpKey(msg)
