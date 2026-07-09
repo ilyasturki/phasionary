@@ -97,12 +97,33 @@ type UIState struct {
 	TagEdit         TagEditState
 	History         HistoryState
 	Search          SearchState
+	layout          layoutCache
+}
+
+// projectSaver persists project snapshots asynchronously so mutations never
+// block the event loop on fsync. Satisfied by *data.Saver; nil in tests, where
+// storeTaskUpdate falls back to a synchronous save.
+type projectSaver interface {
+	Enqueue(domain.Project)
+	Results() <-chan error
+	Close()
+}
+
+// layoutCache memoizes the built Layout so navigation and scroll math don't
+// rewalk every task each frame (buildLayout runs on every render and on every
+// ensureVisible). Invalidated on any content or structural change; keyed on
+// width, the only screen dimension the layout depends on.
+type layoutCache struct {
+	valid  bool
+	width  int
+	layout *Layout
 }
 
 type Dependencies struct {
 	Store        data.ProjectRepository
 	CfgManager   config.Reader
 	StateManager data.StateRepository
+	Saver        projectSaver
 }
 
 func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {

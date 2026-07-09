@@ -224,11 +224,10 @@ func (m *model) applyCategoryEdit(content string) {
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Rename failed: %v", err)
 		return
 	}
-	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
-		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
-		return
+	m.storeTaskUpdate()
+	if m.ui.Screen.StatusMsg == "" {
+		m.ui.Screen.StatusMsg = "Category updated"
 	}
-	m.ui.Screen.StatusMsg = "Category updated"
 }
 
 func (m *model) applyTaskEdit(content string) {
@@ -259,9 +258,8 @@ func (m *model) applyTaskEdit(content string) {
 	task.Title = title
 	task.Description = description
 	task.UpdatedAt = domain.NowTimestamp()
-	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
-		m.ui.Screen.StatusMsg = fmt.Sprintf("Failed to save: %v", err)
-		return
+	m.storeTaskUpdate()
+	if m.ui.Screen.StatusMsg == "" {
+		m.ui.Screen.StatusMsg = "Task updated"
 	}
-	m.ui.Screen.StatusMsg = "Task updated"
 }

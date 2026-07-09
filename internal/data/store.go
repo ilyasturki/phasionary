@@ -95,6 +95,17 @@ func (s *Store) LoadProjectByID(id string) (domain.Project, error) {
 }
 
 func (s *Store) LoadProject(selector string) (domain.Project, error) {
+	// Fast path: a selector that is an exact project ID resolves with a single
+	// file read instead of scanning and JSON-parsing every project on disk. Miss
+	// falls through to a full scan for name selectors, case-insensitive IDs, or
+	// the empty (first-project) selector.
+	if strings.TrimSpace(selector) != "" {
+		if project, err := s.LoadProjectByID(selector); err == nil {
+			return project, nil
+		} else if !errors.Is(err, ErrProjectNotFound) {
+			return domain.Project{}, err
+		}
+	}
 	projects, err := s.ListProjects()
 	if err != nil {
 		return domain.Project{}, err
@@ -114,17 +125,30 @@ func (s *Store) LoadProject(selector string) (domain.Project, error) {
 	return domain.Project{}, ErrProjectNotFound
 }
 
-func (s *Store) saveProjectAtomic(project domain.Project) error {
+// marshalProject stamps UpdatedAt and returns the JSON bytes to persist.
+func (s *Store) marshalProject(project domain.Project) ([]byte, error) {
 	project.UpdatedAt = domain.NowTimestamp()
-	data, err := json.MarshalIndent(project, "", "  ")
-	if err != nil {
-		return err
-	}
+	return json.MarshalIndent(project, "", "  ")
+}
+
+// MarshalProject snapshots a project to the exact bytes a save would persist,
+// stamping UpdatedAt. It does no I/O and is cheap, so a latency-sensitive
+// caller (e.g. the TUI event loop) can run it to capture an immutable snapshot,
+// then hand the bytes to WriteProjectLocked on a background goroutine where the
+// fsync cost is hidden from the UI.
+func (s *Store) MarshalProject(project domain.Project) ([]byte, error) {
+	return s.marshalProject(project)
+}
+
+// writeProjectBytes atomically writes pre-marshaled bytes for id: an fsync'd
+// temp file, renamed into place, then a directory fsync so the rename survives
+// a crash. It performs no locking or existence check; callers layer those on.
+func (s *Store) writeProjectBytes(id string, data []byte) error {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return err
 	}
-	path := s.projectPath(project.ID)
-	tmp := s.tmpPath(project.ID)
+	path := s.projectPath(id)
+	tmp := s.tmpPath(id)
 	if err := writeFileSync(tmp, data, 0o644); err != nil {
 		return err
 	}
@@ -138,6 +162,14 @@ func (s *Store) saveProjectAtomic(project domain.Project) error {
 		_ = dir.Close()
 	}
 	return nil
+}
+
+func (s *Store) saveProjectAtomic(project domain.Project) error {
+	data, err := s.marshalProject(project)
+	if err != nil {
+		return err
+	}
+	return s.writeProjectBytes(project.ID, data)
 }
 
 // writeFileSync writes data to path and fsyncs the file before closing.

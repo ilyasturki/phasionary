@@ -282,8 +282,13 @@ func (b *LayoutBuilder) descriptionIndentFor(task domain.Task) int {
 }
 
 func (m *model) buildLayout() *Layout {
-	builder := NewLayoutBuilder(m.layoutConfig(), m.ui.Screen.Width, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold).
+	w := m.ui.Screen.Width
+	if m.ui.layout.valid && m.ui.layout.width == w && m.ui.layout.layout != nil {
+		return m.ui.layout.layout
+	}
+	builder := NewLayoutBuilder(m.layoutConfig(), w, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold).
 		WithExpandedDescriptions(m.ui.Screen.ExpandDescriptions)
 	layout := builder.Build(m.project, m.positions())
+	m.ui.layout = layoutCache{valid: true, width: w, layout: &layout}
 	return &layout
 }

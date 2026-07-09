@@ -27,6 +27,10 @@ type clipboardResultMsg struct {
 	label string
 }
 
+// saveErrMsg reports a failed background save from the async saver. Successful
+// writes send nothing; a failure surfaces here as a status message.
+type saveErrMsg struct{ err error }
+
 type model struct {
 	project domain.Project
 	ui      *UIState
@@ -34,7 +38,24 @@ type model struct {
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return m.listenSaveErrors()
+}
+
+// listenSaveErrors subscribes to the async saver's error channel so a failed
+// background write becomes a visible status message. It resolves one delivery
+// then must be re-issued (see the saveErrMsg case) to keep listening.
+func (m model) listenSaveErrors() tea.Cmd {
+	if m.deps.Saver == nil {
+		return nil
+	}
+	results := m.deps.Saver.Results()
+	return func() tea.Msg {
+		err, ok := <-results
+		if !ok {
+			return nil
+		}
+		return saveErrMsg{err: err}
+	}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -68,6 +89,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.handleMouseWheel(msg)
 		}
 		return m, nil
+	case saveErrMsg:
+		if msg.err != nil {
+			m.ui.Screen.StatusMsg = "Save failed: " + msg.err.Error()
+		}
+		return m, m.listenSaveErrors()
 	case tea.KeyPressMsg:
 		m.ui.Screen.StatusMsg = ""
 		return m.handleKeyMsg(msg)
@@ -405,6 +431,9 @@ func (m *model) toggleSelectedOption() {
 		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
 			cfg.StatusDisplay = newValue
 		})
+		// Icons vs. text change the status column width, so cached row heights
+		// are stale. (PriorityColor below only recolors — layout is unaffected.)
+		m.invalidateLayout()
 	case 1: // PriorityColor
 		newValue := nextPriorityColor(m.deps.CfgManager.Get().PriorityColor)
 		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
@@ -659,6 +688,13 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 		return err
 	}
 
+	// Persist off the event loop so no keystroke blocks on fsync. Deferring
+	// Close here means the final edit is flushed on exit regardless of which
+	// quit path the program took — program.Run only returns once the event loop
+	// has stopped, so no Enqueue can race this Close.
+	saver := data.NewSaver(store)
+	defer saver.Close()
+
 	stateManager := data.NewStateManager(filepath.Dir(dataDir), workingDir)
 	if err := stateManager.Load(); err != nil {
 		return err
@@ -716,10 +752,12 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 	selMgr := selection.NewManager(positions, initialSelection)
 	modeMachine := modes.NewMachine(startMode)
 
+	deps := NewDependencies(store, cfgManager, stateManager)
+	deps.Saver = saver
 	m := model{
 		project: project,
 		ui:      NewUIState(selMgr, modeMachine),
-		deps:    NewDependencies(store, cfgManager, stateManager),
+		deps:    deps,
 	}
 	m.ui.Fold = foldState
 	m.ui.Screen.ExpandDescriptions = expandDescriptions

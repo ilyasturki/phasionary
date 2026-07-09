@@ -11,12 +11,30 @@ import (
 // edits serve made in the meantime — use reloadProject (R) to pick up
 // out-of-band changes before continuing to edit.
 func (m *model) storeTaskUpdate() {
+	// Content changed: the memoized layout no longer matches the project.
+	m.invalidateLayout()
+	if m.deps.Saver != nil {
+		// Snapshot + hand off to the background writer; the fsync happens off the
+		// event loop so the keystroke returns immediately. Errors surface later
+		// via the Results subscription (see listenSaveErrors).
+		m.deps.Saver.Enqueue(m.project)
+		return
+	}
+	// No async saver (tests, or a store wired without one): save synchronously
+	// so persistence still happens.
 	if m.deps.Store == nil {
 		return
 	}
 	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
 		m.ui.Screen.StatusMsg = "Save failed: " + err.Error()
 	}
+}
+
+// invalidateLayout drops the memoized layout so the next render/scroll rebuilds
+// it. Call after any change that alters what rows exist or how tall they are.
+func (m *model) invalidateLayout() {
+	m.ui.layout.valid = false
+	m.ui.layout.layout = nil
 }
 
 func (m *model) reloadProject() {
@@ -167,4 +185,7 @@ func rebuildPositions(categories []domain.Category, filter *FilterState, fold *F
 func (m *model) rebuildPositions() {
 	positions := rebuildPositions(m.project.Categories, &m.ui.Filter, &m.ui.Fold, m.ui.Screen.ExpandDescriptions)
 	m.ui.Selection.SetPositions(positions)
+	// Structure changed (filter, fold, add/delete, reload, undo/redo): the
+	// memoized layout is stale.
+	m.invalidateLayout()
 }
