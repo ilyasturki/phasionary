@@ -212,6 +212,25 @@ func PriorityIconStyle(priority, colorMode string) lipgloss.Style {
 	return lipgloss.NewStyle()
 }
 
+// PriorityIconBlockStyle returns the style for the priority icon rendered as a
+// filled color block on a highlighted row, mirroring TagBlockStyle: Reverse
+// turns the priority color into the cell background so the icon keeps its color
+// as part of the reversed selection bar instead of vanishing into it. Color is
+// applied when colorMode is "full" or "icon" (empty defaults to "full"); the
+// bool reports whether a colored block renders at all.
+func PriorityIconBlockStyle(priority, colorMode string) (lipgloss.Style, bool) {
+	if colorMode == "" {
+		colorMode = "full"
+	}
+	if colorMode != "full" && colorMode != "icon" {
+		return lipgloss.NewStyle(), false
+	}
+	if c, ok := priorityColor(priority); ok {
+		return lipgloss.NewStyle().Foreground(c).Reverse(true), true
+	}
+	return lipgloss.NewStyle(), false
+}
+
 func TaskTitleStyle(priority, status, colorMode string) lipgloss.Style {
 	base := PriorityStyle(priority, colorMode)
 	if status == "completed" || status == "cancelled" {

@@ -202,7 +202,7 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 		iconStyled = iconStyle.Render(priorityIcon) + " "
 		iconWidth = ansi.StringWidth(priorityIcon + " ")
 	}
-	tagStyled, tagWidth := r.tagSegment(task, finished, false)
+	tagStyled, tagWidth := r.tagSegment(task, finished, false, priorityIcon != "")
 	leading := tagStyled + iconStyled
 	leadingWidth := tagWidth + iconWidth
 	descMarker := r.formatDescriptionBadge(task.Description, false)
@@ -225,8 +225,9 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 // unselected row the tag is its own colored foreground; on a highlighted row it
 // becomes a filled color block (reverse) so it shares the selection bar's look
 // instead of clashing as a colored foreground island. faint mirrors the priority
-// icon's completed/cancelled dimming (unselected rows only).
-func (r *TaskLineRenderer) tagSegment(task domain.Task, finished, selected bool) (string, int) {
+// icon's completed/cancelled dimming (unselected rows only). priorityFollows
+// reports whether a priority icon block sits between the tag and the title.
+func (r *TaskLineRenderer) tagSegment(task domain.Task, finished, selected, priorityFollows bool) (string, int) {
 	seg := ui.TagSegmentText(task.TagColor, task.TagLabel)
 	if seg == "" {
 		return "", 0
@@ -234,12 +235,15 @@ func (r *TaskLineRenderer) tagSegment(task domain.Task, finished, selected bool)
 	width := ansi.StringWidth(seg)
 	if selected {
 		style, _ := ui.TagBlockStyle(task.TagColor)
-		// A labeled tag's segment ends with a separator space before the title.
-		// Keep that space in the row's selection band rather than the reversed
-		// tag color so the colored block hugs the label instead of trailing one
-		// cell past it. A color-only tag has no such trailing space — its single
-		// space is the dot-to-title separator — so it stays a whole block.
-		if task.TagLabel != "" {
+		// A labeled tag's segment ends with a separator space before the next
+		// element. Keep that space in the row's selection band when the title
+		// follows directly, so the colored block hugs the label instead of
+		// trailing one cell past it. But when a priority icon block follows,
+		// color the separator with the tag so the two colored blocks connect
+		// rather than being split by a monochrome gap. A color-only tag has no
+		// such trailing space — its single space is the dot-to-next separator —
+		// so it always stays a whole block.
+		if task.TagLabel != "" && !priorityFollows {
 			core := strings.TrimSuffix(seg, " ")
 			return r.maybeCut(style).Render(core) + r.selectedStyle().Render(" "), width
 		}
@@ -258,11 +262,19 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 	iconStyled := ""
 	iconWidth := 0
 	if priorityIcon != "" {
-		iconStyled = priorityStyle.Render(priorityIcon + " ")
+		// Keep the priority color visible on the selection bar by rendering the
+		// icon as a reverse color block, the same treatment the tag dot gets in
+		// tagSegment; fall back to the plain selection style when icon color is
+		// off so the icon still sits in the band.
+		iconStyle, ok := ui.PriorityIconBlockStyle(task.Priority, r.priorityColor)
+		if !ok {
+			iconStyle = selectedStyle
+		}
+		iconStyled = r.maybeCut(iconStyle).Render(priorityIcon + " ")
 		iconWidth = ansi.StringWidth(priorityIcon + " ")
 	}
 	finished := task.Status == domain.StatusCompleted || task.Status == domain.StatusCancelled
-	tagStyled, tagWidth := r.tagSegment(task, finished, true)
+	tagStyled, tagWidth := r.tagSegment(task, finished, true, priorityIcon != "")
 	leading := tagStyled + iconStyled
 	leadingWidth := tagWidth + iconWidth
 
