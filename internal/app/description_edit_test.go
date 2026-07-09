@@ -2,15 +2,53 @@ package app
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
 )
+
+// descriptionMarkerRow renders the description textarea and returns the index of
+// the single display row whose ">" gutter is drawn (i.e. the cursor's row).
+func descriptionMarkerRow(t *testing.T, m *model) int {
+	t.Helper()
+	require.NotNil(t, m.ui.DescriptionEdit.cursorRow)
+	*m.ui.DescriptionEdit.cursorRow = descriptionCursorDisplayRow(m.ui.DescriptionEdit.textarea)
+	rows := strings.Split(ansi.Strip(m.ui.DescriptionEdit.textarea.View()), "\n")
+	found := -1
+	for i, r := range rows {
+		if strings.HasPrefix(r, "> ") {
+			require.Equal(t, -1, found, "expected one gutter marker, found rows %d and %d", found, i)
+			found = i
+		}
+	}
+	require.NotEqual(t, -1, found, "no > gutter marker in:\n%s", strings.Join(rows, "\n"))
+	return found
+}
+
+func TestDescriptionEdit_GutterMarkerFollowsCursor(t *testing.T) {
+	p := sampleProject()
+	p.Categories[0].Tasks[0].Description = "alpha\nbeta\ngamma"
+	m := newTestModel(t, p)
+	m.ui.Screen.Width = 60
+	m.ui.Screen.Height = 24
+	_ = m.startDescriptionInlineEdit(0, 0)
+
+	// Cursor starts at the end → last logical line.
+	require.Equal(t, 2, descriptionMarkerRow(t, m))
+
+	// Moving up walks the marker with the cursor, one row at a time.
+	_, _ = m.handleDescriptionEditKey(tea.KeyPressMsg{Code: tea.KeyUp})
+	require.Equal(t, 1, descriptionMarkerRow(t, m))
+	_, _ = m.handleDescriptionEditKey(tea.KeyPressMsg{Code: tea.KeyUp})
+	require.Equal(t, 0, descriptionMarkerRow(t, m))
+}
 
 func TestStartDescriptionInlineEdit_EntersModeAndPrefillsTextarea(t *testing.T) {
 	p := sampleProject()

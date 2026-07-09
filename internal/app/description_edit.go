@@ -6,6 +6,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -25,20 +26,35 @@ func (m *model) startDescriptionInlineEdit(catIdx, taskIdx int) tea.Cmd {
 	task := cat.Tasks[taskIdx]
 
 	ta := textarea.New()
-	// Default cursor-line bg is pure black, a stark bar on light terminals; use a neutral mid-gray instead.
+	// No current-line highlight: the block cursor alone marks the position.
+	// Instead a ">" gutter (via the prompt func below) points at the cursor's row.
 	styles := ta.Styles()
-	styles.Focused.CursorLine = lipgloss.NewStyle().Background(lipgloss.Color("240"))
+	styles.Focused.CursorLine = lipgloss.NewStyle()
+	// Clear the cursor's fixed gray so its reverse block swaps the terminal's
+	// real fg/bg — a high-contrast, theme-adaptive cursor matching the app's
+	// other edit cursors (ui.SelectedStyle) instead of a washed-out gray box.
+	styles.Cursor.Color = nil
 	ta.SetStyles(styles)
 	ta.SetValue(task.Description)
 	ta.ShowLineNumbers = false
-	ta.Prompt = ""
+	cursorRow := new(int)
+	// A 2-wide gutter on every line keeps text aligned; the cursor's row shows
+	// "> ", the rest "  ". *cursorRow is refreshed each render (descriptionEditView).
+	ta.SetPromptFunc(2, func(info textarea.PromptInfo) string {
+		if info.LineNumber == *cursorRow {
+			return "> "
+		}
+		return "  "
+	})
 	ta.CharLimit = 0
 	if w := m.ui.Screen.Width; w > 4 {
+		// SetWidth must follow SetPromptFunc so it reserves the gutter width.
 		ta.SetWidth(w - 4)
 	}
 	ta.SetHeight(descriptionEditorVisibleHeight(m.ui.Screen.Height))
 	cmd := ta.Focus()
 	ta.CursorEnd()
+	*cursorRow = descriptionCursorDisplayRow(ta)
 
 	m.ui.DescriptionEdit = DescriptionEditState{
 		textarea:      ta,
@@ -46,11 +62,36 @@ func (m *model) startDescriptionInlineEdit(catIdx, taskIdx int) tea.Cmd {
 		taskIndex:     taskIdx,
 		original:      task.Description,
 		creating:      task.Description == "",
+		cursorRow:     cursorRow,
 	}
 	if !m.ui.Modes.ToDescriptionEdit() {
 		return nil
 	}
 	return cmd
+}
+
+// descriptionCursorDisplayRow returns the display row the textarea cursor sits
+// on, accounting for soft-wrapping of the logical lines above it. The prompt
+// func keys the ">" gutter off this value so the marker follows the cursor even
+// when earlier lines wrap.
+func descriptionCursorDisplayRow(ta textarea.Model) int {
+	width := ta.Width()
+	row := ta.Line()
+	lines := strings.Split(ta.Value(), "\n")
+	display := 0
+	for i := 0; i < row && i < len(lines); i++ {
+		display += wrappedRowCount(lines[i], width)
+	}
+	return display + ta.LineInfo().RowOffset
+}
+
+// wrappedRowCount reports how many display rows a single logical line occupies
+// when soft-wrapped to width.
+func wrappedRowCount(line string, width int) int {
+	if width <= 0 || line == "" {
+		return 1
+	}
+	return strings.Count(ansi.Wrap(line, width, ""), "\n") + 1
 }
 
 func descriptionEditorVisibleHeight(screenHeight int) int {
@@ -163,6 +204,10 @@ func (m *model) finishDescriptionEdit() {
 
 func (m model) descriptionEditView() string {
 	state := m.ui.DescriptionEdit
+	// Refresh the cursor row so the prompt func's ">" gutter tracks the cursor.
+	if state.cursorRow != nil {
+		*state.cursorRow = descriptionCursorDisplayRow(state.textarea)
+	}
 	title := "Edit Description"
 	if state.creating {
 		title = "Add Description"

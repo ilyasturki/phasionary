@@ -35,6 +35,11 @@ Enter
 Sleep 600ms
 Screenshot "/tmp/phas-vt/vhs-out/08_description_inapp_editor.png"
 
+Up
+Up
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/08_description_editor_cursor_up.png"
+
 Escape
 Sleep 400ms
 

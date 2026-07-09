@@ -18,6 +18,10 @@ type DescriptionEditState struct {
 	taskIndex     int
 	original      string
 	creating      bool // true when the task had no description before this edit
+	// cursorRow holds the textarea cursor's current display row, shared by
+	// pointer with the prompt func so it can draw the ">" gutter on that line.
+	// Refreshed each render in descriptionEditView.
+	cursorRow *int
 }
 
 type ClipboardState struct {
