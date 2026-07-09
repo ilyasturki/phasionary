@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
 
@@ -138,10 +139,16 @@ func (m model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.ui.Help.Filtering {
+		return m.handleHelpFilterKey(msg)
+	}
 	switch msg.String() {
 	case "q", "esc", "?":
 		m.ui.Modes.ToNormal()
 		return m, nil
+	case "/":
+		cmd := m.startHelpFilter()
+		return m, cmd
 	case "j", "down":
 		m.moveHelpFocus(1)
 	case "k", "up":
@@ -151,22 +158,80 @@ func (m model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.moveHelpFocus(-m.helpViewportHeight() / 2)
 	case "enter":
-		if len(helpFocusables) == 0 {
-			return m, nil
-		}
-		idx := m.ui.Help.Focused
-		if idx < 0 || idx >= len(helpFocusables) {
-			return m, nil
-		}
-		row := helpRows[helpFocusables[idx]]
-		if row.disabled {
-			return m, nil
-		}
-		b := normalBindings[row.bindingIndex]
-		m.ui.Modes.ToNormal()
-		return m, b.action(&m)
+		return m.runFocusedHelpBinding()
 	}
 	return m, nil
+}
+
+// handleHelpFilterKey handles keys while the `/` filter is active: Esc clears the
+// filter (Esc again closes the dialog), Enter runs the focused match, arrows and
+// ctrl+d/u navigate, and everything else edits the query.
+func (m model) handleHelpFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.ui.Help.Filtering = false
+		m.ui.Help.Filter = textinput.Model{}
+		m.ui.Help.Focused = 0
+		m.ui.Help.ScrollOffset = 0
+		m.ensureHelpVisible()
+		return m, nil
+	case "enter":
+		return m.runFocusedHelpBinding()
+	case "ctrl+c":
+		return m, tea.Quit
+	case "down":
+		m.moveHelpFocus(1)
+		return m, nil
+	case "up":
+		m.moveHelpFocus(-1)
+		return m, nil
+	case "ctrl+d":
+		m.moveHelpFocus(m.helpViewportHeight() / 2)
+		return m, nil
+	case "ctrl+u":
+		m.moveHelpFocus(-m.helpViewportHeight() / 2)
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.ui.Help.Filter, cmd = m.ui.Help.Filter.Update(msg)
+	sanitizeInput(&m.ui.Help.Filter)
+	m.ui.Help.Focused = 0
+	m.ui.Help.ScrollOffset = 0
+	m.ensureHelpVisible()
+	return m, cmd
+}
+
+// startHelpFilter enters the `/` filter sub-mode with a fresh, focused input.
+func (m *model) startHelpFilter() tea.Cmd {
+	ti := textinput.New()
+	cmd := ti.Focus()
+	m.ui.Help.Filter = ti
+	m.ui.Help.Filtering = true
+	m.ui.Help.Focused = 0
+	m.ui.Help.ScrollOffset = 0
+	m.ensureHelpVisible()
+	return cmd
+}
+
+// runFocusedHelpBinding runs the binding under the focused row (if any) and
+// closes the dialog. Display-only rows aren't focusable, so this only ever fires
+// a runnable Navigation/Actions binding.
+func (m model) runFocusedHelpBinding() (tea.Model, tea.Cmd) {
+	rows, focusables := m.currentHelpRows()
+	if len(focusables) == 0 {
+		return m, nil
+	}
+	idx := m.ui.Help.Focused
+	if idx < 0 || idx >= len(focusables) {
+		return m, nil
+	}
+	row := rows[focusables[idx]]
+	if row.disabled {
+		return m, nil
+	}
+	b := normalBindings[row.bindingIndex]
+	m.ui.Modes.ToNormal()
+	return m, b.action(&m)
 }
 
 func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) model {

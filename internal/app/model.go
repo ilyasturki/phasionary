@@ -2,6 +2,7 @@ package app
 
 import (
 	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/textinput"
 
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
@@ -59,6 +60,11 @@ type Screen struct {
 type HelpState struct {
 	Focused      int
 	ScrollOffset int
+	// Filtering is true while the `/` incremental filter is active; Filter holds
+	// its query. The filter narrows the shortcut list, matching each row against
+	// both its key and its label.
+	Filtering bool
+	Filter    textinput.Model
 }
 
 type UIState struct {
