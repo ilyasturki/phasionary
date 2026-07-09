@@ -190,17 +190,21 @@ func (r *TaskLineRenderer) styleDescriptionLine(indentStr, text string, textStyl
 
 func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIcon string) string {
 	status := r.formatStatus(task.Status, false)
+	finished := task.Status == domain.StatusCompleted || task.Status == domain.StatusCancelled
 	iconStyled := ""
 	iconWidth := 0
 	if priorityIcon != "" {
 		iconStyle := ui.PriorityIconStyle(task.Priority, r.priorityColor)
-		if task.Status == domain.StatusCompleted || task.Status == domain.StatusCancelled {
+		if finished {
 			iconStyle = iconStyle.Faint(true)
 		}
 		iconStyle = r.maybeCut(iconStyle)
 		iconStyled = iconStyle.Render(priorityIcon) + " "
 		iconWidth = ansi.StringWidth(priorityIcon + " ")
 	}
+	tagStyled, tagWidth := r.tagSegment(task, finished, false)
+	leading := tagStyled + iconStyled
+	leadingWidth := tagWidth + iconWidth
 	descMarker := r.formatDescriptionBadge(task.Description, false)
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, false)
 	cutBadge, cutBadgeText := r.formatCutBadge(false)
@@ -210,10 +214,30 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 	prefixPart := fmt.Sprintf("%s[%s] ", prefix, status)
 
 	if r.width <= 0 {
-		return prefixPart + iconStyled + r.highlightLine(task.Title, titleStyle) + suffix
+		return prefixPart + leading + r.highlightLine(task.Title, titleStyle) + suffix
 	}
 
-	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, iconStyled, iconWidth, titleStyle, suffix, suffixText)
+	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, leading, leadingWidth, titleStyle, suffix, suffixText)
+}
+
+// tagSegment renders the leading tag (a colored dot plus its optional label and
+// a trailing space) and its display width, or ("", 0) when untagged. On an
+// unselected row the tag is its own colored foreground; on a highlighted row it
+// becomes a filled color block (reverse) so it shares the selection bar's look
+// instead of clashing as a colored foreground island. faint mirrors the priority
+// icon's completed/cancelled dimming (unselected rows only).
+func (r *TaskLineRenderer) tagSegment(task domain.Task, finished, selected bool) (string, int) {
+	seg := ui.TagSegmentText(task.TagColor, task.TagLabel)
+	if seg == "" {
+		return "", 0
+	}
+	var style lipgloss.Style
+	if selected {
+		style, _ = ui.TagBlockStyle(task.TagColor)
+	} else {
+		style, _ = ui.TagDotStyle(task.TagColor, finished)
+	}
+	return r.maybeCut(style).Render(seg), ansi.StringWidth(seg)
 }
 
 func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon string) string {
@@ -228,6 +252,10 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 		iconStyled = priorityStyle.Render(priorityIcon + " ")
 		iconWidth = ansi.StringWidth(priorityIcon + " ")
 	}
+	finished := task.Status == domain.StatusCompleted || task.Status == domain.StatusCancelled
+	tagStyled, tagWidth := r.tagSegment(task, finished, true)
+	leading := tagStyled + iconStyled
+	leadingWidth := tagWidth + iconWidth
 
 	descMarker := r.formatDescriptionBadge(task.Description, true)
 	estimate := r.formatEstimateBadge(task.EstimateMinutes, true)
@@ -240,17 +268,17 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 		selectedStyle.Render("] ")
 
 	if r.width <= 0 {
-		return prefixPart + iconStyled + r.highlightLine(task.Title, priorityStyle) + suffix
+		return prefixPart + leading + r.highlightLine(task.Title, priorityStyle) + suffix
 	}
 
 	overhead := ansi.StringWidth(prefix + "[" + statusText + "] ")
-	return r.wrapSelectedContentWithSuffix(task.Title, prefixPart, iconStyled, iconWidth, overhead, priorityStyle, suffix, suffixText)
+	return r.wrapSelectedContentWithSuffix(task.Title, prefixPart, leading, leadingWidth, overhead, priorityStyle, suffix, suffixText)
 }
 
-func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, iconStyled string, iconWidth int, titleStyle lipgloss.Style, suffix, suffixText string) string {
+func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, leading string, leadingWidth int, titleStyle lipgloss.Style, suffix, suffixText string) string {
 	overhead := ansi.StringWidth(prefixPart)
 	suffixWidth := ansi.StringWidth(suffixText)
-	available := safeWidth(r.width, overhead+iconWidth+suffixWidth)
+	available := safeWidth(r.width, overhead+leadingWidth+suffixWidth)
 	wrapped := ansi.Wrap(title, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
@@ -261,7 +289,7 @@ func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, iconStyl
 		styledLine := r.highlightLine(line, titleStyle)
 		var rendered string
 		if i == 0 {
-			rendered = prefixPart + iconStyled + styledLine
+			rendered = prefixPart + leading + styledLine
 		} else {
 			rendered = indent + styledLine
 		}
@@ -273,9 +301,9 @@ func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, iconStyl
 	return strings.Join(result, "\n")
 }
 
-func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart, iconStyled string, iconWidth, overhead int, titleStyle lipgloss.Style, suffix, suffixText string) string {
+func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart, leading string, leadingWidth, overhead int, titleStyle lipgloss.Style, suffix, suffixText string) string {
 	suffixWidth := ansi.StringWidth(suffixText)
-	available := safeWidth(r.width, overhead+iconWidth+suffixWidth)
+	available := safeWidth(r.width, overhead+leadingWidth+suffixWidth)
 	wrapped := ansi.Wrap(title, available, "")
 	wrapLines := strings.Split(wrapped, "\n")
 	indent := strings.Repeat(" ", overhead)
@@ -287,7 +315,7 @@ func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart, icon
 		styledTitle := r.highlightLine(line, titleStyle)
 		var rendered string
 		if i == 0 {
-			rendered = prefixPart + iconStyled + styledTitle
+			rendered = prefixPart + leading + styledTitle
 		} else {
 			styledIndent := selectedStyle.Render(indent)
 			rendered = styledIndent + styledTitle

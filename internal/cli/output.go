@@ -152,6 +152,8 @@ type TaskListItem struct {
 	Priority        string `json:"priority,omitempty"`
 	Category        string `json:"category"`
 	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
+	TagColor        string `json:"tag_color,omitempty"`
+	TagLabel        string `json:"tag_label,omitempty"`
 }
 
 type TasksOutput struct {
@@ -205,6 +207,8 @@ type TaskDetail struct {
 	Priority        string `json:"priority,omitempty"`
 	Category        string `json:"category"`
 	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
+	TagColor        string `json:"tag_color,omitempty"`
+	TagLabel        string `json:"tag_label,omitempty"`
 	CreatedAt       string `json:"created_at"`
 	UpdatedAt       string `json:"updated_at"`
 	CompletionDate  string `json:"completion_date,omitempty"`
@@ -218,6 +222,8 @@ func writeTaskDetail(w io.Writer, task domain.Task, categoryName string) error {
 		Priority:        task.Priority,
 		Category:        categoryName,
 		EstimateMinutes: task.EstimateMinutes,
+		TagColor:        task.TagColor,
+		TagLabel:        task.TagLabel,
 		CreatedAt:       task.CreatedAt,
 		UpdatedAt:       task.UpdatedAt,
 		CompletionDate:  task.CompletionDate,
@@ -234,6 +240,13 @@ func writeTaskDetail(w io.Writer, task domain.Task, categoryName string) error {
 	fmt.Fprintf(w, "Status:   %s\n", detail.Status)
 	if detail.Priority != "" {
 		fmt.Fprintf(w, "Priority: %s\n", detail.Priority)
+	}
+	if detail.TagColor != "" {
+		tag := detail.TagColor
+		if detail.TagLabel != "" {
+			tag += " (" + detail.TagLabel + ")"
+		}
+		fmt.Fprintf(w, "Tag:      %s\n", tag)
 	}
 	if detail.EstimateMinutes > 0 {
 		fmt.Fprintf(w, "Estimate: %s\n", formatDuration(detail.EstimateMinutes))

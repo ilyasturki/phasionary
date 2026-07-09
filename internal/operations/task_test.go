@@ -122,3 +122,46 @@ func TestCreateTask_NegativeEstimateRejected(t *testing.T) {
 		t.Fatalf("negative-estimate create left %d tasks behind, want 0", n)
 	}
 }
+
+func TestCreateTask_AppliesTag(t *testing.T) {
+	p := projectWithCategory("c1")
+
+	got, err := operations.CreateTask(p, "c1", operations.TaskFields{
+		Title:    "Tagged",
+		TagColor: domain.TagCyan,
+		TagLabel: "backend",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask returned error: %v", err)
+	}
+	if got.TagColor != domain.TagCyan || got.TagLabel != "backend" {
+		t.Fatalf("tag not applied: color=%q label=%q", got.TagColor, got.TagLabel)
+	}
+}
+
+func TestCreateTask_LabelWithoutColorGetsDefault(t *testing.T) {
+	p := projectWithCategory("c1")
+
+	got, err := operations.CreateTask(p, "c1", operations.TaskFields{
+		Title:    "Tagged",
+		TagLabel: "urgent",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask returned error: %v", err)
+	}
+	if got.TagColor != domain.TagGreen || got.TagLabel != "urgent" {
+		t.Fatalf("label without color should default to green: color=%q label=%q", got.TagColor, got.TagLabel)
+	}
+}
+
+func TestCreateTask_InvalidTagColorRejected(t *testing.T) {
+	p := projectWithCategory("c1")
+
+	_, err := operations.CreateTask(p, "c1", operations.TaskFields{Title: "x", TagColor: "puce"})
+	if err == nil {
+		t.Fatal("expected error for invalid tag color, got nil")
+	}
+	if n := len(p.Categories[0].Tasks); n != 0 {
+		t.Fatalf("invalid create left %d tasks behind, want 0", n)
+	}
+}

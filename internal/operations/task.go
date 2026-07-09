@@ -15,6 +15,8 @@ type TaskFields struct {
 	Priority    string
 	Estimate    int
 	Description string
+	TagColor    string
+	TagLabel    string
 }
 
 // CreateTask builds a task from f and appends it to the category identified by
@@ -50,6 +52,12 @@ func CreateTask(p *domain.Project, categoryID string, f TaskFields) (domain.Task
 	}
 	task.SetEstimate(f.Estimate)
 	task.Description = f.Description
+	if f.TagColor != "" || f.TagLabel != "" {
+		if err := task.SetTagColor(f.TagColor); err != nil {
+			return domain.Task{}, err
+		}
+		task.SetTagLabel(f.TagLabel)
+	}
 
 	p.Categories[idx].AddTask(task)
 	return task, nil

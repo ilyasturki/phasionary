@@ -21,6 +21,10 @@ var filterPriorities = []string{
 	"",
 }
 
+// filterTagColors lists the tag filter rows: the palette followed by a trailing
+// "" "untagged" bucket, which matches tasks that carry no tag color.
+var filterTagColors = append(append([]string{}, domain.TagColorCycle...), "")
+
 type FilterView int
 
 const (
@@ -28,16 +32,18 @@ const (
 	FilterViewStatus
 	FilterViewPriority
 	FilterViewCategory
+	FilterViewTag
 )
 
 const (
 	FilterHubStatus int = iota
 	FilterHubPriority
 	FilterHubCategory
+	FilterHubTag
 	FilterHubClearAll
 )
 
-const filterHubCount = 4
+const filterHubCount = 5
 
 type FilterState struct {
 	view             FilterView
@@ -45,9 +51,11 @@ type FilterState struct {
 	statusSelected   int
 	prioritySelected int
 	categorySelected int
+	tagSelected      int
 	statuses         map[string]bool
 	priorities       map[string]bool
 	categories       map[string]bool
+	tags             map[string]bool
 }
 
 func NewFilterState() FilterState {
@@ -56,6 +64,7 @@ func NewFilterState() FilterState {
 		statuses:   make(map[string]bool),
 		priorities: make(map[string]bool),
 		categories: make(map[string]bool),
+		tags:       make(map[string]bool),
 	}
 }
 
@@ -83,6 +92,8 @@ func (f *FilterState) Selected() int {
 		return f.prioritySelected
 	case FilterViewCategory:
 		return f.categorySelected
+	case FilterViewTag:
+		return f.tagSelected
 	default:
 		return f.hubSelected
 	}
@@ -106,6 +117,10 @@ func (f *FilterState) MoveUp() {
 		if f.categorySelected > 0 {
 			f.categorySelected--
 		}
+	case FilterViewTag:
+		if f.tagSelected > 0 {
+			f.tagSelected--
+		}
 	}
 }
 
@@ -127,6 +142,10 @@ func (f *FilterState) MoveDown(catCount int) {
 		if catCount > 0 && f.categorySelected < catCount-1 {
 			f.categorySelected++
 		}
+	case FilterViewTag:
+		if f.tagSelected < len(filterTagColors)-1 {
+			f.tagSelected++
+		}
 	}
 }
 
@@ -144,6 +163,10 @@ func (f *FilterState) ToggleSelected(categories []domain.Category) {
 		if f.categorySelected >= 0 && f.categorySelected < len(categories) {
 			toggleSetMember(f.categories, categories[f.categorySelected].ID)
 		}
+	case FilterViewTag:
+		if f.tagSelected >= 0 && f.tagSelected < len(filterTagColors) {
+			toggleSetMember(f.tags, filterTagColors[f.tagSelected])
+		}
 	}
 }
 
@@ -158,13 +181,15 @@ func toggleSetMember(set map[string]bool, key string) {
 func (f *FilterState) IsStatusEnabled(status string) bool       { return f.statuses[status] }
 func (f *FilterState) IsPriorityEnabled(priority string) bool   { return f.priorities[priority] }
 func (f *FilterState) IsCategoryEnabled(categoryID string) bool { return f.categories[categoryID] }
+func (f *FilterState) IsTagEnabled(color string) bool           { return f.tags[color] }
 
 func (f *FilterState) StatusCount() int   { return len(f.statuses) }
 func (f *FilterState) PriorityCount() int { return len(f.priorities) }
 func (f *FilterState) CategoryCount() int { return len(f.categories) }
+func (f *FilterState) TagCount() int      { return len(f.tags) }
 
 func (f *FilterState) HasActiveFilter() bool {
-	return len(f.statuses) > 0 || len(f.priorities) > 0 || len(f.categories) > 0
+	return len(f.statuses) > 0 || len(f.priorities) > 0 || len(f.categories) > 0 || len(f.tags) > 0
 }
 
 func (f *FilterState) TaskVisible(task domain.Task, categoryID string) bool {
@@ -180,6 +205,11 @@ func (f *FilterState) TaskVisible(task domain.Task, categoryID string) bool {
 	if len(f.categories) > 0 && !f.categories[categoryID] {
 		return false
 	}
+	// The "untagged" row is keyed by "", which an untagged task's empty TagColor
+	// matches directly.
+	if len(f.tags) > 0 && !f.tags[task.TagColor] {
+		return false
+	}
 	return true
 }
 
@@ -187,9 +217,11 @@ func (f *FilterState) ClearAll() {
 	f.statuses = make(map[string]bool)
 	f.priorities = make(map[string]bool)
 	f.categories = make(map[string]bool)
+	f.tags = make(map[string]bool)
 	f.statusSelected = 0
 	f.prioritySelected = 0
 	f.categorySelected = 0
+	f.tagSelected = 0
 }
 
 type OptionsState struct {

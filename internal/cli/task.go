@@ -58,6 +58,8 @@ func newTasksCmd() *cobra.Command {
 							Priority:        task.Priority,
 							Category:        cat.Name,
 							EstimateMinutes: task.EstimateMinutes,
+							TagColor:        task.TagColor,
+							TagLabel:        task.TagLabel,
 						})
 					}
 				}

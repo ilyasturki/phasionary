@@ -15,6 +15,12 @@ var (
 	categoryHeaderRe = regexp.MustCompile(`^##\s+(.+)$`)
 	taskLineRe       = regexp.MustCompile(`^-\s+\[([ x\-~])\]\s+(.+)$`)
 	prioritySuffixRe = regexp.MustCompile(`\s+\((high|medium|low)\)\s*$`)
+	// A trailing " #label" carries the tag label as a single hashtag-style token,
+	// so a priority suffix after it still parses and only a title literally ending
+	// in " #word" is misread (the same lossy trade-off the priority suffix makes).
+	// The color is not represented in markdown, so an imported label re-acquires
+	// the default tag color.
+	tagLabelSuffixRe = regexp.MustCompile(`\s+#(\S+)\s*$`)
 	// A labeled separator is a level-3 heading (### label); a bare one is a
 	// thematic break (--- or longer). Neither collides with the project (#) or
 	// category (##) headers, which both require whitespace after their hashes.
@@ -66,6 +72,9 @@ func ExportCategoryMarkdown(cat domain.Category) string {
 		line := fmt.Sprintf("- [%s] %s", marker, task.Title)
 		if task.Priority != "" {
 			line += fmt.Sprintf(" (%s)", task.Priority)
+		}
+		if task.TagLabel != "" {
+			line += " #" + task.TagLabel
 		}
 		sb.WriteString(line)
 		sb.WriteByte('\n')
@@ -158,6 +167,13 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 			flushDescription()
 			marker := m[1]
 			title := strings.TrimSpace(m[2])
+			// The label sits at the very end of an exported line (after any
+			// priority suffix), so strip it first, then the priority.
+			var tagLabel string
+			if lm := tagLabelSuffixRe.FindStringSubmatch(title); lm != nil {
+				tagLabel = strings.TrimSpace(lm[1])
+				title = strings.TrimSpace(tagLabelSuffixRe.ReplaceAllString(title, ""))
+			}
 			var priority string
 			if pm := prioritySuffixRe.FindStringSubmatch(title); pm != nil {
 				priority = pm[1]
@@ -167,6 +183,7 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 				title:    title,
 				status:   markerToStatus(marker),
 				priority: priority,
+				tagLabel: tagLabel,
 			})
 			currentTask = &currentCategory.tasks[len(currentCategory.tasks)-1]
 			continue
@@ -236,6 +253,9 @@ func ImportMarkdown(r io.Reader, projectName string) (domain.Project, error) {
 					return domain.Project{}, err
 				}
 			}
+			if td.tagLabel != "" {
+				task.SetTagLabel(td.tagLabel)
+			}
 			task.Description = td.description
 			cat.Tasks = append(cat.Tasks, task)
 		}
@@ -256,4 +276,5 @@ type taskData struct {
 	priority    string
 	description string
 	kind        string
+	tagLabel    string
 }

@@ -222,6 +222,30 @@ func TestAPITaskCreateDefaultsStatusToTodo(t *testing.T) {
 	}
 }
 
+func TestAPITaskCreateWithTag(t *testing.T) {
+	srv, store := newTestServer(t, "")
+	p, _ := store.CreateProject("Test")
+	pid, cid := p.ID, p.Categories[0].ID
+
+	resp := do(t, srv, newJSONRequest(t, "POST",
+		"/api/v1/projects/"+pid+"/categories/"+cid+"/tasks",
+		map[string]any{
+			"title":     "Tagged task",
+			"tag_color": domain.TagCyan,
+			"tag_label": "backend",
+		}))
+	assertStatus(t, resp, http.StatusCreated)
+	var got domain.Task
+	decodeJSON(t, resp, &got)
+	if got.TagColor != domain.TagCyan || got.TagLabel != "backend" {
+		t.Fatalf("tag fields wrong: color=%q label=%q", got.TagColor, got.TagLabel)
+	}
+	stored := findTaskInStore(t, store, pid, got.ID)
+	if stored == nil || stored.TagColor != domain.TagCyan || stored.TagLabel != "backend" {
+		t.Fatalf("tag not persisted: %+v", stored)
+	}
+}
+
 func TestAPITaskCreateValidation(t *testing.T) {
 	srv, store := newTestServer(t, "")
 	p, _ := store.CreateProject("Test")
@@ -236,6 +260,7 @@ func TestAPITaskCreateValidation(t *testing.T) {
 		{"blank title", map[string]any{"title": "   "}},
 		{"invalid status", map[string]any{"title": "x", "status": "bogus"}},
 		{"invalid priority", map[string]any{"title": "x", "priority": "bogus"}},
+		{"invalid tag color", map[string]any{"title": "x", "tag_color": "puce"}},
 		{"negative estimate", map[string]any{"title": "x", "estimate_minutes": -5}},
 	}
 	for _, tc := range cases {

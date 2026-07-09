@@ -37,6 +37,15 @@ type VisualState struct {
 	AnchorTaskID     string
 }
 
+// TagClipboard holds a copied tag for the "tag painter": gt grabs the focused
+// task's tag, p (or p in visual mode) applies it elsewhere. Set distinguishes
+// "nothing copied yet" from a copied empty tag (which pastes as a clear).
+type TagClipboard struct {
+	Set   bool
+	Color string
+	Label string
+}
+
 type Screen struct {
 	Width              int
 	Height             int
@@ -53,25 +62,31 @@ type HelpState struct {
 }
 
 type UIState struct {
-	Selection         *selection.Manager
-	Modes             *modes.Machine
-	Screen            Screen
-	Edit              EditState
-	Picker            ProjectPickerState
-	ConfirmDelete     ConfirmDeleteState
-	Options           OptionsState
-	Filter            FilterState
-	Fold              FoldState
-	ExternalEdit      ExternalEditState
-	EstimatePicker    components.EstimatePickerState
-	URLPicker         components.URLPickerState
-	YankPicker        components.YankPickerState
-	Help              HelpState
-	Clipboard         ClipboardState
-	Visual            VisualState
-	DescriptionEdit   DescriptionEditState
-	History           HistoryState
-	Search            SearchState
+	Selection      *selection.Manager
+	Modes          *modes.Machine
+	Screen         Screen
+	Edit           EditState
+	Picker         ProjectPickerState
+	ConfirmDelete  ConfirmDeleteState
+	Options        OptionsState
+	Filter         FilterState
+	Fold           FoldState
+	ExternalEdit   ExternalEditState
+	EstimatePicker components.EstimatePickerState
+	URLPicker      components.URLPickerState
+	YankPicker     components.YankPickerState
+	Help           HelpState
+	Clipboard      ClipboardState
+	TagClip        TagClipboard
+	// TagCopiedLast records whether the most recent copy gesture was a tag copy
+	// (gt) rather than a task/category cut or copy. It routes the normal-mode `p`:
+	// true → paint the copied tag, false → paste the clipboard task/category.
+	TagCopiedLast   bool
+	Visual          VisualState
+	DescriptionEdit DescriptionEditState
+	TagEdit         TagEditState
+	History         HistoryState
+	Search          SearchState
 }
 
 type Dependencies struct {

@@ -18,6 +18,7 @@ const (
 	ModeDescriptionEdit
 	ModeYankPicker
 	ModeSearch
+	ModeTagEdit
 )
 
 type Action int
@@ -30,6 +31,7 @@ const (
 	ActionAddTask
 	ActionAddCategory
 	ActionChangePriority
+	ActionChangeTag
 	ActionChangeEstimate
 	ActionMoveItem
 	ActionCopy
@@ -129,6 +131,8 @@ func (m *Machine) canTransition(target Mode) bool {
 	case ModeYankPicker:
 		return target == ModeNormal
 	case ModeSearch:
+		return target == ModeNormal
+	case ModeTagEdit:
 		return target == ModeNormal
 	}
 	return false
@@ -254,4 +258,12 @@ func (m *Machine) IsSearch() bool {
 
 func (m *Machine) ToSearch() bool {
 	return m.TransitionTo(ModeSearch)
+}
+
+func (m *Machine) IsTagEdit() bool {
+	return m.current == ModeTagEdit
+}
+
+func (m *Machine) ToTagEdit() bool {
+	return m.TransitionTo(ModeTagEdit)
 }

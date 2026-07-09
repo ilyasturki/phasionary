@@ -77,6 +77,8 @@ type taskCreateRequest struct {
 	Priority        string `json:"priority"`
 	EstimateMinutes int    `json:"estimate_minutes"`
 	Description     string `json:"description"`
+	TagColor        string `json:"tag_color"`
+	TagLabel        string `json:"tag_label"`
 }
 
 func (s *Server) handleAPITaskCreate(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +100,8 @@ func (s *Server) handleAPITaskCreate(w http.ResponseWriter, r *http.Request) {
 		Priority:    req.Priority,
 		Estimate:    req.EstimateMinutes,
 		Description: strings.TrimRight(req.Description, "\n"),
+		TagColor:    req.TagColor,
+		TagLabel:    req.TagLabel,
 	}
 	if err := validateTaskFields(fields); err != nil {
 		writeJSONError(w, http.StatusBadRequest, err.Error())

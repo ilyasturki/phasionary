@@ -60,6 +60,7 @@ func (m model) taskInfoLines(catIdx, taskIdx int) []string {
 	lines = append(lines,
 		fmt.Sprintf("Status:   %s", formatStatusLabel(task.Status)),
 		fmt.Sprintf("Priority: %s", formatPriorityLabel(task.Priority)),
+		fmt.Sprintf("Tag:      %s", formatTagInfo(task)),
 		fmt.Sprintf("Estimate: %s", FormatEstimateLabel(task.EstimateMinutes)),
 		fmt.Sprintf("Category: %s", category.Name),
 		"",
@@ -175,6 +176,20 @@ func formatStatusLabel(status string) string {
 	default:
 		return status
 	}
+}
+
+// formatTagInfo renders a task's tag for the info modal: "None" when untagged,
+// otherwise a colored dot, the color name, and the label if present.
+func formatTagInfo(task domain.Task) string {
+	style, ok := ui.TagDotStyle(task.TagColor, false)
+	if !ok {
+		return "None"
+	}
+	s := style.Render(ui.TagDot) + " " + tagColorName(task.TagColor)
+	if task.TagLabel != "" {
+		s += " " + task.TagLabel
+	}
+	return s
 }
 
 func formatPriorityLabel(priority string) string {

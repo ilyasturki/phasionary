@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/atotto/clipboard"
 	tea "charm.land/bubbletea/v2"
+	"github.com/atotto/clipboard"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -248,6 +248,7 @@ func (m *model) stashVisualClipboard(selPositions []selection.Position, isCut bo
 	if len(selPositions) == 0 {
 		return
 	}
+	m.ui.TagCopiedLast = false
 	kind := selPositions[0].Kind
 	switch kind {
 	case selection.FocusTask:
@@ -621,6 +622,8 @@ func (m *model) pasteMultiTasks() {
 			CompletionDate:  src.CompletionDate,
 			EstimateMinutes: src.EstimateMinutes,
 			Description:     src.Description,
+			TagColor:        src.TagColor,
+			TagLabel:        src.TagLabel,
 		}
 		m.project.Categories[dstCatIndex].InsertTask(dstInsertIndex+i, newTask)
 		if i == 0 {
@@ -840,6 +843,14 @@ func (m model) handleVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "d":
 		m.visualDelete()
+		return m, nil
+	case "t":
+		m.visualCycleTag()
+		return m, nil
+	case "T":
+		return m, m.visualStartTagEdit()
+	case "p":
+		m.visualPasteTag()
 		return m, nil
 	}
 	return m, nil

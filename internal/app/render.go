@@ -212,13 +212,14 @@ func (m model) renderTaskDescription(task domain.Task, selected bool, width int,
 // so the description's blockquote bar can sit flush with the title.
 func taskTitleColumn(task domain.Task, statusDisplay string) int {
 	prefix := "  "
+	dotText := ui.TagSegmentText(task.TagColor, task.TagLabel)
 	priorityIcon := ui.PriorityIcon(task.Priority)
 	iconText := ""
 	if priorityIcon != "" {
 		iconText = priorityIcon + " "
 	}
 	statusText := statusLabel(task.Status, statusDisplay)
-	return ansi.StringWidth(prefix + "[" + statusText + "] " + iconText)
+	return ansi.StringWidth(prefix + "[" + statusText + "] " + dotText + iconText)
 }
 
 func statusLabel(status, displayMode string) string {
@@ -282,8 +283,14 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		iconPrefix = iconStyle.Render(icon) + " "
 		iconPlain = icon + " "
 	}
-	prefixPart := fmt.Sprintf("%s[%s] %s", prefix, statusText, iconPrefix)
-	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, cfg.StatusDisplay) + "] " + iconPlain)
+	dotPrefix := ""
+	dotPlain := ui.TagSegmentText(task.TagColor, task.TagLabel)
+	if dotPlain != "" {
+		dotStyle, _ := ui.TagDotStyle(task.TagColor, task.Status == domain.StatusCompleted || task.Status == domain.StatusCancelled)
+		dotPrefix = dotStyle.Render(dotPlain)
+	}
+	prefixPart := fmt.Sprintf("%s[%s] %s%s", prefix, statusText, dotPrefix, iconPrefix)
+	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, cfg.StatusDisplay) + "] " + dotPlain + iconPlain)
 	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
 	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
 		placeholder := ui.MutedStyle.Render("Enter task title...")

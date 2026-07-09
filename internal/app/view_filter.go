@@ -21,6 +21,8 @@ func (m model) filterView() string {
 		return m.filterPriorityView()
 	case FilterViewCategory:
 		return m.filterCategoryView()
+	case FilterViewTag:
+		return m.filterTagView()
 	default:
 		return m.filterHubView()
 	}
@@ -34,6 +36,7 @@ func (m model) filterHubView() string {
 		{"Status", m.ui.Filter.StatusCount()},
 		{"Priority", m.ui.Filter.PriorityCount()},
 		{"Category", m.ui.Filter.CategoryCount()},
+		{"Tag", m.ui.Filter.TagCount()},
 	}
 
 	lines := []string{ui.DialogTitleStyle.Render("Filter Tasks"), ""}
@@ -112,6 +115,29 @@ func (m model) filterCategoryView() string {
 	}
 	lines = append(lines, "", ui.RenderHints(filterSubHints))
 	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (m model) filterTagView() string {
+	lines := []string{ui.DialogTitleStyle.Render("Filter · Tag"), ""}
+	for i, color := range filterTagColors {
+		lines = append(lines, renderCheckboxLine(
+			formatTagFilterLabel(color),
+			m.ui.Filter.IsTagEnabled(color),
+			i == m.ui.Filter.Selected(),
+		))
+	}
+	lines = append(lines, "", ui.RenderHints(filterSubHints))
+	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+}
+
+// formatTagFilterLabel renders a tag filter row: a colored dot plus the color
+// name, or a plain "untagged" for the empty bucket.
+func formatTagFilterLabel(color string) string {
+	if color == "" {
+		return "untagged"
+	}
+	style, _ := ui.TagDotStyle(color, false)
+	return style.Render(ui.TagDot) + " " + tagColorName(color)
 }
 
 func renderCheckboxLine(label string, enabled, selected bool) string {

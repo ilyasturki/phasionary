@@ -23,7 +23,22 @@ const (
 	// within a category. Its Title holds the optional label; Status/Priority/etc.
 	// are unused. An absent/empty Kind is an ordinary task.
 	KindSeparator = "separator"
+
+	// Tag colors are stored as stable name strings (not ANSI numbers) so the
+	// on-disk value stays legible and survives any palette change. The renderer
+	// maps each name to a basic ANSI color that tracks the terminal theme. The
+	// four were picked to dodge the strongest existing collisions (red =
+	// high-priority/cancelled, yellow = todo/search/visual).
+	TagGreen   = "green"
+	TagBlue    = "blue"
+	TagMagenta = "magenta"
+	TagCyan    = "cyan"
 )
+
+// TagColorCycle is the canonical palette order `t` steps through and the single
+// source of truth the other tag-color lists derive from: NextTagColor walks it,
+// and the editor/filter build their rows by adding the "no tag" sentinel.
+var TagColorCycle = []string{TagGreen, TagBlue, TagMagenta, TagCyan}
 
 var DefaultCategories = []string{"Feature", "Fix", "Ergonomy", "Documentation", "Research"}
 
@@ -62,6 +77,8 @@ type Task struct {
 	EstimateMinutes int    `json:"estimate_minutes,omitempty"`
 	Description     string `json:"description,omitempty"`
 	Kind            string `json:"kind,omitempty"`
+	TagColor        string `json:"tag_color,omitempty"`
+	TagLabel        string `json:"tag_label,omitempty"`
 }
 
 // IsSeparator reports whether this task is a separator row rather than a real
@@ -277,6 +294,69 @@ func (t *Task) CyclePriority() bool {
 	t.Priority = next
 	t.UpdatedAt = NowTimestamp()
 	return true
+}
+
+func ValidateTagColor(color string) error {
+	switch color {
+	case "", TagGreen, TagBlue, TagMagenta, TagCyan:
+		return nil
+	default:
+		return errors.New("invalid tag color")
+	}
+}
+
+// NextTagColor returns the color that follows color in TagColorCycle, wrapping
+// from the last color back to "" (no tag). An empty color starts the cycle at
+// the first color; any unrecognized value resets to "" (no tag).
+func NextTagColor(color string) string {
+	if color == "" {
+		return TagColorCycle[0]
+	}
+	for i, c := range TagColorCycle {
+		if c == color && i+1 < len(TagColorCycle) {
+			return TagColorCycle[i+1]
+		}
+	}
+	return "" // last color, or any unrecognized value, wraps to no tag
+}
+
+// CycleTag advances the tag one step through the palette (…→cyan→none→green→…).
+// Cycling back to no tag also drops the label, since a label needs a colored dot
+// to attach to. Always reports a change.
+func (t *Task) CycleTag() bool {
+	next := NextTagColor(t.TagColor)
+	t.TagColor = next
+	if next == "" {
+		t.TagLabel = ""
+	}
+	t.UpdatedAt = NowTimestamp()
+	return true
+}
+
+// SetTagColor sets a validated palette color (or "" to clear the tag entirely).
+// Clearing the color also clears the label.
+func (t *Task) SetTagColor(color string) error {
+	if err := ValidateTagColor(color); err != nil {
+		return err
+	}
+	t.TagColor = color
+	if color == "" {
+		t.TagLabel = ""
+	}
+	t.UpdatedAt = NowTimestamp()
+	return nil
+}
+
+// SetTagLabel stores the trimmed label. Labeling an untagged task assigns the
+// first palette color so the label has a dot to ride on; clearing the label
+// keeps the existing color.
+func (t *Task) SetTagLabel(label string) {
+	label = strings.TrimSpace(label)
+	t.TagLabel = label
+	if label != "" && t.TagColor == "" {
+		t.TagColor = TagGreen
+	}
+	t.UpdatedAt = NowTimestamp()
 }
 
 func (t *Task) CycleStatusReverse() bool {

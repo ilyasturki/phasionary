@@ -102,6 +102,7 @@ func (m *model) deleteTask(position selection.Position) {
 	m.ui.Clipboard.Task = &taskCopy
 	m.ui.Clipboard.IsCut = false
 	m.ui.Clipboard.SourceID = ""
+	m.ui.TagCopiedLast = false
 
 	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
 	m.rebuildAndClamp()
@@ -414,6 +415,7 @@ func (m *model) cutSelectedTask() {
 	m.ui.Clipboard.Task = &taskCopy
 	m.ui.Clipboard.IsCut = true
 	m.ui.Clipboard.SourceID = task.ID
+	m.ui.TagCopiedLast = false
 
 	title := task.Title
 	if len([]rune(title)) > 30 {
@@ -451,6 +453,8 @@ func (m *model) pasteTask() {
 		CompletionDate:  m.ui.Clipboard.Task.CompletionDate,
 		EstimateMinutes: m.ui.Clipboard.Task.EstimateMinutes,
 		Description:     m.ui.Clipboard.Task.Description,
+		TagColor:        m.ui.Clipboard.Task.TagColor,
+		TagLabel:        m.ui.Clipboard.Task.TagLabel,
 	}
 
 	position, ok := m.selectedPosition()
@@ -527,4 +531,16 @@ func (m *model) findTaskByID(id string) (int, int) {
 		}
 	}
 	return -1, -1
+}
+
+// selectTaskByID moves the cursor onto the visible task row with the given ID.
+// Reports whether a match was found. Call after rebuildPositions to keep the
+// cursor on a task whose position may have shifted.
+func (m *model) selectTaskByID(id string) bool {
+	return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		if p.Kind != selection.FocusTask {
+			return false
+		}
+		return m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == id
+	})
 }

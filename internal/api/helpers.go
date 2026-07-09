@@ -43,6 +43,7 @@ var (
 	errTaskTitleRequired = errors.New("title is required")
 	errTaskBadStatus     = errors.New("invalid status")
 	errTaskBadPriority   = errors.New("invalid priority")
+	errTaskBadTagColor   = errors.New("invalid tag color")
 )
 
 // validateTaskFields checks the title and the enum-like status/priority fields.
@@ -57,6 +58,9 @@ func validateTaskFields(f operations.TaskFields) error {
 	}
 	if domain.ValidatePriority(f.Priority) != nil {
 		return errTaskBadPriority
+	}
+	if domain.ValidateTagColor(f.TagColor) != nil {
+		return errTaskBadTagColor
 	}
 	return nil
 }

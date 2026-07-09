@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/atotto/clipboard"
 	tea "charm.land/bubbletea/v2"
+	"github.com/atotto/clipboard"
 
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
@@ -114,6 +114,8 @@ func (m model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case modes.ModeDescriptionEdit:
 		return m.handleDescriptionEditKey(msg)
+	case modes.ModeTagEdit:
+		return m.handleTagEditKey(msg)
 	case modes.ModeExternalEdit:
 		return m, nil
 	default:
@@ -237,6 +239,8 @@ func (m *model) openFilterHubSelection() {
 		m.ui.Filter.SetView(FilterViewPriority)
 	case FilterHubCategory:
 		m.ui.Filter.SetView(FilterViewCategory)
+	case FilterHubTag:
+		m.ui.Filter.SetView(FilterViewTag)
 	case FilterHubClearAll:
 		if m.ui.Filter.HasActiveFilter() {
 			m.ui.Filter.ClearAll()
@@ -381,6 +385,7 @@ func (m *model) copySelected() tea.Cmd {
 			IsCut:    false,
 			SourceID: "",
 		}
+		m.ui.TagCopiedLast = false
 	case selection.FocusSeparator:
 		// Copy the label text to the system clipboard, but don't stash the
 		// separator as a paste-able item (it isn't part of the cut/paste model).
@@ -479,6 +484,8 @@ func (m model) renderView() string {
 		return modal.Render(content, m.yankPickerView())
 	case modes.ModeDescriptionEdit:
 		return modal.Render(content, m.descriptionEditView())
+	case modes.ModeTagEdit:
+		return modal.Render(content, m.tagEditView())
 	}
 	return content
 }

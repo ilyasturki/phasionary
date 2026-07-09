@@ -113,6 +113,74 @@ func priorityColor(priority string) (color.Color, bool) {
 	}
 }
 
+// tagColor maps a stored tag color name to a basic ANSI color. Like the
+// priority palette these are 0–6 so the terminal keeps them legible on both
+// light and dark themes (ANSI 16–255 and hex do not track the theme).
+func tagColor(name string) (color.Color, bool) {
+	switch name {
+	case "green":
+		return lipgloss.Color("2"), true
+	case "blue":
+		return lipgloss.Color("4"), true
+	case "magenta":
+		return lipgloss.Color("5"), true
+	case "cyan":
+		return lipgloss.Color("6"), true
+	default:
+		return nil, false
+	}
+}
+
+// TagDot is the glyph drawn before a tagged task's title.
+const TagDot = "●"
+
+// TagDotVisible reports whether name is a renderable tag color — i.e. whether a
+// dot should be drawn (and its column reserved) at all.
+func TagDotVisible(name string) bool {
+	_, ok := tagColor(name)
+	return ok
+}
+
+// TagDotStyle returns the style for the tag dot and whether it renders. faint
+// mirrors the priority icon's completed/cancelled dimming.
+func TagDotStyle(name string, faint bool) (lipgloss.Style, bool) {
+	c, ok := tagColor(name)
+	if !ok {
+		return lipgloss.NewStyle(), false
+	}
+	s := lipgloss.NewStyle().Foreground(c)
+	if faint {
+		s = s.Faint(true)
+	}
+	return s, true
+}
+
+// TagBlockStyle returns the style for a tag rendered as a filled color block on
+// a highlighted row: Reverse turns the tag color into the cell background so the
+// tag reads as part of the reversed selection bar instead of a clashing
+// foreground island. Reverse-based so it tracks the terminal theme like the rest
+// of the selection.
+func TagBlockStyle(name string) (lipgloss.Style, bool) {
+	c, ok := tagColor(name)
+	if !ok {
+		return lipgloss.NewStyle(), false
+	}
+	return lipgloss.NewStyle().Foreground(c).Reverse(true), true
+}
+
+// TagSegmentText is the plain leading tag text drawn before a task title: the
+// dot, an optional label, and a trailing space — or "" when untagged. Both the
+// renderer and the layout/column math call this so the two never drift.
+func TagSegmentText(name, label string) string {
+	if !TagDotVisible(name) {
+		return ""
+	}
+	if label != "" {
+		return TagDot + " " + label + " "
+	}
+	return TagDot + " "
+}
+
 // PriorityStyle returns the text style for a task title with the given
 // priority. Color is applied only when colorMode is "full" (or empty, which
 // is treated as the default "full").

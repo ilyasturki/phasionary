@@ -412,3 +412,88 @@ func TestTask_SetPriority(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestTask_CycleTag(t *testing.T) {
+	t.Run("walks the palette then back to none", func(t *testing.T) {
+		task := Task{}
+		want := []string{TagGreen, TagBlue, TagMagenta, TagCyan, ""}
+		for _, expected := range want {
+			task.CycleTag()
+			assert.Equal(t, expected, task.TagColor)
+		}
+	})
+
+	t.Run("cycling to none clears the label", func(t *testing.T) {
+		task := Task{TagColor: TagCyan, TagLabel: "urgent"}
+		task.CycleTag()
+		assert.Equal(t, "", task.TagColor)
+		assert.Equal(t, "", task.TagLabel)
+	})
+
+	t.Run("stamps UpdatedAt", func(t *testing.T) {
+		task := Task{}
+		task.CycleTag()
+		assert.NotEmpty(t, task.UpdatedAt)
+	})
+}
+
+func TestNextTagColor(t *testing.T) {
+	assert.Equal(t, TagGreen, NextTagColor(""))
+	assert.Equal(t, TagBlue, NextTagColor(TagGreen))
+	assert.Equal(t, TagMagenta, NextTagColor(TagBlue))
+	assert.Equal(t, TagCyan, NextTagColor(TagMagenta))
+	assert.Equal(t, "", NextTagColor(TagCyan))
+	assert.Equal(t, "", NextTagColor("bogus"))
+}
+
+func TestValidateTagColor(t *testing.T) {
+	for _, c := range []string{"", TagGreen, TagBlue, TagMagenta, TagCyan} {
+		assert.NoError(t, ValidateTagColor(c))
+	}
+	assert.Error(t, ValidateTagColor("red"))
+	assert.Error(t, ValidateTagColor("2"))
+}
+
+func TestTask_SetTagColor(t *testing.T) {
+	t.Run("sets a valid color", func(t *testing.T) {
+		task := Task{}
+		require.NoError(t, task.SetTagColor(TagBlue))
+		assert.Equal(t, TagBlue, task.TagColor)
+		assert.NotEmpty(t, task.UpdatedAt)
+	})
+
+	t.Run("clearing the color drops the label", func(t *testing.T) {
+		task := Task{TagColor: TagBlue, TagLabel: "api"}
+		require.NoError(t, task.SetTagColor(""))
+		assert.Equal(t, "", task.TagColor)
+		assert.Equal(t, "", task.TagLabel)
+	})
+
+	t.Run("rejects an invalid color", func(t *testing.T) {
+		task := Task{}
+		assert.Error(t, task.SetTagColor("chartreuse"))
+	})
+}
+
+func TestTask_SetTagLabel(t *testing.T) {
+	t.Run("labeling an untagged task assigns the first color", func(t *testing.T) {
+		task := Task{}
+		task.SetTagLabel("  urgent  ")
+		assert.Equal(t, "urgent", task.TagLabel)
+		assert.Equal(t, TagGreen, task.TagColor)
+	})
+
+	t.Run("keeps an existing color", func(t *testing.T) {
+		task := Task{TagColor: TagCyan}
+		task.SetTagLabel("backend")
+		assert.Equal(t, "backend", task.TagLabel)
+		assert.Equal(t, TagCyan, task.TagColor)
+	})
+
+	t.Run("clearing the label keeps the color", func(t *testing.T) {
+		task := Task{TagColor: TagCyan, TagLabel: "backend"}
+		task.SetTagLabel("")
+		assert.Equal(t, "", task.TagLabel)
+		assert.Equal(t, TagCyan, task.TagColor)
+	})
+}
