@@ -1,0 +1,70 @@
+package app
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"phasionary/internal/app/selection"
+	"phasionary/internal/domain"
+)
+
+// copyProject has a task carrying a description so the FocusDescription row is
+// meaningful to copy from.
+func copyProject() domain.Project {
+	return domain.Project{
+		ID:   "p1",
+		Name: "My Project",
+		Categories: []domain.Category{{
+			ID:   "c1",
+			Name: "Cat A",
+			Tasks: []domain.Task{
+				{ID: "t1", Title: "Alpha", Description: "the body of alpha", Status: domain.StatusTodo},
+				{ID: "sep", Title: "— divider —", Status: domain.StatusTodo, Kind: domain.KindSeparator},
+			},
+		}},
+	}
+}
+
+func TestCopyTextForPosition(t *testing.T) {
+	m := newTestModel(t, copyProject())
+
+	cases := []struct {
+		name string
+		pos  selection.Position
+		want string
+	}{
+		{"project", selection.Position{Kind: selection.FocusProject}, "My Project"},
+		{"category", selection.Position{Kind: selection.FocusCategory, CategoryIndex: 0}, "Cat A"},
+		{"task", selection.Position{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0}, "Alpha"},
+		{"description", selection.Position{Kind: selection.FocusDescription, CategoryIndex: 0, TaskIndex: 0}, "the body of alpha"},
+		{"separator", selection.Position{Kind: selection.FocusSeparator, CategoryIndex: 0, TaskIndex: 1}, "— divider —"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, m.copyTextForPosition(tc.pos))
+		})
+	}
+}
+
+// Regression: pressing `y` while focused on a description row must copy the
+// description body, not an empty string.
+func TestCopySelected_CopiesDescriptionBody(t *testing.T) {
+	m := newTestModel(t, copyProject())
+	// Description rows only exist as navigable positions when expanded.
+	m.ui.Screen.ExpandDescriptions = true
+	m.rebuildPositions()
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		return p.Kind == selection.FocusDescription && p.CategoryIndex == 0 && p.TaskIndex == 0
+	})
+
+	pos, ok := m.selectedPosition()
+	if !ok || pos.Kind != selection.FocusDescription {
+		t.Fatalf("expected a focused description row, got %+v ok=%v", pos, ok)
+	}
+	assert.Equal(t, "the body of alpha", m.copyTextForPosition(pos))
+
+	// A description copy is text-only: it must not stash a paste-able task.
+	m.copySelected()
+	assert.Nil(t, m.ui.Clipboard.Task)
+}

@@ -84,11 +84,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ui.Screen.WindowFocused = true
 	case tea.BlurMsg:
 		m.ui.Screen.WindowFocused = false
-	case tea.MouseWheelMsg:
-		if m.ui.Modes.Current() == modes.ModeNormal {
-			m.handleMouseWheel(msg)
-		}
-		return m, nil
 	case saveErrMsg:
 		if msg.err != nil {
 			m.ui.Screen.StatusMsg = "Save failed: " + msg.err.Error()
@@ -101,15 +96,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.forwardToInput(msg)
 	}
 	return m, nil
-}
-
-func (m *model) handleMouseWheel(msg tea.MouseWheelMsg) {
-	switch msg.Button {
-	case tea.MouseWheelUp:
-		m.scrollUp(wheelScrollStep)
-	case tea.MouseWheelDown:
-		m.scrollDown(wheelScrollStep)
-	}
 }
 
 // normalizeKey rewrites Shift+Backspace to a plain Backspace so it deletes a
@@ -473,32 +459,40 @@ func (m model) handleNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// copyTextForPosition returns the plain text that `y` copies for the item at
+// pos: the name for a project/category, the title for a task or separator, and
+// the body for a description row. Empty when there is nothing to copy.
+func (m *model) copyTextForPosition(pos selection.Position) string {
+	switch pos.Kind {
+	case selection.FocusProject:
+		return m.project.Name
+	case selection.FocusCategory:
+		return m.project.Categories[pos.CategoryIndex].Name
+	case selection.FocusTask, selection.FocusSeparator:
+		return m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
+	case selection.FocusDescription:
+		return m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Description
+	}
+	return ""
+}
+
 func (m *model) copySelected() tea.Cmd {
 	pos, ok := m.selectedPosition()
 	if !ok {
 		return nil
 	}
-	var text string
-	switch pos.Kind {
-	case selection.FocusProject:
-		text = m.project.Name
-	case selection.FocusCategory:
-		text = m.project.Categories[pos.CategoryIndex].Name
-	case selection.FocusTask:
-		task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
-		text = task.Title
-		taskCopy := task
+	// A task copy also stashes the whole task for paste; other kinds (category,
+	// description, separator) only put text on the system clipboard.
+	if pos.Kind == selection.FocusTask {
+		taskCopy := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
 		m.ui.Clipboard = ClipboardState{
 			Task:     &taskCopy,
 			IsCut:    false,
 			SourceID: "",
 		}
 		m.ui.TagCopiedLast = false
-	case selection.FocusSeparator:
-		// Copy the label text to the system clipboard, but don't stash the
-		// separator as a paste-able item (it isn't part of the cut/paste model).
-		text = m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
 	}
+	text := m.copyTextForPosition(pos)
 	return func() tea.Msg {
 		return clipboardResultMsg{err: clipboard.WriteAll(text)}
 	}
@@ -518,7 +512,10 @@ func (m *model) copyCategoryContent() tea.Cmd {
 func (m model) View() tea.View {
 	v := tea.NewView(m.renderView())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
+	// Leave mouse tracking off so the terminal keeps native click-drag text
+	// selection. On the alt screen most terminals translate the mouse wheel
+	// into ↑/↓ key presses (alternate scroll mode), which move the selection.
+	v.MouseMode = tea.MouseModeNone
 	v.ReportFocus = true
 	return v
 }
