@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -48,6 +49,49 @@ func TestDescriptionEdit_GutterMarkerFollowsCursor(t *testing.T) {
 	require.Equal(t, 1, descriptionMarkerRow(t, m))
 	_, _ = m.handleDescriptionEditKey(tea.KeyPressMsg{Code: tea.KeyUp})
 	require.Equal(t, 0, descriptionMarkerRow(t, m))
+}
+
+func TestHandleMouseWheel_ScrollsDescriptionEditor(t *testing.T) {
+	// A description taller than the editor viewport must scroll with the wheel.
+	p := sampleProject()
+	var b strings.Builder
+	for i := 0; i < 30; i++ {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		fmt.Fprintf(&b, "line%02d", i)
+	}
+	p.Categories[0].Tasks[0].Description = b.String()
+	m := newTestModel(t, p)
+	m.ui.Screen.Width = 60
+	m.ui.Screen.Height = 24
+	_ = m.startDescriptionInlineEdit(0, 0)
+	// Render once so the textarea's viewport learns its content height, exactly
+	// as the app's render loop does before any wheel event arrives.
+	_ = m.ui.DescriptionEdit.textarea.View()
+
+	// Cursor opens at the end (last line). One wheel-down is a no-op on the
+	// cursor but forces the view to settle at the bottom, giving us a baseline.
+	require.Equal(t, 29, m.ui.DescriptionEdit.textarea.Line())
+	_, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	require.Equal(t, 29, m.ui.DescriptionEdit.textarea.Line())
+	bottomOffset := m.ui.DescriptionEdit.textarea.ScrollYOffset()
+	require.Positive(t, bottomOffset, "a description taller than the editor must scroll")
+
+	// Each wheel-up notch nudges the cursor up one line; enough of them scroll
+	// the viewport toward the top.
+	for i := 0; i < 20; i++ {
+		_, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	}
+	assert.Equal(t, 9, m.ui.DescriptionEdit.textarea.Line(), "wheel-up moves one line per notch")
+	assert.Less(t, m.ui.DescriptionEdit.textarea.ScrollYOffset(), bottomOffset, "view scrolled up")
+
+	// Wheeling back down returns to the bottom.
+	for i := 0; i < 20; i++ {
+		_, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	}
+	assert.Equal(t, 29, m.ui.DescriptionEdit.textarea.Line())
+	assert.Equal(t, bottomOffset, m.ui.DescriptionEdit.textarea.ScrollYOffset())
 }
 
 func TestStartDescriptionInlineEdit_EntersModeAndPrefillsTextarea(t *testing.T) {

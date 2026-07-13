@@ -84,6 +84,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ui.Screen.WindowFocused = true
 	case tea.BlurMsg:
 		m.ui.Screen.WindowFocused = false
+	case tea.MouseWheelMsg:
+		m.handleMouseWheel(msg)
+		return m, nil
 	case saveErrMsg:
 		if msg.err != nil {
 			m.ui.Screen.StatusMsg = "Save failed: " + msg.err.Error()
@@ -96,6 +99,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.forwardToInput(msg)
 	}
 	return m, nil
+}
+
+func (m *model) handleMouseWheel(msg tea.MouseWheelMsg) {
+	switch m.ui.Modes.Current() {
+	case modes.ModeNormal:
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			m.scrollUp(wheelScrollStep)
+		case tea.MouseWheelDown:
+			m.scrollDown(wheelScrollStep)
+		}
+	case modes.ModeDescriptionEdit:
+		// The textarea's view follows its cursor, so scrolling a long
+		// description means nudging the cursor a line at a time.
+		for i := 0; i < wheelScrollStep; i++ {
+			switch msg.Button {
+			case tea.MouseWheelUp:
+				m.ui.DescriptionEdit.textarea.CursorUp()
+			case tea.MouseWheelDown:
+				m.ui.DescriptionEdit.textarea.CursorDown()
+			}
+		}
+	}
 }
 
 // normalizeKey rewrites Shift+Backspace to a plain Backspace so it deletes a
@@ -512,10 +538,10 @@ func (m *model) copyCategoryContent() tea.Cmd {
 func (m model) View() tea.View {
 	v := tea.NewView(m.renderView())
 	v.AltScreen = true
-	// Leave mouse tracking off so the terminal keeps native click-drag text
-	// selection. On the alt screen most terminals translate the mouse wheel
-	// into ↑/↓ key presses (alternate scroll mode), which move the selection.
-	v.MouseMode = tea.MouseModeNone
+	// Mouse tracking is on so the wheel scrolls the viewport (see
+	// handleMouseWheel). This means the terminal forwards drags to the app, so
+	// selecting on-screen text is done with Shift+drag (the usual override).
+	v.MouseMode = tea.MouseModeCellMotion
 	v.ReportFocus = true
 	return v
 }

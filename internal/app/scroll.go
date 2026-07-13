@@ -1,6 +1,6 @@
 package app
 
-const wheelScrollStep = 3
+const wheelScrollStep = 1
 
 func (m *model) scrollUp(amount int) {
 	if m.ui.Screen.ScrollOffset <= 0 {
