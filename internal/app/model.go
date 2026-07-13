@@ -59,6 +59,11 @@ type Screen struct {
 	PendingKey         rune
 	WindowFocused      bool
 	ExpandDescriptions bool
+	// WheelAccum accumulates mouse-wheel events between scroll steps. Trackpads
+	// and hi-res wheels emit several events per physical notch, so we only move
+	// a line once wheelScrollDivisor events pile up (see wheelTick). Sign tracks
+	// direction; a reversal resets it.
+	WheelAccum int
 }
 
 type HelpState struct {

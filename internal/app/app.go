@@ -101,7 +101,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// wheelTick accumulates a raw wheel event and reports whether enough have piled
+// up (wheelScrollDivisor) to move a line, resetting the counter when it fires.
+// This smooths out trackpads and hi-res wheels that emit several events per
+// physical notch. A change of direction restarts the count.
+func (m *model) wheelTick(button tea.MouseButton) bool {
+	var dir int
+	switch button {
+	case tea.MouseWheelUp:
+		dir = -1
+	case tea.MouseWheelDown:
+		dir = 1
+	default:
+		return false
+	}
+	if (dir > 0) != (m.ui.Screen.WheelAccum > 0) {
+		m.ui.Screen.WheelAccum = 0
+	}
+	m.ui.Screen.WheelAccum += dir
+	if m.ui.Screen.WheelAccum <= -wheelScrollDivisor || m.ui.Screen.WheelAccum >= wheelScrollDivisor {
+		m.ui.Screen.WheelAccum = 0
+		return true
+	}
+	return false
+}
+
 func (m *model) handleMouseWheel(msg tea.MouseWheelMsg) {
+	if !m.wheelTick(msg.Button) {
+		return
+	}
 	switch m.ui.Modes.Current() {
 	case modes.ModeNormal:
 		switch msg.Button {

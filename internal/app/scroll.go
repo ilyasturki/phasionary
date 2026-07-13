@@ -1,6 +1,11 @@
 package app
 
+// wheelScrollStep is how many lines one emitted wheel tick scrolls.
 const wheelScrollStep = 1
+
+// wheelScrollDivisor slows scrolling by requiring this many raw wheel events per
+// emitted tick. Raise it to scroll slower, lower it (min 1) to scroll faster.
+const wheelScrollDivisor = 4
 
 func (m *model) scrollUp(amount int) {
 	if m.ui.Screen.ScrollOffset <= 0 {

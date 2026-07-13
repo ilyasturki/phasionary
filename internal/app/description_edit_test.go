@@ -70,28 +70,49 @@ func TestHandleMouseWheel_ScrollsDescriptionEditor(t *testing.T) {
 	// as the app's render loop does before any wheel event arrives.
 	_ = m.ui.DescriptionEdit.textarea.View()
 
-	// Cursor opens at the end (last line). One wheel-down is a no-op on the
-	// cursor but forces the view to settle at the bottom, giving us a baseline.
+	// wheel sends `lines` worth of wheel events in one direction. It takes
+	// wheelScrollDivisor raw events to move a single line.
+	wheel := func(button tea.MouseButton, lines int) {
+		for i := 0; i < lines*wheelScrollDivisor; i++ {
+			_, _ = m.Update(tea.MouseWheelMsg{Button: button})
+		}
+	}
+
+	// Cursor opens at the end (last line). One line of wheel-down is a no-op on
+	// the cursor but forces the view to settle at the bottom, giving a baseline.
 	require.Equal(t, 29, m.ui.DescriptionEdit.textarea.Line())
-	_, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	wheel(tea.MouseWheelDown, 1)
 	require.Equal(t, 29, m.ui.DescriptionEdit.textarea.Line())
 	bottomOffset := m.ui.DescriptionEdit.textarea.ScrollYOffset()
 	require.Positive(t, bottomOffset, "a description taller than the editor must scroll")
 
-	// Each wheel-up notch nudges the cursor up one line; enough of them scroll
-	// the viewport toward the top.
-	for i := 0; i < 20; i++ {
-		_, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
-	}
-	assert.Equal(t, 9, m.ui.DescriptionEdit.textarea.Line(), "wheel-up moves one line per notch")
+	// Twenty lines of wheel-up move the cursor up twenty lines and scroll the
+	// viewport toward the top.
+	wheel(tea.MouseWheelUp, 20)
+	assert.Equal(t, 9, m.ui.DescriptionEdit.textarea.Line(),
+		"wheel-up moves one line per wheelScrollDivisor events")
 	assert.Less(t, m.ui.DescriptionEdit.textarea.ScrollYOffset(), bottomOffset, "view scrolled up")
 
 	// Wheeling back down returns to the bottom.
-	for i := 0; i < 20; i++ {
-		_, _ = m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
-	}
+	wheel(tea.MouseWheelDown, 20)
 	assert.Equal(t, 29, m.ui.DescriptionEdit.textarea.Line())
 	assert.Equal(t, bottomOffset, m.ui.DescriptionEdit.textarea.ScrollYOffset())
+}
+
+func TestWheelTick_AccumulatesAndReversesDirection(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+
+	// It takes wheelScrollDivisor events to emit one tick.
+	for i := 0; i < wheelScrollDivisor-1; i++ {
+		assert.False(t, m.wheelTick(tea.MouseWheelDown), "event %d should still accumulate", i+1)
+	}
+	assert.True(t, m.wheelTick(tea.MouseWheelDown), "the wheelScrollDivisor-th event emits a tick")
+	assert.Equal(t, 0, m.ui.Screen.WheelAccum, "accumulator resets after a tick")
+
+	// Reversing direction discards the partial accumulation.
+	assert.False(t, m.wheelTick(tea.MouseWheelDown))
+	assert.False(t, m.wheelTick(tea.MouseWheelUp), "reversal restarts the count")
+	assert.Equal(t, -1, m.ui.Screen.WheelAccum)
 }
 
 func TestStartDescriptionInlineEdit_EntersModeAndPrefillsTextarea(t *testing.T) {
