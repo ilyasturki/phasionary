@@ -80,7 +80,8 @@
           "updated_at": "2026-05-23T16:37:34Z",
           "priority": "low",
           "completion_date": "2026-05-23T16:37:34Z",
-          "estimate_minutes": 30
+          "estimate_minutes": 30,
+          "description": "Dates rendered in the report footer used the locale default; pinned to ISO 8601."
         },
         {
           "id": "b6e8bd2d-e2f4-2219-4e20-0c141cba0d5b",

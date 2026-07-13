@@ -126,9 +126,11 @@ const descriptionBar = "▎ "
 
 // RenderDescription renders a task description as a standalone, focusable block
 // with a blockquote-style left bar. The bar sits at `indent` columns (aligned
-// with the title on the task row) and text follows after it. Italic + bar
-// distinguishes descriptions from completed-task rows (which use Faint).
-func (r *TaskLineRenderer) RenderDescription(description string, indent int, selected bool) string {
+// with the title on the task row) and text follows after it. The text mirrors
+// the title's color treatment (priority color, faint when completed/cancelled)
+// with italic on top so descriptions still read as a distinct element.
+func (r *TaskLineRenderer) RenderDescription(task domain.Task, indent int, selected bool) string {
+	description := task.Description
 	if description == "" {
 		return ""
 	}
@@ -142,7 +144,7 @@ func (r *TaskLineRenderer) RenderDescription(description string, indent int, sel
 		}
 	}
 
-	textStyle := ui.DescriptionStyle
+	textStyle := ui.TaskTitleStyle(task.Priority, task.Status, r.priorityColor).Italic(true)
 	barStyle := ui.DescriptionBarStyle
 	if r.cut {
 		textStyle = ui.ApplyCut(textStyle)

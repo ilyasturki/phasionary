@@ -51,10 +51,9 @@ var (
 	SearchMatchStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3"))
 	SearchCurrentMatchStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("3")).Bold(true).Underline(true)
 
-	// Description rendering uses italic text with a faint left bar glyph — a
-	// markdown-blockquote treatment that visually distinguishes descriptions
-	// from completed-task rows (which use Faint).
-	DescriptionStyle    = lipgloss.NewStyle().Italic(true)
+	// Description text mirrors its task title's color treatment (see
+	// TaskTitleStyle) with italic added; the faint left bar glyph gives it a
+	// markdown-blockquote look that keeps it distinct from the title row.
 	DescriptionBarStyle = lipgloss.NewStyle().Faint(true)
 
 	// Shortcut bar (lazygit-style footer): keys read brighter, labels read

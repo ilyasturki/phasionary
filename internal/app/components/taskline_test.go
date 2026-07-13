@@ -92,7 +92,7 @@ func TestTaskLineRenderer_Render(t *testing.T) {
 func TestTaskLineRenderer_RenderDescription(t *testing.T) {
 	t.Run("renders description with blockquote bar at given indent", func(t *testing.T) {
 		renderer := NewTaskLineRenderer(80, "text", "full", true)
-		result := renderer.RenderDescription("Some details about the task", 9, false)
+		result := renderer.RenderDescription(domain.Task{Description: "Some details about the task"}, 9, false)
 		assert.Contains(t, result, "Some details about the task")
 		// Each line should start with 9 spaces of indent + the bar glyph (after stripping styles).
 		for _, line := range strings.Split(result, "\n") {
@@ -103,12 +103,12 @@ func TestTaskLineRenderer_RenderDescription(t *testing.T) {
 
 	t.Run("empty description renders nothing", func(t *testing.T) {
 		renderer := NewTaskLineRenderer(80, "text", "full", true)
-		assert.Equal(t, "", renderer.RenderDescription("", 9, false))
+		assert.Equal(t, "", renderer.RenderDescription(domain.Task{}, 9, false))
 	})
 
 	t.Run("preserves paragraph breaks", func(t *testing.T) {
 		renderer := NewTaskLineRenderer(80, "text", "full", true)
-		result := renderer.RenderDescription("First paragraph\n\nSecond paragraph", 9, false)
+		result := renderer.RenderDescription(domain.Task{Description: "First paragraph\n\nSecond paragraph"}, 9, false)
 		assert.Contains(t, result, "First paragraph")
 		assert.Contains(t, result, "Second paragraph")
 		// first para + blank + second para = 3 lines

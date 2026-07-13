@@ -205,7 +205,7 @@ func (m model) renderTaskDescription(task domain.Task, selected bool, width int,
 		renderer = renderer.WithSearch(q, m.searchMatchStyle(selected))
 	}
 	indent := taskTitleColumn(task, cfg.StatusDisplay)
-	return renderer.RenderDescription(task.Description, indent, selected)
+	return renderer.RenderDescription(task, indent, selected)
 }
 
 // taskTitleColumn returns the column where the task title begins on its row,
