@@ -26,6 +26,16 @@ func (m *model) startDescriptionInlineEdit(catIdx, taskIdx int) tea.Cmd {
 	task := cat.Tasks[taskIdx]
 
 	ta := textarea.New()
+	// Add ctrl-based bindings alongside the widget's alt-based defaults so the
+	// description editor feels like a conventional text editor: ctrl+arrow jumps
+	// by word, ctrl+backspace/ctrl+delete removes a word. The existing alt/emacs
+	// bindings (alt+arrows, ctrl+w, ctrl+a/e, ctrl+k/u, ...) keep working.
+	km := ta.KeyMap
+	km.WordForward.SetKeys("alt+right", "alt+f", "ctrl+right")
+	km.WordBackward.SetKeys("alt+left", "alt+b", "ctrl+left")
+	km.DeleteWordForward.SetKeys("alt+delete", "alt+d", "ctrl+delete")
+	km.DeleteWordBackward.SetKeys("alt+backspace", "ctrl+w", "ctrl+backspace")
+	ta.KeyMap = km
 	// No current-line highlight: the block cursor alone marks the position.
 	// Instead a ">" gutter (via the prompt func below) points at the cursor's row.
 	styles := ta.Styles()

@@ -297,6 +297,14 @@ func (m *model) cancelEditing() {
 }
 
 func (m model) forwardToInput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.ui.Modes.IsDescriptionEdit() {
+		// Paste routing: ctrl+v issues the textarea's Paste command and terminals
+		// deliver bracketed paste as tea.PasteMsg — both arrive here (not as key
+		// presses), so the description textarea must see them or paste is a no-op.
+		var cmd tea.Cmd
+		m.ui.DescriptionEdit.textarea, cmd = m.ui.DescriptionEdit.textarea.Update(msg)
+		return m, cmd
+	}
 	if m.ui.Modes.IsEdit() {
 		var cmd tea.Cmd
 		m.ui.Edit.input, cmd = m.ui.Edit.input.Update(msg)

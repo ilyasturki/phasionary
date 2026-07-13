@@ -163,6 +163,36 @@ func TestHandleDescriptionEditKey_CtrlSSaves(t *testing.T) {
 	assert.Equal(t, "saved via ctrl+s", m.project.Categories[0].Tasks[0].Description)
 }
 
+func TestForwardToInput_DescriptionEdit_InsertsBracketedPaste(t *testing.T) {
+	// Bracketed paste from the terminal arrives as a tea.PasteMsg (not a key
+	// press), routed through forwardToInput. Description-edit mode must forward
+	// it to the textarea or paste silently does nothing (the reported bug).
+	m := newTestModel(t, sampleProject())
+	_ = m.startDescriptionInlineEdit(0, 0)
+	m.ui.DescriptionEdit.textarea.SetValue("start ")
+	m.ui.DescriptionEdit.textarea.CursorEnd()
+
+	_, _ = m.forwardToInput(tea.PasteMsg{Content: "pasted\ntext"})
+
+	assert.Equal(t, "start pasted\ntext", m.ui.DescriptionEdit.textarea.Value(),
+		"bracketed paste must be inserted at the cursor")
+}
+
+func TestDescriptionEdit_CtrlArrowWordNavAndDelete(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	_ = m.startDescriptionInlineEdit(0, 0)
+	m.ui.DescriptionEdit.textarea.SetValue("alpha beta gamma")
+	m.ui.DescriptionEdit.textarea.CursorEnd()
+
+	// ctrl+left steps back one word: cursor moves before "gamma".
+	_, _ = m.handleDescriptionEditKey(tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModCtrl})
+	// ctrl+backspace deletes the word now to the left of the cursor ("beta ").
+	_, _ = m.handleDescriptionEditKey(tea.KeyPressMsg{Code: tea.KeyBackspace, Mod: tea.ModCtrl})
+
+	assert.Equal(t, "alpha gamma", m.ui.DescriptionEdit.textarea.Value(),
+		"ctrl+left skips a word back, ctrl+backspace deletes the preceding word")
+}
+
 func TestEditOrFocusDescription_TaskWithoutDescription_EntersInlineEditMode(t *testing.T) {
 	// Regression guard for the v2 of this feature: pressing shift+enter on a
 	// task with no description used to open the external editor; it should
