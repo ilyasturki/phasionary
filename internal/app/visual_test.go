@@ -509,3 +509,151 @@ func TestVisualMode_CategoryAnchorSelectsOnlyCategories(t *testing.T) {
 		assert.Equal(t, selection.FocusCategory, p.Kind)
 	}
 }
+
+// newTestModelWithDescription builds a model on sampleProject with t1 carrying
+// an expanded description, so the position list is:
+// 0 project, 1 Cat A, 2 t1, 3 t1-description, 4 t2, 5 t3, 6 Cat B, 7 t4, 8 t5.
+func newTestModelWithDescription(t *testing.T) *model {
+	t.Helper()
+	p := sampleProject()
+	p.Categories[0].Tasks[0].Description = "alpha details"
+	m := newTestModel(t, p)
+	m.ui.Screen.ExpandDescriptions = true
+	m.rebuildPositions()
+	return m
+}
+
+func TestEnterVisualMode_FromDescriptionRow(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(3) // t1's description row
+	m.enterVisualMode()
+
+	assert.True(t, m.ui.Modes.IsVisual())
+	assert.Equal(t, selection.FocusTask, m.ui.Visual.Kind)
+	assert.Equal(t, "t1", m.ui.Visual.AnchorTaskID)
+	assert.True(t, m.ui.Visual.AnchorOnDescription)
+	// The anchor resolves to the description row, not the task row above it.
+	assert.Equal(t, 3, m.resolveVisualAnchor())
+}
+
+func TestVisualMoveCursor_LandsOnDescriptionRows(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1)
+
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusDescription, pos.Kind)
+	assert.True(t, m.isInVisualRange(3))
+}
+
+func TestVisualCopyTitles_IncludesSelectedDescriptionBody(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // t1, t1-description, t2
+
+	text := m.visualTitleText(m.visualSelectedPositions())
+	assert.Equal(t, "Alpha\nalpha details\nBeta", text)
+}
+
+func TestVisualCopyTitles_LoneDescriptionYieldsBodyOnly(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(3) // t1's description row
+	m.enterVisualMode()
+
+	text := m.visualTitleText(m.visualSelectedPositions())
+	assert.Equal(t, "alpha details", text)
+}
+
+func TestVisualChecklist_NestsDescriptionUnderItem(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t1's description
+
+	text := m.visualChecklistText(m.visualSelectedPositions())
+	assert.Equal(t, "- [ ] Alpha\n  alpha details", text)
+}
+
+func TestVisualDelete_RoundsUpOrphanDescription(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(3) // t1's description row, t1 itself stays above the range
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // extend down to t2
+	m.visualDelete()
+
+	// The orphan description pulls its parent in, without duplicates.
+	assert.Equal(t, []string{"t1", "t2"}, m.ui.ConfirmDelete.TaskIDs)
+	m.confirmDeleteVisualRange()
+
+	require.Len(t, m.project.Categories[0].Tasks, 1)
+	assert.Equal(t, "t3", m.project.Categories[0].Tasks[0].ID)
+	assert.Contains(t, m.ui.Screen.StatusMsg, "Deleted 2")
+}
+
+func TestVisualCut_DedupesTaskWithItsDescription(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t1's description
+	m.visualCut()
+
+	assert.Equal(t, []string{"t1"}, m.ui.Clipboard.TaskIDs)
+	assert.Len(t, m.ui.Clipboard.Tasks, 1)
+	assert.Contains(t, m.ui.Screen.StatusMsg, "1 task(s)")
+}
+
+func TestVisualCycleTag_AppliesOncePerTask(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t1's description
+	m.visualCycleTag()
+
+	// Task + its description row count as one task: the tag advances one step.
+	assert.Equal(t, domain.NextTagColor(""), m.project.Categories[0].Tasks[0].TagColor)
+}
+
+func TestVisualMoveDown_CursorFollowsDescriptionRow(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // cursor on t1's description
+	m.visualMoveDown()
+
+	// t2 hopped above the block.
+	assert.Equal(t, []string{"t2", "t1", "t3"}, taskIDs(m.project.Categories[0]))
+	// The cursor re-attaches to t1's description row at its new index.
+	pos, ok := m.selectedPosition()
+	require.True(t, ok)
+	assert.Equal(t, selection.FocusDescription, pos.Kind)
+	assert.Equal(t, 1, pos.TaskIndex)
+	// The range still covers t1 and its description.
+	assert.Len(t, m.visualSelectedPositions(), 2)
+}
+
+func TestVisualStatusText_CountsRoundedUpTasks(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(3) // t1's description row
+	m.enterVisualMode()
+
+	// A lone description row still selects its parent task for every op.
+	assert.Contains(t, m.statusText(), "1 task selected")
+
+	m.visualMoveCursor(-1) // pull in t1's own row: still one task
+	assert.Contains(t, m.statusText(), "1 task selected")
+}
+
+func TestVisualSwap_PreservesDescriptionAnchor(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // cursor on t1's description
+	m.visualSwap()
+
+	assert.True(t, m.ui.Visual.AnchorOnDescription)
+	assert.Equal(t, 3, m.resolveVisualAnchor())
+	assert.Equal(t, 2, m.ui.Selection.Selected())
+}

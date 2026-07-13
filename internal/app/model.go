@@ -40,6 +40,10 @@ type VisualState struct {
 	Kind             selection.FocusKind
 	AnchorCategoryID string
 	AnchorTaskID     string
+	// AnchorOnDescription pins the anchor to the task's description row rather
+	// than the task row itself — both carry the same task ID, so the ID pair
+	// alone cannot tell them apart when re-resolving the anchor.
+	AnchorOnDescription bool
 }
 
 // TagClipboard holds a copied tag for the "tag painter": gt grabs the focused

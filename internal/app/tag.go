@@ -312,10 +312,12 @@ func (m *model) applyTagClip(task *domain.Task) {
 
 // visualTaskPositions keeps only real task rows from a visual selection,
 // dropping any separators caught in the range so tag actions — which have no
-// meaning on a divider — apply to tasks alone.
+// meaning on a divider — apply to tasks alone. Description rows round up to
+// their parent task (deduped), so a task touched via both its row and its
+// description is tagged exactly once.
 func visualTaskPositions(positions []selection.Position) []selection.Position {
 	var out []selection.Position
-	for _, p := range positions {
+	for _, p := range visualRoundUpPositions(positions) {
 		if p.Kind == selection.FocusTask {
 			out = append(out, p)
 		}

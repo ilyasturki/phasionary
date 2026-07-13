@@ -12,22 +12,46 @@ import (
 )
 
 // visualTaskLevel reports whether kind is a row that belongs to the unified
-// task-level visual domain — a real task or a separator divider. Task-level
-// selections cover both, so a separator caught between two tasks (or chosen as
-// an endpoint) highlights, travels, and deletes with the block.
+// task-level visual domain — a real task, a separator divider, or an expanded
+// description row. Task-level selections cover all three, so any of them
+// caught in the range (or chosen as an endpoint) highlights and travels with
+// the block.
 func visualTaskLevel(kind selection.FocusKind) bool {
-	return kind == selection.FocusTask || kind == selection.FocusSeparator
+	return kind == selection.FocusTask || kind == selection.FocusSeparator || kind == selection.FocusDescription
 }
 
 // matchesVisualDomain reports whether a row of kind k belongs to the same
 // visual-selection domain as an anchor whose normalized kind is visualKind
 // (either FocusCategory or FocusTask). Category anchors select only category
-// rows; task-level anchors select the whole task+separator domain.
+// rows; task-level anchors select the whole task+separator+description domain.
 func matchesVisualDomain(k, visualKind selection.FocusKind) bool {
 	if visualKind == selection.FocusCategory {
 		return k == selection.FocusCategory
 	}
 	return visualTaskLevel(k)
+}
+
+// visualRoundUpPositions maps each description row in a visual selection to
+// its parent task and drops the duplicate that appears when a task and its
+// description are both in range — structural operations (delete, cut, move,
+// tags) act on whole tasks, so the pair counts once. A description whose
+// parent sits above the range still pulls that task in ("round up").
+// Separators pass through untouched.
+func visualRoundUpPositions(positions []selection.Position) []selection.Position {
+	out := make([]selection.Position, 0, len(positions))
+	seen := make(map[[2]int]struct{}, len(positions))
+	for _, p := range positions {
+		if p.Kind == selection.FocusDescription {
+			p.Kind = selection.FocusTask
+		}
+		key := [2]int{p.CategoryIndex, p.TaskIndex}
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, p)
+	}
+	return out
 }
 
 // countRealTasks returns how many of the positions are real tasks, ignoring any
@@ -58,8 +82,8 @@ func (m *model) enterVisualMode() {
 		return
 	}
 	pos, ok := m.selectedPosition()
-	if !ok || pos.Kind == selection.FocusProject || pos.Kind == selection.FocusDescription {
-		m.ui.Screen.StatusMsg = "Visual mode only works on tasks, separators, or categories"
+	if !ok || pos.Kind == selection.FocusProject {
+		m.ui.Screen.StatusMsg = "Visual mode doesn't work on the project row"
 		return
 	}
 	if !m.ui.Modes.ToVisual() {
@@ -79,6 +103,7 @@ func (m *model) enterVisualMode() {
 	}
 	if visualTaskLevel(pos.Kind) {
 		anchor.AnchorTaskID = cat.Tasks[pos.TaskIndex].ID
+		anchor.AnchorOnDescription = pos.Kind == selection.FocusDescription
 	}
 	m.ui.Visual = anchor
 }
@@ -113,11 +138,13 @@ func (m *model) visualSwap() {
 	cat := m.project.Categories[curPos.CategoryIndex]
 	m.ui.Visual.AnchorCategoryID = cat.ID
 	m.ui.Visual.AnchorTaskID = ""
+	m.ui.Visual.AnchorOnDescription = false
 	if visualTaskLevel(curPos.Kind) {
 		if curPos.TaskIndex < 0 || curPos.TaskIndex >= len(cat.Tasks) {
 			return
 		}
 		m.ui.Visual.AnchorTaskID = cat.Tasks[curPos.TaskIndex].ID
+		m.ui.Visual.AnchorOnDescription = curPos.Kind == selection.FocusDescription
 	}
 	m.ui.Selection.MoveTo(anchorIdx)
 	m.ensureVisible()
@@ -199,7 +226,12 @@ func (m model) resolveVisualAnchor() int {
 		if m.ui.Visual.Kind == selection.FocusCategory {
 			return i
 		}
-		// Task-level: match the anchor by its stable task/separator ID.
+		// Task-level: match the anchor by its stable task/separator ID. A task
+		// row and its description row share that ID, so the description flag
+		// disambiguates which of the two the anchor sits on.
+		if (p.Kind == selection.FocusDescription) != m.ui.Visual.AnchorOnDescription {
+			continue
+		}
 		if p.TaskIndex < 0 || p.TaskIndex >= len(cat.Tasks) {
 			continue
 		}
@@ -254,15 +286,19 @@ func (m *model) visualCopyTitles() tea.Cmd {
 	}
 }
 
-// visualTitleText joins the plain titles of the selection. Separators carry no
-// task content, so they are omitted from the copied text (the internal
-// clipboard still keeps them for a faithful paste).
+// visualTitleText joins the plain titles of the selection. The copied text
+// mirrors what is visibly selected: a description row in range contributes its
+// body after the title (or alone, if only the description is selected).
+// Separators carry no task content, so they are omitted from the copied text
+// (the internal clipboard still keeps them for a faithful paste).
 func (m model) visualTitleText(selPositions []selection.Position) string {
 	titles := make([]string, 0, len(selPositions))
 	for _, pos := range selPositions {
 		switch pos.Kind {
 		case selection.FocusTask:
 			titles = append(titles, m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title)
+		case selection.FocusDescription:
+			titles = append(titles, m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Description)
 		case selection.FocusCategory:
 			titles = append(titles, m.project.Categories[pos.CategoryIndex].Name)
 		}
@@ -285,7 +321,8 @@ func (m *model) visualCopyChecklist() tea.Cmd {
 }
 
 // visualChecklistText renders the selection as a markdown checklist. As with
-// visualTitleText, separators are omitted from the copied text.
+// visualTitleText, separators are omitted from the copied text, and a selected
+// description row nests its body under the parent's checklist item.
 func (m model) visualChecklistText(selPositions []selection.Position) string {
 	lines := make([]string, 0, len(selPositions))
 	for _, pos := range selPositions {
@@ -297,6 +334,11 @@ func (m model) visualChecklistText(selPositions []selection.Position) string {
 				mark = "x"
 			}
 			lines = append(lines, fmt.Sprintf("- [%s] %s", mark, task.Title))
+		case selection.FocusDescription:
+			desc := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Description
+			for _, l := range strings.Split(desc, "\n") {
+				lines = append(lines, "  "+l)
+			}
 		case selection.FocusCategory:
 			lines = append(lines, "## "+m.project.Categories[pos.CategoryIndex].Name)
 		}
@@ -321,7 +363,10 @@ func (m *model) stashVisualClipboard(selPositions []selection.Position, isCut bo
 		m.ui.Clipboard = ClipboardState{Categories: cats, CategoryIDs: ids, IsCut: isCut}
 	default:
 		// Task-level: stash the tasks and any interleaved separators so a paste
-		// reproduces the block, dividers and all.
+		// reproduces the block, dividers and all. Description rows round up to
+		// their parent task (deduped) — a task is stashed once even when both
+		// its row and its description are in range.
+		selPositions = visualRoundUpPositions(selPositions)
 		tasks := make([]domain.Task, 0, len(selPositions))
 		ids := make([]string, 0, len(selPositions))
 		for _, pos := range selPositions {
@@ -342,7 +387,7 @@ func (m *model) visualDelete() {
 	state := ConfirmDeleteState{Kind: ConfirmDeleteVisualRange}
 	switch m.ui.Visual.Kind {
 	case selection.FocusTask:
-		for _, pos := range selPositions {
+		for _, pos := range visualRoundUpPositions(selPositions) {
 			state.TaskIDs = append(state.TaskIDs, m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].ID)
 		}
 	case selection.FocusCategory:
@@ -449,7 +494,7 @@ func (m *model) visualShift(dir int) {
 	case selection.FocusCategory:
 		m.visualShiftCategories(selPositions, dir)
 	case selection.FocusTask:
-		m.visualShiftTasks(selPositions, dir)
+		m.visualShiftTasks(visualRoundUpPositions(selPositions), dir)
 	}
 }
 
@@ -509,15 +554,52 @@ func (m *model) visualShiftTasks(selPositions []selection.Position, dir int) {
 		neighbor = taskLo - 1
 		dst = taskHi
 	}
+	cursorID, cursorOnDesc := m.visualCursorRowID()
 	m.recordHistory()
 	moved := cat.Tasks[neighbor]
 	_ = cat.RemoveTask(neighbor)
 	cat.InsertTask(dst, moved)
 	m.project.UpdatedAt = domain.NowTimestamp()
 	m.rebuildPositions()
-	m.ui.Selection.MoveBy(dir)
+	// The hopped neighbor may span one row or two (task + expanded
+	// description), so the cursor re-attaches by ID instead of shifting by a
+	// fixed row count.
+	m.selectTaskLevelRow(cursorID, cursorOnDesc)
 	m.ensureVisible()
 	m.storeTaskUpdate()
+}
+
+// visualCursorRowID captures the cursor's task ID and whether the cursor sits
+// on the task's description row, so the cursor can re-attach to the same row
+// after a structural change re-indexes the position list.
+func (m *model) visualCursorRowID() (string, bool) {
+	cur, ok := m.ui.Selection.SelectedPosition()
+	if !ok || !visualTaskLevel(cur.Kind) {
+		return "", false
+	}
+	if cur.CategoryIndex < 0 || cur.CategoryIndex >= len(m.project.Categories) {
+		return "", false
+	}
+	cat := m.project.Categories[cur.CategoryIndex]
+	if cur.TaskIndex < 0 || cur.TaskIndex >= len(cat.Tasks) {
+		return "", false
+	}
+	return cat.Tasks[cur.TaskIndex].ID, cur.Kind == selection.FocusDescription
+}
+
+// selectTaskLevelRow moves the selection to the task-level row with the given
+// task ID — the description row when onDescription is set, the task row
+// otherwise. No-op when id is empty or the row no longer exists.
+func (m *model) selectTaskLevelRow(id string, onDescription bool) {
+	if id == "" {
+		return
+	}
+	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+		if !visualTaskLevel(p.Kind) || (p.Kind == selection.FocusDescription) != onDescription {
+			return false
+		}
+		return m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == id
+	})
 }
 
 // visualShiftTasksAcross moves the contiguous task block [taskLo, taskHi] out
@@ -540,10 +622,7 @@ func (m *model) visualShiftTasksAcross(catIdx, taskLo, taskHi, dir int) {
 		}
 	}
 
-	cursorID := ""
-	if cur, ok := m.ui.Selection.SelectedPosition(); ok && visualTaskLevel(cur.Kind) {
-		cursorID = m.project.Categories[cur.CategoryIndex].Tasks[cur.TaskIndex].ID
-	}
+	cursorID, cursorOnDesc := m.visualCursorRowID()
 
 	m.recordHistory()
 	src := &m.project.Categories[catIdx]
@@ -568,18 +647,13 @@ func (m *model) visualShiftTasksAcross(catIdx, taskLo, taskHi, dir int) {
 	// follow or resolveVisualAnchor can no longer find it.
 	m.ui.Visual.AnchorCategoryID = m.project.Categories[dstCatIdx].ID
 	m.rebuildPositions()
-	if cursorID != "" {
-		m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-			return visualTaskLevel(p.Kind) &&
-				m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == cursorID
-		})
-	}
+	m.selectTaskLevelRow(cursorID, cursorOnDesc)
 	m.ensureVisible()
 	m.storeTaskUpdate()
 }
 
 func (m *model) visualCut() {
-	selPositions := m.visualSelectedPositions()
+	selPositions := visualRoundUpPositions(m.visualSelectedPositions())
 	if len(selPositions) == 0 {
 		m.exitVisualMode()
 		return

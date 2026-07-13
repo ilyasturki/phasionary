@@ -197,9 +197,11 @@ func (m model) renderTaskLine(task domain.Task, selected bool, width int, focuse
 	return renderer.Render(task, selected)
 }
 
-func (m model) renderTaskDescription(task domain.Task, selected bool, width int, focused bool, cut bool) string {
+func (m model) renderTaskDescription(task domain.Task, selected bool, width int, focused bool, visualMode bool, isCursor bool, cut bool) string {
 	cfg := m.deps.CfgManager.Get()
 	renderer := components.NewTaskLineRenderer(width, cfg.StatusDisplay, cfg.PriorityColor, focused).
+		WithVisualMode(visualMode).
+		WithCursor(isCursor).
 		WithCut(cut)
 	if q := m.searchQuery(); q != "" {
 		renderer = renderer.WithSearch(q, m.searchMatchStyle(selected))
@@ -424,8 +426,10 @@ func (m model) statusText() string {
 		count := len(positions)
 		noun := plural(count, "category", "categories")
 		if m.ui.Visual.Kind != selection.FocusCategory {
-			// Task-level: count real tasks so a swept-in divider never inflates it.
-			count = countRealTasks(positions)
+			// Task-level: count the tasks operations will act on — descriptions
+			// round up to their parent (a lone description still selects its
+			// task) and a swept-in divider never inflates the number.
+			count = countRealTasks(visualRoundUpPositions(positions))
 			noun = plural(count, "task", "tasks")
 		}
 		return fmt.Sprintf("-- VISUAL -- %d %s selected", count, noun)
