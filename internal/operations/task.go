@@ -17,6 +17,23 @@ type TaskFields struct {
 	Description string
 	TagColor    string
 	TagLabel    string
+	// Kind selects the row to build: empty for an ordinary task,
+	// domain.KindSeparator for a divider. A separator carries only a Title (its
+	// label, which may be empty); every other field must be unset.
+	Kind string
+}
+
+// isSeparatorKind reports whether f describes a separator row.
+func (f TaskFields) isSeparatorKind() bool { return f.Kind == domain.KindSeparator }
+
+// validateSeparatorFields rejects the fields a separator does not have, so a
+// client can't smuggle a status or an estimate onto a divider.
+func validateSeparatorFields(f TaskFields) error {
+	if f.Status != "" || f.Priority != "" || f.Estimate != 0 ||
+		f.Description != "" || f.TagColor != "" || f.TagLabel != "" {
+		return ErrSeparatorFieldNotAllowed
+	}
+	return nil
 }
 
 // CreateTask builds a task from f and appends it to the category identified by
@@ -25,8 +42,36 @@ type TaskFields struct {
 // CompletionDate) and validation hold. Returns ErrTitleRequired, an invalid
 // status/priority error, or domain.ErrCategoryNotFound.
 func CreateTask(p *domain.Project, categoryID string, f TaskFields) (domain.Task, error) {
-	if strings.TrimSpace(f.Title) == "" {
+	return CreateTaskAfter(p, categoryID, f, "")
+}
+
+// CreateTaskAfter is CreateTask with a position: the new row lands immediately
+// below the task identified by afterTaskID, or at the end of the category when
+// afterTaskID is empty. Separators exist to divide a list, so they are always
+// created relative to a neighbour rather than appended.
+//
+// Returns domain.ErrTaskNotFound when afterTaskID doesn't resolve within the
+// category, plus everything CreateTask returns.
+func CreateTaskAfter(
+	p *domain.Project,
+	categoryID string,
+	f TaskFields,
+	afterTaskID string,
+) (domain.Task, error) {
+	switch f.Kind {
+	case "", domain.KindSeparator:
+	default:
+		return domain.Task{}, ErrInvalidKind
+	}
+	// A separator's label is optional (an unlabeled one renders as a plain
+	// rule), so the title requirement applies only to real tasks.
+	if !f.isSeparatorKind() && strings.TrimSpace(f.Title) == "" {
 		return domain.Task{}, ErrTitleRequired
+	}
+	if f.isSeparatorKind() {
+		if err := validateSeparatorFields(f); err != nil {
+			return domain.Task{}, err
+		}
 	}
 	if f.Estimate < 0 {
 		return domain.Task{}, ErrNegativeEstimate
@@ -34,6 +79,28 @@ func CreateTask(p *domain.Project, categoryID string, f TaskFields) (domain.Task
 	idx, err := p.FindCategoryByID(categoryID)
 	if err != nil {
 		return domain.Task{}, err
+	}
+	cat := &p.Categories[idx]
+
+	// Resolve the anchor before building the row so a bad id fails without
+	// mutating anything.
+	insertAt := len(cat.Tasks)
+	if afterTaskID != "" {
+		anchor, err := cat.FindTaskByID(afterTaskID)
+		if err != nil {
+			return domain.Task{}, err
+		}
+		insertAt = anchor + 1
+	}
+
+	if f.isSeparatorKind() {
+		sep, err := domain.NewSeparator()
+		if err != nil {
+			return domain.Task{}, err
+		}
+		sep.Title = strings.TrimSpace(f.Title)
+		cat.InsertTask(insertAt, sep)
+		return sep, nil
 	}
 
 	task, err := domain.NewTask(f.Title)
@@ -59,7 +126,7 @@ func CreateTask(p *domain.Project, categoryID string, f TaskFields) (domain.Task
 		task.SetTagLabel(f.TagLabel)
 	}
 
-	p.Categories[idx].AddTask(task)
+	cat.InsertTask(insertAt, task)
 	return task, nil
 }
 
@@ -78,10 +145,24 @@ func findTask(p *domain.Project, categoryID, taskID string) (*domain.Task, error
 	return &p.Categories[cidx].Tasks[tidx], nil
 }
 
+// findRealTask is findTask restricted to ordinary tasks. The field setters go
+// through it so every door into a task's status/priority/estimate refuses a
+// separator, not just the partial-update path.
+func findRealTask(p *domain.Project, categoryID, taskID string) (*domain.Task, error) {
+	task, err := findTask(p, categoryID, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if task.IsSeparator() {
+		return nil, ErrSeparatorFieldNotAllowed
+	}
+	return task, nil
+}
+
 // SetTaskStatus applies status to the identified task through domain.SetStatus,
 // so completion-date bookkeeping and validation hold.
 func SetTaskStatus(p *domain.Project, categoryID, taskID, status string) (domain.Task, error) {
-	task, err := findTask(p, categoryID, taskID)
+	task, err := findRealTask(p, categoryID, taskID)
 	if err != nil {
 		return domain.Task{}, err
 	}
@@ -91,10 +172,134 @@ func SetTaskStatus(p *domain.Project, categoryID, taskID, status string) (domain
 	return *task, nil
 }
 
+// TaskUpdate carries a partial task edit: a nil field is left untouched. The
+// pointers exist so the JSON API can tell an omitted field from one explicitly
+// set to its zero value — clearing a description and not touching it are
+// different requests.
+type TaskUpdate struct {
+	Title       *string
+	Status      *string
+	Priority    *string
+	Estimate    *int
+	Description *string
+}
+
+// UpdateTask applies a partial edit to the identified task, routing each field
+// through the domain setters where they exist so validation and the
+// UpdatedAt/CompletionDate bookkeeping hold. An update with no fields set
+// returns the task unchanged along with ErrNoChange, so an empty PATCH doesn't
+// bump the project's timestamp. Returns ErrTitleRequired, ErrNegativeEstimate,
+// an invalid status/priority error, domain.ErrCategoryNotFound, or
+// domain.ErrTaskNotFound.
+func UpdateTask(p *domain.Project, categoryID, taskID string, u TaskUpdate) (domain.Task, error) {
+	task, err := findTask(p, categoryID, taskID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	// A separator is a divider, not a task: the only thing it has is its label,
+	// and that label may legitimately be empty (an unlabeled separator renders
+	// as a plain rule). Both rules differ from the task path, so split here
+	// before the ordinary validation runs.
+	if task.IsSeparator() {
+		return updateSeparator(task, u)
+	}
+
+	// Validate everything up front: a rejected field must not leave the task
+	// half-updated, since the caller saves whatever the project holds.
+	var title string
+	if u.Title != nil {
+		title = strings.TrimSpace(*u.Title)
+		if title == "" {
+			return domain.Task{}, ErrTitleRequired
+		}
+	}
+	if u.Estimate != nil && *u.Estimate < 0 {
+		return domain.Task{}, ErrNegativeEstimate
+	}
+	if u.Status != nil {
+		if err := domain.ValidateStatus(*u.Status); err != nil {
+			return domain.Task{}, err
+		}
+	}
+	if u.Priority != nil {
+		if err := domain.ValidatePriority(*u.Priority); err != nil {
+			return domain.Task{}, err
+		}
+	}
+
+	if u.Title == nil && u.Status == nil && u.Priority == nil && u.Estimate == nil && u.Description == nil {
+		return *task, ErrNoChange
+	}
+
+	if u.Title != nil {
+		task.Title = title
+		task.UpdatedAt = domain.NowTimestamp()
+	}
+	if u.Description != nil {
+		// Match CreateTask: trailing newlines from a multi-line editor are noise.
+		task.Description = strings.TrimRight(*u.Description, "\n")
+		task.UpdatedAt = domain.NowTimestamp()
+	}
+	if u.Status != nil {
+		if err := task.SetStatus(*u.Status); err != nil {
+			return domain.Task{}, err
+		}
+	}
+	if u.Priority != nil {
+		if err := task.SetPriority(*u.Priority); err != nil {
+			return domain.Task{}, err
+		}
+	}
+	if u.Estimate != nil {
+		task.SetEstimate(*u.Estimate)
+	}
+	return *task, nil
+}
+
+// updateSeparator applies the only edit a separator accepts: its label. Any
+// other field in u is rejected rather than ignored, so a client that thinks it
+// set a status finds out it didn't.
+func updateSeparator(sep *domain.Task, u TaskUpdate) (domain.Task, error) {
+	if u.Status != nil || u.Priority != nil || u.Estimate != nil || u.Description != nil {
+		return domain.Task{}, ErrSeparatorFieldNotAllowed
+	}
+	if u.Title == nil {
+		return *sep, ErrNoChange
+	}
+	// Empty is allowed here (unlike a task): it clears the label back to a
+	// plain rule.
+	label := strings.TrimSpace(*u.Title)
+	if label == sep.Title {
+		return *sep, ErrNoChange
+	}
+	sep.Title = label
+	sep.UpdatedAt = domain.NowTimestamp()
+	return *sep, nil
+}
+
+// DeleteTask removes the identified task from its category and returns the task
+// as it was, so callers can report or undo the deletion.
+func DeleteTask(p *domain.Project, categoryID, taskID string) (domain.Task, error) {
+	cidx, err := p.FindCategoryByID(categoryID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	cat := &p.Categories[cidx]
+	tidx, err := cat.FindTaskByID(taskID)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	task := cat.Tasks[tidx]
+	if err := cat.RemoveTask(tidx); err != nil {
+		return domain.Task{}, err
+	}
+	return task, nil
+}
+
 // SetTaskPriority applies priority to the identified task through
 // domain.SetPriority.
 func SetTaskPriority(p *domain.Project, categoryID, taskID, priority string) (domain.Task, error) {
-	task, err := findTask(p, categoryID, taskID)
+	task, err := findRealTask(p, categoryID, taskID)
 	if err != nil {
 		return domain.Task{}, err
 	}
@@ -109,7 +314,7 @@ func SetTaskEstimate(p *domain.Project, categoryID, taskID string, minutes int) 
 	if minutes < 0 {
 		return domain.Task{}, ErrNegativeEstimate
 	}
-	task, err := findTask(p, categoryID, taskID)
+	task, err := findRealTask(p, categoryID, taskID)
 	if err != nil {
 		return domain.Task{}, err
 	}

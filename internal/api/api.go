@@ -91,6 +91,13 @@ type taskCreateRequest struct {
 	Description     string `json:"description"`
 	TagColor        string `json:"tag_color"`
 	TagLabel        string `json:"tag_label"`
+	// Kind is "" for an ordinary task or "separator" for a divider, whose only
+	// field is its (optional) label in Title.
+	Kind string `json:"kind"`
+	// InsertAfter places the new row directly below that task; empty appends to
+	// the end of the category. Separators are only useful between rows, so the
+	// client always sends an anchor for them.
+	InsertAfter string `json:"insert_after"`
 }
 
 func (s *Server) handleAPITaskCreate(w http.ResponseWriter, r *http.Request) {
@@ -102,32 +109,52 @@ func (s *Server) handleAPITaskCreate(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	status := req.Status
-	if status == "" {
-		status = domain.StatusTodo
-	}
-	fields := operations.TaskFields{
-		Title:       strings.TrimSpace(req.Title),
-		Status:      status,
-		Priority:    req.Priority,
-		Estimate:    req.EstimateMinutes,
-		Description: strings.TrimRight(req.Description, "\n"),
-		TagColor:    req.TagColor,
-		TagLabel:    req.TagLabel,
-	}
-	if err := validateTaskFields(fields); err != nil {
-		writeJSONError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if fields.Estimate < 0 {
-		writeJSONError(w, http.StatusBadRequest, "estimate_minutes must be zero or greater")
-		return
+	// A separator carries only a label, so it skips the task defaults entirely —
+	// giving it a default status is exactly the corruption the verbs reject.
+	// The client's other fields are still forwarded verbatim so the verb can
+	// reject them: dropping them here instead would silently accept a request
+	// that asked for something impossible.
+	var fields operations.TaskFields
+	if req.Kind == domain.KindSeparator {
+		fields = operations.TaskFields{
+			Kind:        domain.KindSeparator,
+			Title:       strings.TrimSpace(req.Title),
+			Status:      req.Status,
+			Priority:    req.Priority,
+			Estimate:    req.EstimateMinutes,
+			Description: req.Description,
+			TagColor:    req.TagColor,
+			TagLabel:    req.TagLabel,
+		}
+	} else {
+		status := req.Status
+		if status == "" {
+			status = domain.StatusTodo
+		}
+		fields = operations.TaskFields{
+			Title:       strings.TrimSpace(req.Title),
+			Status:      status,
+			Priority:    req.Priority,
+			Estimate:    req.EstimateMinutes,
+			Description: strings.TrimRight(req.Description, "\n"),
+			TagColor:    req.TagColor,
+			TagLabel:    req.TagLabel,
+			Kind:        req.Kind,
+		}
+		if err := validateTaskFields(fields); err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if fields.Estimate < 0 {
+			writeJSONError(w, http.StatusBadRequest, "estimate_minutes must be zero or greater")
+			return
+		}
 	}
 
 	var created domain.Task
 	_, err := s.withProject(pid, func(p *domain.Project) error {
 		var e error
-		created, e = operations.CreateTask(p, cid, fields)
+		created, e = operations.CreateTaskAfter(p, cid, fields, req.InsertAfter)
 		return e
 	})
 	if err != nil {
@@ -135,6 +162,149 @@ func (s *Server) handleAPITaskCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, created)
+}
+
+// taskUpdateRequest is the partial-edit payload for PATCH. Every field is a
+// pointer so an omitted field is left untouched while an explicit "" or 0
+// clears it — the mobile editor can send only what actually changed.
+type taskUpdateRequest struct {
+	Title           *string `json:"title"`
+	Status          *string `json:"status"`
+	Priority        *string `json:"priority"`
+	EstimateMinutes *int    `json:"estimate_minutes"`
+	Description     *string `json:"description"`
+}
+
+func (s *Server) handleAPITaskUpdate(w http.ResponseWriter, r *http.Request) {
+	pid := r.PathValue("pid")
+	cid := r.PathValue("cid")
+	tid := r.PathValue("tid")
+
+	var req taskUpdateRequest
+	if err := decodeJSONBody(w, r, &req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// Validate the enum-like fields here so they 400 without touching disk;
+	// domain's validators return plain errors that errorStatus can't classify.
+	if req.Status != nil && domain.ValidateStatus(*req.Status) != nil {
+		writeJSONError(w, http.StatusBadRequest, errTaskBadStatus.Error())
+		return
+	}
+	if req.Priority != nil && domain.ValidatePriority(*req.Priority) != nil {
+		writeJSONError(w, http.StatusBadRequest, errTaskBadPriority.Error())
+		return
+	}
+
+	update := operations.TaskUpdate{
+		Title:       req.Title,
+		Status:      req.Status,
+		Priority:    req.Priority,
+		Estimate:    req.EstimateMinutes,
+		Description: req.Description,
+	}
+	var updated domain.Task
+	_, err := s.withProject(pid, func(p *domain.Project) error {
+		var e error
+		updated, e = operations.UpdateTask(p, cid, tid, update)
+		return e
+	})
+	if err != nil {
+		s.apiError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (s *Server) handleAPITaskDelete(w http.ResponseWriter, r *http.Request) {
+	pid := r.PathValue("pid")
+	cid := r.PathValue("cid")
+	tid := r.PathValue("tid")
+
+	_, err := s.withProject(pid, func(p *domain.Project) error {
+		_, e := operations.DeleteTask(p, cid, tid)
+		return e
+	})
+	if err != nil {
+		s.apiError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// categoryCreateRequest is the payload for adding a category from the phone.
+type categoryCreateRequest struct {
+	Name string `json:"name"`
+}
+
+func (s *Server) handleAPICategoryCreate(w http.ResponseWriter, r *http.Request) {
+	pid := r.PathValue("pid")
+
+	var req categoryCreateRequest
+	if err := decodeJSONBody(w, r, &req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var created domain.Category
+	_, err := s.withProject(pid, func(p *domain.Project) error {
+		var e error
+		created, e = operations.CreateCategory(p, req.Name)
+		return e
+	})
+	if err != nil {
+		s.apiError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, created)
+}
+
+// foldsPayload is both the GET response and the PUT body. It mirrors the
+// state.json key so the phone and the TUI speak one vocabulary about which
+// categories are collapsed. PUT replaces the whole list, matching
+// StateRepository.SetFoldedCategories.
+type foldsPayload struct {
+	FoldedCategories []string `json:"folded_categories"`
+}
+
+func (s *Server) handleAPIFoldsGet(w http.ResponseWriter, r *http.Request) {
+	pid := r.PathValue("pid")
+	// Resolve the project first so an unknown id 404s instead of reporting an
+	// empty fold set for a project that doesn't exist.
+	if _, err := s.store.LoadProjectByID(pid); err != nil {
+		s.apiError(w, err)
+		return
+	}
+	folded := s.state.GetFoldedCategories(pid)
+	if folded == nil {
+		folded = []string{}
+	}
+	writeJSON(w, http.StatusOK, foldsPayload{FoldedCategories: folded})
+}
+
+func (s *Server) handleAPIFoldsSet(w http.ResponseWriter, r *http.Request) {
+	pid := r.PathValue("pid")
+	if _, err := s.store.LoadProjectByID(pid); err != nil {
+		s.apiError(w, err)
+		return
+	}
+
+	var req foldsPayload
+	if err := decodeJSONBody(w, r, &req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// Category IDs are not validated against the project: a fold entry for a
+	// category deleted elsewhere is inert, and the TUI already tolerates it.
+	if err := s.state.SetFoldedCategories(pid, req.FoldedCategories); err != nil {
+		s.apiError(w, err)
+		return
+	}
+	folded := req.FoldedCategories
+	if folded == nil {
+		folded = []string{}
+	}
+	writeJSON(w, http.StatusOK, foldsPayload{FoldedCategories: folded})
 }
 
 // taskStatusRequest sets a task's status explicitly (unlike the HTML endpoint,

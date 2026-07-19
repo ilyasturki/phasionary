@@ -14,12 +14,17 @@ import (
 
 func newTestServer(t *testing.T, token string) (*Server, *data.Store) {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), "projects")
+	root := t.TempDir()
+	dir := filepath.Join(root, "projects")
 	store := data.NewStore(dir)
 	if err := store.Ensure(); err != nil {
 		t.Fatalf("ensure: %v", err)
 	}
-	srv := New(store, Config{Addr: "127.0.0.1:0", Token: token})
+	state := data.NewStateManager(root, root)
+	if err := state.Load(); err != nil {
+		t.Fatalf("load state: %v", err)
+	}
+	srv := New(store, state, Config{Addr: "127.0.0.1:0", Token: token})
 	return srv, store
 }
 

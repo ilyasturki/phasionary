@@ -65,7 +65,14 @@ it as an "Authorization: Bearer <token>" header.`,
 				return err
 			}
 
-			srv := api.New(store, api.Config{Addr: addr, Token: token})
+			// Same state.json the TUI uses: folds set from the phone show up
+			// in the TUI the next time it opens the project, and vice versa.
+			state, err := stateManagerFromViper()
+			if err != nil {
+				return err
+			}
+
+			srv := api.New(store, state, api.Config{Addr: addr, Token: token})
 
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()

@@ -23,11 +23,15 @@ type Config struct {
 
 type Server struct {
 	store data.ProjectRepository
+	state data.StateRepository
 	cfg   Config
 }
 
-func New(store data.ProjectRepository, cfg Config) *Server {
-	return &Server{store: store, cfg: cfg}
+// New builds the API server. state backs the fold endpoints and is the same
+// state.json the TUI reads, so collapsing a category on the phone collapses it
+// in the TUI too; it must not be nil.
+func New(store data.ProjectRepository, state data.StateRepository, cfg Config) *Server {
+	return &Server{store: store, state: state, cfg: cfg}
 }
 
 func (s *Server) Run(ctx context.Context) error {

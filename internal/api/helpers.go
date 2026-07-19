@@ -32,6 +32,20 @@ func errorStatus(err error) (int, string) {
 		return http.StatusNotFound, "category not found"
 	case errors.Is(err, domain.ErrTaskNotFound):
 		return http.StatusNotFound, "task not found"
+	case errors.Is(err, domain.ErrDuplicateCategoryName):
+		return http.StatusConflict, "category name already exists"
+	// The verbs validate their own input (PATCH sends a partial payload the
+	// handler can't fully check up front), so their sentinels are client errors.
+	case errors.Is(err, operations.ErrTitleRequired):
+		return http.StatusBadRequest, "title is required"
+	case errors.Is(err, operations.ErrNameRequired):
+		return http.StatusBadRequest, "name is required"
+	case errors.Is(err, operations.ErrNegativeEstimate):
+		return http.StatusBadRequest, "estimate_minutes must be zero or greater"
+	case errors.Is(err, operations.ErrSeparatorFieldNotAllowed):
+		return http.StatusBadRequest, "a separator only has a label"
+	case errors.Is(err, operations.ErrInvalidKind):
+		return http.StatusBadRequest, "invalid kind"
 	default:
 		return http.StatusInternalServerError, "internal server error"
 	}

@@ -18,6 +18,11 @@ func (s *Server) handler() http.Handler {
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/projects", s.handleAPIProjectsList)
 	mux.HandleFunc("GET /api/v1/projects/{pid}", s.handleAPIProjectGet)
+	mux.HandleFunc("GET /api/v1/projects/{pid}/folds", s.handleAPIFoldsGet)
+	mux.HandleFunc("PUT /api/v1/projects/{pid}/folds", s.handleAPIFoldsSet)
+	mux.HandleFunc("POST /api/v1/projects/{pid}/categories", s.handleAPICategoryCreate)
 	mux.HandleFunc("POST /api/v1/projects/{pid}/categories/{cid}/tasks", s.handleAPITaskCreate)
+	mux.HandleFunc("PATCH /api/v1/projects/{pid}/categories/{cid}/tasks/{tid}", s.handleAPITaskUpdate)
+	mux.HandleFunc("DELETE /api/v1/projects/{pid}/categories/{cid}/tasks/{tid}", s.handleAPITaskDelete)
 	mux.HandleFunc("POST /api/v1/projects/{pid}/categories/{cid}/tasks/{tid}/status", s.handleAPITaskStatus)
 }
