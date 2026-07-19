@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 
 	"phasionary/internal/domain"
@@ -57,6 +58,17 @@ func (s *Server) handleAPIProjectsList(w http.ResponseWriter, r *http.Request) {
 		s.apiError(w, err)
 		return
 	}
+	// Most recently touched first — the phone's picker is "what am I working
+	// on", where the TUI's picker keeps a manual order (state.json
+	// project_order). That's why the sort lives here and not in the store:
+	// changing ListProjects would reorder the TUI too. UpdatedAt is UTC RFC3339,
+	// so string comparison is chronological.
+	sort.SliceStable(projects, func(i, j int) bool {
+		if projects[i].UpdatedAt != projects[j].UpdatedAt {
+			return projects[i].UpdatedAt > projects[j].UpdatedAt
+		}
+		return strings.ToLower(projects[i].Name) < strings.ToLower(projects[j].Name)
+	})
 	writeJSON(w, http.StatusOK, projects)
 }
 
