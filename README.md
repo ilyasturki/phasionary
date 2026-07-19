@@ -32,8 +32,6 @@ inputs.phasionary.url = "github:ilyasturki/phasionary";
 
 Grab the latest `phasionary-linux-x64` or `phasionary-linux-arm64` from the [releases page](https://github.com/ilyasturki/phasionary/releases), `chmod +x`, drop in `$PATH`.
 
-Each release also ships `phasionary-android.apk` — the [Android client](android/README.md) for the `phasionary serve` API. Sideload it on your phone.
-
 ### From source
 
 ```bash
@@ -62,6 +60,12 @@ phasionary import project.md                          # Restore from markdown
 ```
 
 Run `phasionary --help` for the full surface (projects, categories, config, completions).
+
+## Mobile
+
+Every release also ships `phasionary-android.apk` — a native Android client, sideloaded from the [releases page](https://github.com/ilyasturki/phasionary/releases). It's a thin, online-only client for the `/api/v1` JSON API that `phasionary serve` exposes; point it at your machine over a private network (Tailscale) and the same projects, categories and fold state show up on your phone.
+
+Setup, the API surface it uses, and build instructions: [`android/README.md`](android/README.md).
 
 ## Configuration
 
