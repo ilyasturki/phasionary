@@ -4,14 +4,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -20,8 +24,10 @@ import com.phasionary.app.ui.theme.PhasTheme
 import com.phasionary.app.ui.theme.PhasionaryTheme
 
 /**
- * A collapsible category group header: a caret, the name, and a done/total
- * tally. Tapping toggles collapse (the TUI's h/l on a category group).
+ * A collapsible category group header: a caret, the name, a done/total tally,
+ * and — when [onAdd] is given — a trailing "+" that starts capturing a task in
+ * this category. Tapping the header toggles collapse (the TUI's h/l on a
+ * category group).
  */
 @Composable
 fun CategoryHeader(
@@ -29,6 +35,7 @@ fun CategoryHeader(
     counts: StatusCounts,
     expanded: Boolean,
     modifier: Modifier = Modifier,
+    onAdd: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val colors = PhasTheme.colors
@@ -38,7 +45,9 @@ fun CategoryHeader(
             .clickable(onClick = onClick)
             .background(colors.surface)
             .heightIn(min = 40.dp)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            // Only the left/vertical padding here — "+" pads itself, so its tap
+            // target reaches the screen edge instead of stopping short of it.
+            .padding(start = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -60,6 +69,19 @@ fun CategoryHeader(
             color = colors.textMuted,
             style = MaterialTheme.typography.labelMedium,
         )
+        if (onAdd != null) {
+            Text(
+                text = "+",
+                color = colors.accent,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .clickable(onClick = onAdd)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .semantics { contentDescription = "Add task to $name" },
+            )
+        } else {
+            Spacer(Modifier.width(12.dp))
+        }
     }
 }
 

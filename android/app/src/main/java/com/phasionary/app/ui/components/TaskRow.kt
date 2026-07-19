@@ -95,20 +95,25 @@ fun TaskRow(
 }
 
 /**
- * A read-only in-category divider, mirroring the TUI separator: a rule spanning
- * the row, or "── label ──" when the separator carries a label. Not clickable.
+ * An in-category divider, mirroring the TUI separator: a rule spanning the row,
+ * or "── label ──" when the separator carries a label. A separator has no
+ * status, priority or estimate — tapping it edits its label, nothing else.
  */
 @Composable
 fun SeparatorRow(
     label: String,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     val colors = PhasTheme.colors
     val trimmed = label.trim()
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 32.dp)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            // Taller than the TUI's single line so the rule is still a
+            // comfortable touch target.
+            .heightIn(min = 44.dp)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
