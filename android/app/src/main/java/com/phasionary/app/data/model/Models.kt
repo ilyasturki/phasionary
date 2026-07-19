@@ -74,12 +74,15 @@ object Status {
 
 /** Priority wire values (must match domain.Priority* constants). "" = none. */
 object Priority {
+    const val CRITICAL = "critical"
     const val HIGH = "high"
     const val MEDIUM = "medium"
     const val LOW = "low"
+    const val TRIVIAL = "trivial"
     const val NONE = ""
 
-    val ALL = listOf(HIGH, MEDIUM, LOW, NONE)
+    /** Highest to lowest, with "none" last — the order the editor offers them in. */
+    val ALL = listOf(CRITICAL, HIGH, MEDIUM, LOW, TRIVIAL, NONE)
 }
 
 /** Per-category status tally, mirroring domain.StatusCounts. */
@@ -100,6 +103,11 @@ fun Category.statusCounts(): StatusCounts {
     var completed = 0
     var cancelled = 0
     for (task in tasks) {
+        // Separators are dividers, not work — the TUI's StatusCounts skips them
+        // too. They currently carry an empty status that matches no branch
+        // below, but relying on that would break the moment the field gains an
+        // omitempty and the model default (todo) kicked in.
+        if (task.isSeparator) continue
         when (task.status) {
             Status.TODO -> todo++
             Status.IN_PROGRESS -> inProgress++

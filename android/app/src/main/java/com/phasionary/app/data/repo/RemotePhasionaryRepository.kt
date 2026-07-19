@@ -1,11 +1,16 @@
 package com.phasionary.app.data.repo
 
 import com.phasionary.app.data.ApiException
+import com.phasionary.app.data.model.Category
+import com.phasionary.app.data.model.CreateCategoryBody
 import com.phasionary.app.data.model.CreateTaskBody
 import com.phasionary.app.data.model.ErrorEnvelope
+import com.phasionary.app.data.model.FoldsBody
+import com.phasionary.app.data.model.Kind
 import com.phasionary.app.data.model.Project
 import com.phasionary.app.data.model.StatusBody
 import com.phasionary.app.data.model.Task
+import com.phasionary.app.data.model.UpdateTaskBody
 import com.phasionary.app.data.net.PhasionaryJson
 import com.phasionary.app.data.settings.ServerConfig
 import io.ktor.client.HttpClient
@@ -64,11 +69,67 @@ class RemotePhasionaryRepository(
         jsonBody = PhasionaryJson.encodeToString(StatusBody(status)),
     )
 
-    private suspend inline fun <reified T> request(
+    override suspend fun createSeparator(
+        projectId: String,
+        categoryId: String,
+        afterTaskId: String,
+    ): Task = request(
+        HttpMethod.Post,
+        "projects/$projectId/categories/$categoryId/tasks",
+        jsonBody = PhasionaryJson.encodeToString(
+            CreateTaskBody(title = "", kind = Kind.SEPARATOR, insertAfter = afterTaskId),
+        ),
+    )
+
+    override suspend fun updateTask(
+        projectId: String,
+        categoryId: String,
+        taskId: String,
+        body: UpdateTaskBody,
+    ): Task = request(
+        HttpMethod.Patch,
+        "projects/$projectId/categories/$categoryId/tasks/$taskId",
+        jsonBody = PhasionaryJson.encodeToString(body),
+    )
+
+    override suspend fun deleteTask(projectId: String, categoryId: String, taskId: String) {
+        // 204 No Content — nothing to parse, so this skips the body decode.
+        execute(
+            HttpMethod.Delete,
+            "projects/$projectId/categories/$categoryId/tasks/$taskId",
+            jsonBody = null,
+        )
+    }
+
+    override suspend fun createCategory(projectId: String, name: String): Category = request(
+        HttpMethod.Post,
+        "projects/$projectId/categories",
+        jsonBody = PhasionaryJson.encodeToString(CreateCategoryBody(name)),
+    )
+
+    override suspend fun getFolds(projectId: String): List<String> =
+        request<FoldsBody>(HttpMethod.Get, "projects/$projectId/folds", jsonBody = null)
+            .foldedCategories
+
+    override suspend fun setFolds(projectId: String, categoryIds: List<String>) {
+        request<FoldsBody>(
+            HttpMethod.Put,
+            "projects/$projectId/folds",
+            jsonBody = PhasionaryJson.encodeToString(FoldsBody(categoryIds)),
+        )
+    }
+
+    /**
+     * Sends the request and returns the raw response, translating transport
+     * failures and non-2xx statuses into [ApiException]. Split out of [request]
+     * so body-less responses (204 on DELETE) share the same auth and error
+     * handling without a decode step.
+     */
+    private suspend fun execute(
         method: HttpMethod,
         path: String,
         jsonBody: String?,
-    ): T {
+    ): HttpResponse {
         val cfg = configProvider()
         if (!cfg.isConfigured) throw ApiException.NotConfigured
 
@@ -87,16 +148,23 @@ class RemotePhasionaryRepository(
             throw ApiException.Network(e)
         }
 
-        if (response.status.isSuccess()) {
-            return try {
-                response.body()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                throw ApiException.Malformed(e)
-            }
+        if (!response.status.isSuccess()) throw errorFor(response)
+        return response
+    }
+
+    private suspend inline fun <reified T> request(
+        method: HttpMethod,
+        path: String,
+        jsonBody: String?,
+    ): T {
+        val response = execute(method, path, jsonBody)
+        return try {
+            response.body()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            throw ApiException.Malformed(e)
         }
-        throw errorFor(response)
     }
 
     /** Reads the {"error": …} envelope (falling back to the status text) and maps
