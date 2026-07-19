@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
 )
 
 type State struct {
@@ -25,7 +27,12 @@ type StateRepository interface {
 	DeleteFoldedCategories(projectID string) error
 }
 
+// StateManager reads and writes state.json. Two processes share that file — the
+// TUI and `phasionary serve` (which the mobile app talks to) — and every save
+// rewrites it whole, so writes go through update: reload, apply, save. The mutex
+// covers the API server's concurrent request goroutines.
 type StateManager struct {
+	mu         sync.Mutex
 	path       string
 	currentDir string
 	state      State
@@ -44,6 +51,15 @@ func NewStateManager(stateDir, currentDir string) *StateManager {
 }
 
 func (m *StateManager) Load() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.load()
+}
+
+// load refreshes the in-memory state from disk. Callers hold m.mu. On any error
+// the cached state is left untouched, so a transient read failure degrades to
+// stale data rather than to empty data.
+func (m *StateManager) load() error {
 	data, err := os.ReadFile(m.path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -82,6 +98,13 @@ func (m *StateManager) Load() error {
 }
 
 func (m *StateManager) Save() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.save()
+}
+
+// save writes the whole cached state to disk. Callers hold m.mu.
+func (m *StateManager) save() error {
 	data, err := json.MarshalIndent(m.state, "", "  ")
 	if err != nil {
 		return err
@@ -93,9 +116,28 @@ func (m *StateManager) Save() error {
 	return os.WriteFile(m.path, data, 0o644)
 }
 
+// update re-reads state.json, applies fn to the fresh state, and writes it back
+// when fn reports a change. The reload is what keeps the TUI and the serve
+// process from clobbering each other: without it, a TUI save built from a cache
+// loaded at startup would drop folds the phone wrote in the meantime (and vice
+// versa), because each save rewrites the entire file.
+func (m *StateManager) update(fn func(*State) bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.load(); err != nil {
+		return err
+	}
+	if !fn(&m.state) {
+		return nil
+	}
+	return m.save()
+}
+
 // GetProjectForDir returns the project ID owned by the manager's current
 // directory, or "" if none is linked.
 func (m *StateManager) GetProjectForDir() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.state.DirectoryProjects == nil {
 		return ""
 	}
@@ -104,59 +146,91 @@ func (m *StateManager) GetProjectForDir() string {
 
 // SetProjectForDir links the manager's current directory to the given project ID.
 func (m *StateManager) SetProjectForDir(id string) error {
-	if m.state.DirectoryProjects == nil {
-		m.state.DirectoryProjects = make(map[string]string)
-	}
-	m.state.DirectoryProjects[m.currentDir] = id
-	return m.Save()
+	return m.update(func(s *State) bool {
+		if s.DirectoryProjects == nil {
+			s.DirectoryProjects = make(map[string]string)
+		}
+		s.DirectoryProjects[m.currentDir] = id
+		return true
+	})
 }
 
 // UnlinkDir removes the link for the manager's current directory. Returns the
 // previously linked project ID (empty if none was linked).
 func (m *StateManager) UnlinkDir() (string, error) {
-	if m.state.DirectoryProjects == nil {
-		return "", nil
+	var prev string
+	err := m.update(func(s *State) bool {
+		if s.DirectoryProjects == nil {
+			return false
+		}
+		id, ok := s.DirectoryProjects[m.currentDir]
+		if !ok {
+			return false
+		}
+		prev = id
+		delete(s.DirectoryProjects, m.currentDir)
+		return true
+	})
+	if err != nil {
+		return "", err
 	}
-	prev, ok := m.state.DirectoryProjects[m.currentDir]
-	if !ok {
-		return "", nil
-	}
-	delete(m.state.DirectoryProjects, m.currentDir)
-	return prev, m.Save()
+	return prev, nil
 }
 
 func (m *StateManager) GetProjectOrder() []string {
-	return m.state.ProjectOrder
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.state.ProjectOrder)
 }
 
 func (m *StateManager) SetProjectOrder(order []string) error {
-	m.state.ProjectOrder = order
-	return m.Save()
+	return m.update(func(s *State) bool {
+		// Clone: the cache outlives this call, and the caller is free to keep
+		// mutating the slice it passed in.
+		s.ProjectOrder = slices.Clone(order)
+		return true
+	})
 }
 
+// GetFoldedCategories returns the collapsed category IDs for a project. It
+// re-reads state.json first: the phone folds categories through the API while
+// the TUI is running, and the TUI reads this at project open, so a cached read
+// would show yesterday's folds until a restart.
 func (m *StateManager) GetFoldedCategories(projectID string) []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	// A failed reload leaves the cache intact; stale folds beat no folds, and
+	// there is no error channel here to report on.
+	_ = m.load()
 	if m.state.FoldedCategories == nil {
 		return nil
 	}
-	return m.state.FoldedCategories[projectID]
+	return slices.Clone(m.state.FoldedCategories[projectID])
 }
 
 func (m *StateManager) SetFoldedCategories(projectID string, categoryIDs []string) error {
-	if m.state.FoldedCategories == nil {
-		m.state.FoldedCategories = make(map[string][]string)
-	}
-	if len(categoryIDs) == 0 {
-		delete(m.state.FoldedCategories, projectID)
-	} else {
-		m.state.FoldedCategories[projectID] = categoryIDs
-	}
-	return m.Save()
+	return m.update(func(s *State) bool {
+		if s.FoldedCategories == nil {
+			s.FoldedCategories = make(map[string][]string)
+		}
+		if len(categoryIDs) == 0 {
+			delete(s.FoldedCategories, projectID)
+		} else {
+			s.FoldedCategories[projectID] = slices.Clone(categoryIDs)
+		}
+		return true
+	})
 }
 
 func (m *StateManager) DeleteFoldedCategories(projectID string) error {
-	if m.state.FoldedCategories == nil {
-		return nil
-	}
-	delete(m.state.FoldedCategories, projectID)
-	return m.Save()
+	return m.update(func(s *State) bool {
+		if s.FoldedCategories == nil {
+			return false
+		}
+		if _, ok := s.FoldedCategories[projectID]; !ok {
+			return false
+		}
+		delete(s.FoldedCategories, projectID)
+		return true
+	})
 }
