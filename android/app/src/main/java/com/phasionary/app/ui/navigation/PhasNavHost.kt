@@ -1,5 +1,7 @@
 package com.phasionary.app.ui.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
@@ -25,7 +27,16 @@ fun PhasApp() {
     val navController = rememberNavController()
 
     Surface(color = PhasTheme.colors.background) {
-        NavHost(navController = navController, startDestination = Routes.PROJECTS) {
+        NavHost(
+            navController = navController,
+            startDestination = Routes.PROJECTS,
+            // Screens cut over instantly, like a TUI redraw — no slide, no fade.
+            // Set on the host so every destination inherits it.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
+        ) {
             composable(Routes.PROJECTS) {
                 ProjectListScreen(
                     onOpenProject = { projectId -> navController.navigate(Routes.tasks(projectId)) },

@@ -1,6 +1,9 @@
 package com.phasionary.app.ui.theme
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
@@ -8,6 +11,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
@@ -36,6 +40,7 @@ private val FlatShapes = Shapes(
     extraLarge = Square,
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhasionaryTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -77,7 +82,17 @@ fun PhasionaryTheme(
         )
     }
 
-    CompositionLocalProvider(LocalPhasColors provides phas) {
+    // Kill every default animation the design system doesn't want:
+    // LocalIndication swaps the press effect under Modifier.clickable, and a
+    // null LocalRippleConfiguration disables ripple inside Material components
+    // (which reach for it directly rather than through LocalIndication).
+    val indication = remember(phas.selection) { FlatIndication(phas.selection) }
+
+    CompositionLocalProvider(
+        LocalPhasColors provides phas,
+        LocalIndication provides indication,
+        LocalRippleConfiguration provides null,
+    ) {
         MaterialTheme(
             colorScheme = scheme,
             typography = PhasTypography,
