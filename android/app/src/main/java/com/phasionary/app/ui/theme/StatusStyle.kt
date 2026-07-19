@@ -17,6 +17,18 @@ fun statusLabel(status: String): String = when (status) {
     else -> status
 }
 
+/**
+ * The TUI's bracketed status marker (config status_display=icons). Always three
+ * characters wide, so in a monospace face the titles after it line up.
+ */
+fun statusGlyph(status: String): String = when (status) {
+    Status.TODO -> "[ ]"
+    Status.IN_PROGRESS -> "[/]"
+    Status.COMPLETED -> "[x]"
+    Status.CANCELLED -> "[-]"
+    else -> "[?]"
+}
+
 fun statusColor(status: String, colors: PhasColors): Color = when (status) {
     Status.TODO -> colors.statusTodo
     Status.IN_PROGRESS -> colors.statusInProgress
@@ -25,17 +37,30 @@ fun statusColor(status: String, colors: PhasColors): Color = when (status) {
     else -> colors.textMuted
 }
 
-/** The triangle marker the TUI uses; empty for medium/none. */
+/** The markers the TUI uses (ui.PriorityIcon); empty for medium/none. */
 fun priorityGlyph(priority: String): String = when (priority) {
+    Priority.CRITICAL -> "⇈"
     Priority.HIGH -> "▲"
     Priority.LOW -> "▼"
+    Priority.TRIVIAL -> "⇊"
     else -> ""
+}
+
+/** Spelled-out priority, for the editor and for screen readers. */
+fun priorityLabel(priority: String): String = when (priority) {
+    Priority.CRITICAL -> "critical"
+    Priority.HIGH -> "high"
+    Priority.MEDIUM -> "medium"
+    Priority.LOW -> "low"
+    Priority.TRIVIAL -> "trivial"
+    Priority.NONE -> "none"
+    else -> priority
 }
 
 /** Color for the priority glyph / title tint; null when there is no tint. */
 fun priorityColor(priority: String, colors: PhasColors): Color? = when (priority) {
-    Priority.HIGH -> colors.priorityHigh
-    Priority.LOW -> colors.priorityLow
+    Priority.CRITICAL, Priority.HIGH -> colors.priorityHigh
+    Priority.LOW, Priority.TRIVIAL -> colors.priorityLow
     else -> null
 }
 
