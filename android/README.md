@@ -5,11 +5,42 @@ A native Android (Kotlin + Jetpack Compose) client for the Phasionary
 Tailscale. It carries the TUI's dense, monospace, sharp-edged aesthetic into a
 touch UI.
 
-**v1 scope (this build):** the read path + status changes — project picker,
-category-grouped collapsible task list, tap a row to reveal its description, tap
-a status chip to cycle status (todo → in progress → completed → cancelled →
-todo, applied optimistically). Quick-capture (FAB) and swipe gestures land in
-the next pass.
+**Scope (this build):** project picker (most recently updated first),
+category-grouped task list with server-shared collapse state, tap a status
+marker to cycle status optimistically, tap a row to open a full-page editor
+(title / description / status / priority / estimate, plus delete), and inline
+capture rows for adding tasks and categories. Separators are editable too —
+insert one below a task from the editor, tap it to relabel or delete it in
+place. Swipe gestures and task reordering land in a later pass.
+
+Everything is deliberately animation-free: navigation cuts between screens with
+no transition, and Material's ripple is replaced by an instant flat press
+highlight (`ui/theme/Indication.kt`), so the app feels as immediate as the TUI.
+
+### API surface it uses
+
+The client drives these `/api/v1` endpoints (all served by `phasionary serve`):
+
+| Method | Path | Used for |
+| --- | --- | --- |
+| `GET` | `/projects` | picker; sorted by `updated_at`, newest first |
+| `GET` | `/projects/{pid}` | the task list, and the editor's task lookup |
+| `GET` `PUT` | `/projects/{pid}/folds` | collapsed categories, shared with the TUI |
+| `POST` | `/projects/{pid}/categories` | add category |
+| `POST` | `/projects/{pid}/categories/{cid}/tasks` | inline task capture; `kind: "separator"` + `insert_after` for a divider |
+| `PATCH` | `/projects/{pid}/categories/{cid}/tasks/{tid}` | editor save (only changed fields) |
+| `DELETE` | `/projects/{pid}/categories/{cid}/tasks/{tid}` | editor delete |
+| `POST` | `/projects/{pid}/categories/{cid}/tasks/{tid}/status` | status marker tap |
+
+Folds are stored in the server's `state.json`, the same file the TUI reads, so
+collapsing a category on the phone collapses it in the TUI as well — the TUI
+picks it up the next time it opens the project.
+
+**Separators** are `Task`s with `kind: "separator"`, and the API enforces what
+they are: a divider carries a label (which may be empty — that renders as a
+plain rule) and nothing else. A `PATCH` or a status change that would put a
+status, priority, estimate or description on one is rejected with a 400 rather
+than silently turning it into a half-task. The tallies skip them on both ends.
 
 ## Toolchain
 
@@ -91,9 +122,11 @@ Unit tests run on the JVM (no device/emulator) — `just test` (or
 - **Serialization** (`ModelSerializationTest`) — wire JSON ⇆ models, omitted /
   unknown fields, request-body omission.
 - **Repository** (`RemotePhasionaryRepositoryTest`) — Ktor `MockEngine`: URL +
-  bearer header, success parsing, and status-code → typed-error mapping.
-- **ViewModel** (`TaskListViewModelTest`) — load, optimistic status cycle,
-  revert-on-failure, category collapse.
+  bearer header, success parsing, status-code → typed-error mapping, the PATCH
+  body's omitted-vs-explicitly-empty distinction, and the 204 on delete.
+- **ViewModels** (`TaskListViewModelTest`, `TaskEditViewModelTest`) — load,
+  optimistic status cycle and fold write with revert-on-failure, inline add,
+  and the editor's dirty tracking / partial-save diff.
 
 ## Release APK
 
@@ -128,12 +161,13 @@ app/src/main/java/com/phasionary/app/
     ApiException  typed failures
   di/             AppContainer (manual DI, no Hilt in v1)
   ui/
-    theme/        TUI design system: color tokens, monospace type, flat theme
-    components/    TaskRow, StatusChip, CategoryHeader, state views
+    theme/        TUI design system: color tokens, monospace type, flat theme,
+                  FlatIndication (the no-animation press effect)
+    components/    TaskRow, StatusChip, CategoryHeader, InlineInputRow, state views
     projects/     project picker screen + ViewModel
-    tasks/        task list screen + ViewModel
+    tasks/        task list + task editor screens & ViewModels
     settings/     settings screen + ViewModel
-    navigation/    NavHost + routes
+    navigation/    NavHost + routes (transitions disabled)
   MainActivity, PhasionaryApp
 nix/sdk.nix       Nix-patched Android SDK definition
 justfile          task runner (sdk / run / install / apk / logs / test)
@@ -144,7 +178,11 @@ justfile          task runner (sdk / run / install / apk / logs / test)
 - **Token storage:** plaintext DataStore — acceptable for a single-user, private
   (Tailscale-only) setup. Move to an encrypted store before any wider use.
 - **Task order:** rendered as the server returns it (matches the TUI); no
-  client-side re-sort in v1.
+  client-side re-sort. Projects are sorted server-side by `updated_at` for this
+  client only — the TUI picker keeps its own manual order.
+- **Freshness:** the task list re-reads the project when the screen resumes.
+  There is no live push, so changes made in the TUI while the list is already on
+  screen appear on the next resume, not instantly.
 - **Font:** system monospace (`FontFamily.Monospace`). Drop a JetBrains Mono
   `.ttf` into `app/src/main/res/font` and point `ui/theme/Type.kt` at it to
   match the desktop TUI exactly.
