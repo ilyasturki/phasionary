@@ -30,6 +30,8 @@ Screenshot "/tmp/phas-vt/vhs-out/13_fwd_3_cancelled.png"
 Type " "
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/13_fwd_4_todo.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 # shift+space (reverse cycle) requires kitty keyboard protocol; covered by unit
 # tests in task_test.go since VHS 0.x cannot synthesize the chord.

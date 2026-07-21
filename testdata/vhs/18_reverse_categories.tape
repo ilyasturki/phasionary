@@ -25,6 +25,8 @@ Screenshot "/tmp/phas-vt/vhs-out/18_after_reverse.png"
 Type "S"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/18_toggled_back.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

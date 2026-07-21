@@ -34,6 +34,8 @@ Sleep 200ms
 Type "k"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/16_picker_new_project.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Escape

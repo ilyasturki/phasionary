@@ -43,6 +43,8 @@ Sleep 400ms
 Enter
 Sleep 600ms
 Screenshot "/tmp/phas-vt/vhs-out/25_help_filter_enter_runs.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

@@ -13,6 +13,8 @@ Sleep 1500ms
 Show
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/15_pick_opens_picker.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Escape

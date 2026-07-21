@@ -39,6 +39,8 @@ Screenshot "/tmp/phas-vt/vhs-out/21_separator_moved.png"
 Type "d"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/21_separator_deleted.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

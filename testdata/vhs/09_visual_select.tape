@@ -83,6 +83,8 @@ Screenshot "/tmp/phas-vt/vhs-out/09_delete_confirm.png"
 Type "y"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/09_after_delete.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

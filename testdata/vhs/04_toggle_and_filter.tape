@@ -51,6 +51,8 @@ Sleep 200ms
 Enter
 Sleep 300ms
 Screenshot "/tmp/phas-vt/vhs-out/04_filter_after_clear.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Escape
 Sleep 300ms

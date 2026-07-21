@@ -71,6 +71,8 @@ Sleep 150ms
 Type "T"
 Sleep 300ms
 Screenshot "/tmp/phas-vt/vhs-out/22_bulk_editor.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 Escape
 Sleep 200ms
 

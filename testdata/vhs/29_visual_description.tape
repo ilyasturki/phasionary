@@ -52,6 +52,8 @@ Sleep 200ms
 Type "v"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/29_visual_anchor_on_desc.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Escape
 Sleep 300ms

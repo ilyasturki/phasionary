@@ -41,6 +41,8 @@ Screenshot "/tmp/phas-vt/vhs-out/19_picker_filter_moved.png"
 Escape
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/19_picker_filter_cleared.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 # Esc again closes the picker.
 Escape

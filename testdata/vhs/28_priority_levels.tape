@@ -36,6 +36,8 @@ Screenshot "/tmp/phas-vt/vhs-out/28_trivial.png"
 Type "gi"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/28_info_trivial.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

@@ -26,6 +26,8 @@ Sleep 150ms
 Type "z"
 Sleep 800ms
 Screenshot "/tmp/phas-vt/vhs-out/20_after_zz.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

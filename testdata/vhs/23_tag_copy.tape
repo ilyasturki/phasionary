@@ -54,6 +54,8 @@ Screenshot "/tmp/phas-vt/vhs-out/23_after_visual_paste.png"
 Type "gy"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/23_yank_menu.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 Escape
 Sleep 200ms
 

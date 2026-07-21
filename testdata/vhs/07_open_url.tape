@@ -34,6 +34,8 @@ Screenshot "/tmp/phas-vt/vhs-out/07_open_url_picker_second.png"
 Escape
 Sleep 300ms
 Screenshot "/tmp/phas-vt/vhs-out/07_open_url_closed.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

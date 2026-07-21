@@ -36,6 +36,8 @@ Screenshot "/tmp/phas-vt/vhs-out/27_editor_two_lines.png"
 Enter
 Sleep 600ms
 Screenshot "/tmp/phas-vt/vhs-out/27_saved_multiline.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

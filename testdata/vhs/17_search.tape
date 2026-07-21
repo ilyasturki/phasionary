@@ -44,6 +44,8 @@ Screenshot "/tmp/phas-vt/vhs-out/17_search_prev.png"
 Escape
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/17_search_cleared.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

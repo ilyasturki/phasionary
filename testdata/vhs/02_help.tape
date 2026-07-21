@@ -41,6 +41,8 @@ Sleep 200ms
 Enter
 Sleep 600ms
 Screenshot "/tmp/phas-vt/vhs-out/02_help_enter_dispatches.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

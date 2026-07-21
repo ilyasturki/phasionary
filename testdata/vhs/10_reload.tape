@@ -27,6 +27,8 @@ Screenshot "/tmp/phas-vt/vhs-out/10_stale_in_memory.png"
 Type "r"
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/10_after_reload.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

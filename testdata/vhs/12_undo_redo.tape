@@ -60,6 +60,8 @@ Screenshot "/tmp/phas-vt/vhs-out/12_after_undo_add.png"
 Type "uuuuuuuuuu"
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/12_after_many_undos.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

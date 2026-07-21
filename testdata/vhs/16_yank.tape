@@ -34,6 +34,8 @@ Screenshot "/tmp/phas-vt/vhs-out/16_yank_picker_uuid.png"
 Enter
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/16_yank_copied.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"

@@ -4,6 +4,12 @@
 # Usage: ./testdata/vhs/run.sh [tape-name ...]
 #   ./testdata/vhs/run.sh                  # run all
 #   ./testdata/vhs/run.sh 03_add_task      # run one
+#
+# Writing tapes: always put a Sleep after the LAST Screenshot, before the
+# closing Hide/q. VHS writes a screenshot on the next rendered frame, so a tape
+# that quits straight after its final Screenshot can exit before that frame
+# exists and silently drop the file — no error, just a missing PNG. Measured on
+# 20_center_zz: 2/5 runs captured without the trailing Sleep, 8/8 with it.
 set -euo pipefail
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || {

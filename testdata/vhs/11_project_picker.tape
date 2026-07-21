@@ -30,6 +30,8 @@ Screenshot "/tmp/phas-vt/vhs-out/11_picker_add_empty.png"
 Type@40ms "Side Project"
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/11_picker_add_typed.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 # Cancel without creating so the seed stays intact
 Escape

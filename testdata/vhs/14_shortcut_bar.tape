@@ -37,6 +37,8 @@ Screenshot "/tmp/phas-vt/vhs-out/14_shortcut_bar_options_off.png"
 Escape
 Sleep 300ms
 Screenshot "/tmp/phas-vt/vhs-out/14_shortcut_bar_hidden.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Type ","
 Sleep 300ms

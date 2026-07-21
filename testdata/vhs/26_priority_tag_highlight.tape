@@ -53,6 +53,8 @@ Sleep 200ms
 Enter
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/26_labeled_tag_no_priority.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 Hide
 Type "q"
