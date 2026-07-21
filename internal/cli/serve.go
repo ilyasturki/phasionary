@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -79,6 +80,31 @@ Settings alongside the server URL. Requests without it are rejected.
 	return token, nil
 }
 
+// resolveAllowedHosts returns the extra Host header values the server accepts.
+//
+// It exists because viper hands back a bound environment variable as one
+// opaque string, and GetStringSlice then splits a string on whitespace rather
+// than commas. PHASIONARY_SERVE_ALLOWED_HOSTS="a.example,b.example" therefore
+// arrived as the single hostname "a.example,b.example", which matches nothing —
+// so both names were refused with a 421 that named neither. The repeated
+// --allowed-host flag was unaffected, pflag having already split it.
+//
+// Splitting on commas here makes the two paths agree. Empty entries are
+// dropped so a trailing comma or an unset-but-exported variable is not turned
+// into an "" host, which hostAllowed would reject anyway but only after the
+// startup log had claimed to accept it.
+func resolveAllowedHosts() []string {
+	var hosts []string
+	for _, entry := range viper.GetStringSlice("serve.allowed_hosts") {
+		for _, host := range strings.Split(entry, ",") {
+			if host = strings.TrimSpace(host); host != "" {
+				hosts = append(hosts, host)
+			}
+		}
+	}
+	return hosts
+}
+
 func newServeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -104,7 +130,10 @@ Requests are accepted when the Host header is an IP address or "localhost",
 which covers reaching the server by LAN or Tailscale IP. A request naming the
 server some other way — a Tailscale MagicDNS name, or a reverse proxy — is
 refused until that name is passed with --allowed-host. This is what stops a web
-page from reaching the server by re-pointing its own domain at it.`,
+page from reaching the server by re-pointing its own domain at it.
+
+--allowed-host is repeatable; PHASIONARY_SERVE_ALLOWED_HOSTS takes the same
+names as a comma-separated list.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			host := viper.GetString("serve.host")
 			if host == "" {
@@ -142,7 +171,7 @@ page from reaching the server by re-pointing its own domain at it.`,
 			srv := api.New(store, state, api.Config{
 				Addr:         addr,
 				Token:        token,
-				AllowedHosts: viper.GetStringSlice("serve.allowed_hosts"),
+				AllowedHosts: resolveAllowedHosts(),
 			})
 
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
