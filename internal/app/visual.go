@@ -378,6 +378,39 @@ func (m *model) stashVisualClipboard(selPositions []selection.Position, isCut bo
 	}
 }
 
+// visualCycleStatus sets every task in the visual selection to a single shared
+// next status, stepped from the first selected task so repeated presses walk
+// the whole block through the cycle together (reverse walks it backwards).
+// Separators carry no status and are skipped; description rows round up to
+// their parent task. Stays in visual mode.
+func (m *model) visualCycleStatus(reverse bool) {
+	if m.ui.Visual.Kind != selection.FocusTask {
+		return
+	}
+	selPositions := visualTaskPositions(m.visualSelectedPositions())
+	if len(selPositions) == 0 {
+		return
+	}
+	first := m.project.Categories[selPositions[0].CategoryIndex].Tasks[selPositions[0].TaskIndex]
+	next := domain.NextStatus(first.Status, reverse)
+	m.recordHistory()
+	changed := 0
+	for _, pos := range selPositions {
+		task := &m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
+		if task.Status == next {
+			continue
+		}
+		_ = task.SetStatus(next)
+		changed++
+	}
+	if changed == 0 {
+		m.discardLastHistory()
+		return
+	}
+	m.storeTaskUpdate()
+	m.ui.Screen.StatusMsg = fmt.Sprintf("Set %d task(s) to %s", changed, formatStatusLabel(next))
+}
+
 func (m *model) visualDelete() {
 	selPositions := m.visualSelectedPositions()
 	if len(selPositions) == 0 {
@@ -999,6 +1032,12 @@ func (m model) handleVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "d":
 		m.visualDelete()
+		return m, nil
+	case "space":
+		m.visualCycleStatus(false)
+		return m, nil
+	case "shift+space":
+		m.visualCycleStatus(true)
 		return m, nil
 	case "t":
 		m.visualCycleTag()

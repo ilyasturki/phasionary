@@ -103,6 +103,7 @@ func computeHelpRows() ([]helpRow, []int) {
 		helpTextRow("j/k", "extend range (skips category rows)"),
 		helpTextRow("J/K", "shift range down/up"),
 		helpTextRow("o", "swap anchor and cursor"),
+		helpTextRow("space", "cycle status of whole range forward/back"),
 		helpTextRow("y", "copy titles (newline-joined)"),
 		helpTextRow("Y", "copy as markdown checklist"),
 		helpTextRow("x", "cut range (then p to paste)"),

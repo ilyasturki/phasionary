@@ -657,3 +657,73 @@ func TestVisualSwap_PreservesDescriptionAnchor(t *testing.T) {
 	assert.Equal(t, 3, m.resolveVisualAnchor())
 	assert.Equal(t, 2, m.ui.Selection.Selected())
 }
+
+func TestVisualCycleStatus_AppliesSharedNextStatusToWholeRange(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1 (todo)
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // extend through t2 (in_progress) and t3 (completed)
+
+	m.visualCycleStatus(false)
+
+	// The whole block steps from the first task's status, not each its own.
+	cat := m.project.Categories[0]
+	assert.Equal(t, domain.StatusInProgress, cat.Tasks[0].Status)
+	assert.Equal(t, domain.StatusInProgress, cat.Tasks[1].Status)
+	assert.Equal(t, domain.StatusInProgress, cat.Tasks[2].Status)
+	assert.True(t, m.ui.Modes.IsVisual(), "stays in visual mode for repeated presses")
+
+	// A second press walks the block on together.
+	m.visualCycleStatus(false)
+	cat = m.project.Categories[0]
+	assert.Equal(t, domain.StatusCompleted, cat.Tasks[0].Status)
+	assert.Equal(t, domain.StatusCompleted, cat.Tasks[2].Status)
+}
+
+func TestVisualCycleStatus_ReverseWalksBackwards(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1 (todo)
+	m.enterVisualMode()
+	m.visualMoveCursor(1)
+
+	m.visualCycleStatus(true)
+
+	cat := m.project.Categories[0]
+	assert.Equal(t, domain.StatusCancelled, cat.Tasks[0].Status)
+	assert.Equal(t, domain.StatusCancelled, cat.Tasks[1].Status)
+}
+
+func TestVisualCycleStatus_SkipsSeparatorsInRange(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // sweep the separator and land on t2
+
+	m.visualCycleStatus(false)
+
+	cat := m.project.Categories[0]
+	assert.Equal(t, domain.StatusInProgress, cat.Tasks[0].Status)
+	assert.Empty(t, cat.Tasks[1].Status, "separator carries no status")
+	assert.Equal(t, domain.StatusInProgress, cat.Tasks[2].Status)
+}
+
+func TestVisualCycleStatus_NoOpOnCategorySelection(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(1) // Cat A header
+	m.enterVisualMode()
+	require.Equal(t, selection.FocusCategory, m.ui.Visual.Kind)
+
+	m.visualCycleStatus(false)
+
+	assert.Equal(t, domain.StatusTodo, m.project.Categories[0].Tasks[0].Status)
+}
+
+func TestVisualCycleStatus_RoundsDescriptionUpToParentOnce(t *testing.T) {
+	m := newTestModelWithDescription(t)
+	m.ui.Selection.MoveTo(3) // t1's description row only
+	m.enterVisualMode()
+
+	m.visualCycleStatus(false)
+
+	assert.Equal(t, domain.StatusInProgress, m.project.Categories[0].Tasks[0].Status)
+}

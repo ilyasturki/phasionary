@@ -272,20 +272,40 @@ func (t *Task) SetEstimate(minutes int) {
 	t.UpdatedAt = NowTimestamp()
 }
 
-func (t *Task) CycleStatus() bool {
-	var nextStatus string
-	switch t.Status {
-	case StatusTodo:
-		nextStatus = StatusInProgress
-	case StatusInProgress:
-		nextStatus = StatusCompleted
-	case StatusCompleted:
-		nextStatus = StatusCancelled
-	case StatusCancelled:
-		nextStatus = StatusTodo
-	default:
-		nextStatus = StatusTodo
+// NextStatus returns the status one step along the cycle
+// (todo→in_progress→completed→cancelled→todo), walking it backwards when
+// reverse is set. Any unrecognized value resets to todo.
+func NextStatus(status string, reverse bool) string {
+	if reverse {
+		switch status {
+		case StatusTodo:
+			return StatusCancelled
+		case StatusCancelled:
+			return StatusCompleted
+		case StatusCompleted:
+			return StatusInProgress
+		case StatusInProgress:
+			return StatusTodo
+		default:
+			return StatusTodo
+		}
 	}
+	switch status {
+	case StatusTodo:
+		return StatusInProgress
+	case StatusInProgress:
+		return StatusCompleted
+	case StatusCompleted:
+		return StatusCancelled
+	case StatusCancelled:
+		return StatusTodo
+	default:
+		return StatusTodo
+	}
+}
+
+func (t *Task) CycleStatus() bool {
+	nextStatus := NextStatus(t.Status, false)
 	if nextStatus == t.Status {
 		return false
 	}
@@ -380,19 +400,7 @@ func (t *Task) SetTagLabel(label string) {
 }
 
 func (t *Task) CycleStatusReverse() bool {
-	var nextStatus string
-	switch t.Status {
-	case StatusTodo:
-		nextStatus = StatusCancelled
-	case StatusCancelled:
-		nextStatus = StatusCompleted
-	case StatusCompleted:
-		nextStatus = StatusInProgress
-	case StatusInProgress:
-		nextStatus = StatusTodo
-	default:
-		nextStatus = StatusTodo
-	}
+	nextStatus := NextStatus(t.Status, true)
 	if nextStatus == t.Status {
 		return false
 	}
