@@ -76,6 +76,7 @@ func (m *model) beginTagEdit(taskIDs []string, color, label string) tea.Cmd {
 	}
 	ti := textinput.New()
 	ti.Prompt = ""
+	ti.CharLimit = domain.MaxLineLen
 	ti.SetValue(label)
 	ti.SetCursor(len([]rune(label)))
 	cmd := ti.Focus()
