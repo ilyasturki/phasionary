@@ -134,7 +134,11 @@ func (m *StateManager) save() error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(m.path, data, 0o644)
+	// Same atomic write the project store uses. state.json is rewritten whole on
+	// every fold toggle and project switch, so a crash mid-write would truncate
+	// it and lose every fold and the project ordering — cheap to prevent, and
+	// the projects beside it already get this treatment.
+	return writeFileAtomic(m.path, m.path+".tmp", data, 0o644)
 }
 
 // update re-reads state.json, applies fn to the fresh state, and writes it back

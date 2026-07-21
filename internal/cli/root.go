@@ -56,7 +56,12 @@ func newRootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolP("quiet", "q", false, "suppress non-essential output")
 	cmd.PersistentFlags().BoolP("long", "l", false, "show additional details (IDs, timestamps) in list output")
 
-	viper.AutomaticEnv()
+	// Deliberately no viper.AutomaticEnv(): without a prefix it maps the key
+	// "data" to the bare environment variable DATA and "config" to CONFIG,
+	// names generic enough to already exist in a shell for unrelated reasons —
+	// silently relocating where projects are read and written. Every key that
+	// should be settable from the environment is bound explicitly below, under
+	// a PHASIONARY_ name, and BindEnv works without AutomaticEnv.
 	if err := viper.BindEnv("config", config.EnvConfigPath); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
