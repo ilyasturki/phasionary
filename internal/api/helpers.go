@@ -46,6 +46,16 @@ func errorStatus(err error) (int, string) {
 		return http.StatusBadRequest, "a separator only has a label"
 	case errors.Is(err, operations.ErrInvalidKind):
 		return http.StatusBadRequest, "invalid kind"
+	// Text validation rejects what the client sent, so these are 400s. Without
+	// these arms they would fall through to the 500 default and get logged as
+	// unexpected internal errors, which is exactly backwards: the server handled
+	// the request correctly by refusing it.
+	case errors.Is(err, domain.ErrControlCharacters):
+		return http.StatusBadRequest, "text must not contain control characters"
+	case errors.Is(err, domain.ErrInvalidUTF8):
+		return http.StatusBadRequest, "text must be valid UTF-8"
+	case errors.Is(err, domain.ErrTextTooLong):
+		return http.StatusBadRequest, "text is too long"
 	default:
 		return http.StatusInternalServerError, "internal server error"
 	}

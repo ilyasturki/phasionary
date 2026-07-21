@@ -108,6 +108,42 @@ func NormalizeName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
+// MaxIDLen caps an identifier's length so a hand-written or hostile ID cannot
+// produce a filename the OS rejects.
+const MaxIDLen = 64
+
+// ErrInvalidID is returned when an identifier contains anything outside
+// [A-Za-z0-9_-], is empty, or exceeds MaxIDLen.
+var ErrInvalidID = errors.New("invalid id")
+
+// ValidateID checks an identifier that will be interpolated into a filename.
+//
+// The store maps a project ID straight to <dir>/<id>.json, so the ID is a path
+// component and an unchecked one escapes the data directory ("../../x") or
+// collides with the .lock and .tmp siblings. This is an allowlist rather than a
+// denylist of "../" and friends: excluding '/' makes traversal unrepresentable,
+// and excluding '.' rules out both ".." and any confusion with those suffixes,
+// without needing to enumerate what an attacker might try.
+//
+// The set is deliberately wider than what NewID emits so that a hand-written
+// project imported with a readable ID keeps it.
+func ValidateID(id string) error {
+	if id == "" || len(id) > MaxIDLen {
+		return ErrInvalidID
+	}
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_':
+		default:
+			return ErrInvalidID
+		}
+	}
+	return nil
+}
+
 func NewID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

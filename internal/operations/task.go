@@ -52,6 +52,24 @@ func CreateTask(p *domain.Project, categoryID string, f TaskFields) (domain.Task
 //
 // Returns domain.ErrTaskNotFound when afterTaskID doesn't resolve within the
 // category, plus everything CreateTask returns.
+// validateTaskText screens the free-text fields of a write.
+//
+// This is the single gate all four writers share — TUI, CLI, JSON API and the
+// HTML endpoint all build a TaskFields and hand it here — which is why the
+// check lives at this layer rather than in each front door. Titles and tag
+// labels render on one line and reject every control character; descriptions
+// are legitimately multi-line, so they keep newlines and tabs and reject the
+// rest.
+func validateTaskText(f TaskFields) error {
+	if err := domain.ValidateLine(f.Title); err != nil {
+		return err
+	}
+	if err := domain.ValidateLine(f.TagLabel); err != nil {
+		return err
+	}
+	return domain.ValidateMultiline(f.Description)
+}
+
 func CreateTaskAfter(
 	p *domain.Project,
 	categoryID string,
@@ -67,6 +85,9 @@ func CreateTaskAfter(
 	// rule), so the title requirement applies only to real tasks.
 	if !f.isSeparatorKind() && strings.TrimSpace(f.Title) == "" {
 		return domain.Task{}, ErrTitleRequired
+	}
+	if err := validateTaskText(f); err != nil {
+		return domain.Task{}, err
 	}
 	if f.isSeparatorKind() {
 		if err := validateSeparatorFields(f); err != nil {
@@ -212,6 +233,14 @@ func UpdateTask(p *domain.Project, categoryID, taskID string, u TaskUpdate) (dom
 		if title == "" {
 			return domain.Task{}, ErrTitleRequired
 		}
+		if err := domain.ValidateLine(title); err != nil {
+			return domain.Task{}, err
+		}
+	}
+	if u.Description != nil {
+		if err := domain.ValidateMultiline(*u.Description); err != nil {
+			return domain.Task{}, err
+		}
 	}
 	if u.Estimate != nil && *u.Estimate < 0 {
 		return domain.Task{}, ErrNegativeEstimate
@@ -269,6 +298,9 @@ func updateSeparator(sep *domain.Task, u TaskUpdate) (domain.Task, error) {
 	// Empty is allowed here (unlike a task): it clears the label back to a
 	// plain rule.
 	label := strings.TrimSpace(*u.Title)
+	if err := domain.ValidateLine(label); err != nil {
+		return domain.Task{}, err
+	}
 	if label == sep.Title {
 		return *sep, ErrNoChange
 	}

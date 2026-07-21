@@ -14,6 +14,9 @@ func CreateCategory(p *domain.Project, name string) (domain.Category, error) {
 	if name == "" {
 		return domain.Category{}, ErrNameRequired
 	}
+	if err := domain.ValidateLine(name); err != nil {
+		return domain.Category{}, err
+	}
 	cat, err := p.AddCategoryNamed(name)
 	if err != nil {
 		return domain.Category{}, err
@@ -28,6 +31,9 @@ func RenameCategory(p *domain.Project, categoryID, name string) (domain.Category
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return domain.Category{}, ErrNameRequired
+	}
+	if err := domain.ValidateLine(name); err != nil {
+		return domain.Category{}, err
 	}
 	idx, err := p.FindCategoryByID(categoryID)
 	if err != nil {
