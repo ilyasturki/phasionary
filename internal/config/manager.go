@@ -31,6 +31,10 @@ func NewManager(configPath string) *Manager {
 	}
 }
 
+// configFileMode is the permission the config file is kept at. It holds the
+// serve token, so it is owner-only.
+const configFileMode fs.FileMode = 0o600
+
 // Load reads the config from disk. Creates a default config file if missing.
 func (m *Manager) Load() error {
 	data, err := os.ReadFile(m.path)
@@ -43,7 +47,24 @@ func (m *Manager) Load() error {
 	if err := json.Unmarshal(data, &m.cfg); err != nil {
 		return fmt.Errorf("parsing config %s: %w", m.path, err)
 	}
+	m.tightenPermissions()
 	return nil
+}
+
+// tightenPermissions narrows an existing config file to configFileMode.
+//
+// Files created before the token lived here were written 0644, and Save alone
+// would not fix them: it writes through to the existing inode, which keeps the
+// old mode. Without this, upgrading and then generating a token would leave the
+// token world-readable. Failure is ignored — a config that cannot be chmodded
+// (unusual ownership, odd filesystem) should not stop the tool from running,
+// and serve refuses to use a token it cannot protect anyway.
+func (m *Manager) tightenPermissions() {
+	info, err := os.Stat(m.path)
+	if err != nil || info.Mode().Perm() == configFileMode {
+		return
+	}
+	_ = os.Chmod(m.path, configFileMode)
 }
 
 // Save writes the current config to disk. Creates the directory if needed.
@@ -56,8 +77,14 @@ func (m *Manager) Save() error {
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
-	if err := os.WriteFile(m.path, data, 0o644); err != nil {
+	if err := os.WriteFile(m.path, data, configFileMode); err != nil {
 		return fmt.Errorf("writing config %s: %w", m.path, err)
+	}
+	// WriteFile only applies the mode when it creates the file, so an existing
+	// 0644 config would keep its old permissions after a write. Chmod
+	// unconditionally so saving a token always lands on an owner-only file.
+	if err := os.Chmod(m.path, configFileMode); err != nil {
+		return fmt.Errorf("securing config %s: %w", m.path, err)
 	}
 	return nil
 }
