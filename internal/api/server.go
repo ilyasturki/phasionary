@@ -19,6 +19,10 @@ import (
 type Config struct {
 	Addr  string
 	Token string
+	// AllowedHosts names additional Host header values to accept beyond IP
+	// literals and localhost — a Tailscale MagicDNS name, say, or the public
+	// name of a reverse proxy. See hostAllowed.
+	AllowedHosts []string
 }
 
 type Server struct {
@@ -57,7 +61,11 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.cfg.Token != "" {
 		log.Printf("auth enabled; send requests with Authorization: Bearer <token> (token %s)", redact(s.cfg.Token))
 	} else {
-		log.Printf("auth disabled (no --token); only safe on localhost")
+		log.Printf("WARNING: auth disabled (no token configured); every request is accepted, " +
+			"including from any web page the browser loads")
+	}
+	if len(s.cfg.AllowedHosts) > 0 {
+		log.Printf("additionally accepting Host: %s", strings.Join(s.cfg.AllowedHosts, ", "))
 	}
 
 	select {

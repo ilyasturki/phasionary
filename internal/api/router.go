@@ -6,8 +6,14 @@ func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
 
+	// Applied inside-out: the last wrap runs first. Logging stays outermost so
+	// every request is recorded including the ones that are refused — which is
+	// also why it must never write the raw request path (see safeForLog). The
+	// Host check sits outside auth so a rebinding attempt is rejected before any
+	// token comparison happens.
 	var h http.Handler = mux
 	h = s.authMiddleware(h)
+	h = s.hostMiddleware(h)
 	h = panicMiddleware(h)
 	h = loggingMiddleware(h)
 	return h

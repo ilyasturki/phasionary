@@ -20,6 +20,7 @@ func newJSONRequest(t *testing.T, method, target string, body any) *http.Request
 		t.Fatalf("marshal body: %v", err)
 	}
 	req := httptest.NewRequest(method, target, bytes.NewReader(raw))
+	req.Host = testHost
 	req.Header.Set("Content-Type", "application/json")
 	return req
 }
@@ -280,6 +281,7 @@ func TestAPITaskCreateMalformedJSON(t *testing.T) {
 	req := httptest.NewRequest("POST",
 		"/api/v1/projects/"+pid+"/categories/"+cid+"/tasks",
 		strings.NewReader("{not valid json"))
+	req.Host = testHost
 	req.Header.Set("Content-Type", "application/json")
 	resp := do(t, srv, req)
 	assertStatus(t, resp, http.StatusBadRequest)

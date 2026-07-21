@@ -28,6 +28,12 @@ func newTestServer(t *testing.T, token string) (*Server, *data.Store) {
 	return srv, store
 }
 
+// testHost is the Host header the helpers attach. httptest.NewRequest defaults
+// to "example.com", which hostMiddleware refuses — that default is exactly the
+// shape of a DNS-rebinding request, so tests have to name the server the way a
+// real client would.
+const testHost = "127.0.0.1:7777"
+
 func newRequest(t *testing.T, method, target string, form url.Values) *http.Request {
 	t.Helper()
 	var body io.Reader
@@ -35,6 +41,7 @@ func newRequest(t *testing.T, method, target string, form url.Values) *http.Requ
 		body = strings.NewReader(form.Encode())
 	}
 	req := httptest.NewRequest(method, target, body)
+	req.Host = testHost
 	if form != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
