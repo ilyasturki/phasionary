@@ -85,6 +85,37 @@ Authentication is not optional, even on loopback: binding to `127.0.0.1` does no
 
 Setup, the API surface it uses, and build instructions: [`android/README.md`](android/README.md).
 
+### Running it as a NixOS service
+
+The flake ships `nixosModules.phasionary`. `tokenFile` is required — without it the server generates a token and prints it, which under systemd means the credential lands in the journal and stays there.
+
+```nix
+services.phasionary.serve = {
+  enable = true;
+  tokenFile = config.age.secrets.phasionary-token.path;  # or sops-nix, etc.
+};
+```
+
+That binds `127.0.0.1:7777` and needs nothing else on a machine you reach by SSH tunnel. To reach it by a **name** — a domain, a Tailscale MagicDNS name — put TLS in front and list the name, or every request is refused with `421`:
+
+```nix
+services.phasionary.serve = {
+  enable = true;
+  tokenFile = config.age.secrets.phasionary-token.path;
+  allowedHosts = [ "phasionary.example.com" ];
+};
+
+services.nginx.virtualHosts."phasionary.example.com" = {
+  forceSSL = true;
+  enableACME = true;
+  locations."/".proxyPass = "http://127.0.0.1:7777";
+};
+```
+
+Keep the bind on loopback and `openFirewall = false` in this shape: nginx reaches the service without crossing the firewall, and the token only stays secret because TLS terminates upstream — it is a bearer credential sent in the clear over plain HTTP.
+
+Exposing the API to the open internet is worth thinking twice about. It is a single-user tool: one shared token, no per-client revocation, and no rate limiting on the token comparison. A private network (Tailscale, WireGuard, an SSH tunnel) fits it better than a public domain.
+
 ## Configuration
 
 Config lives at `~/.config/phasionary/config.json`. Override with `phasionary config set <key> <value>` or edit directly.
