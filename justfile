@@ -1,14 +1,28 @@
+# The repo-root VERSION file is the single source of truth for the version,
+# shared with the Go build (injected via ldflags below) and flake.nix, which
+# stamps the same `v`-prefixed value.
+version := trim(`cat VERSION`)
+commit := `git rev-parse --short HEAD`
+build_date := `date -u +%Y-%m-%dT%H:%M:%SZ`
+ldflags := "-X phasionary/internal/version.Version=v" + version + \
+    " -X phasionary/internal/version.Commit=" + commit + \
+    " -X phasionary/internal/version.BuildDate=" + build_date
+
 # Build the CLI binary.
 build:
-    go build -ldflags "-X phasionary/internal/version.Version=$(git describe --tags --always) -X phasionary/internal/version.Commit=$(git rev-parse --short HEAD) -X phasionary/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o phasionary ./cmd/phasionary
+    go build -ldflags "{{ldflags}}" -o phasionary ./cmd/phasionary
 
-# Run the CLI binary
+# Run from source, passing args through (e.g. `just run version`).
 run *ARGS:
-    ./phasionary {{ARGS}}
+    go run -ldflags "{{ldflags}}" ./cmd/phasionary {{ARGS}}
 
-# Run the CLI binary with the app data
+# Run from source against the local ./data dir.
 run-app *ARGS:
-    ./phasionary --data ./data {{ARGS}}
+    go run -ldflags "{{ldflags}}" ./cmd/phasionary --data ./data {{ARGS}}
+
+# Run the compiled binary, building it first if needed.
+exec *ARGS: build
+    ./phasionary {{ARGS}}
 
 # Serve the web UI with token auth (random token unless one is given).
 serve token=`openssl rand -hex 16` host="127.0.0.1" port="7777": build
@@ -19,9 +33,9 @@ serve token=`openssl rand -hex 16` host="127.0.0.1" port="7777": build
 build-nix:
     nix build
 
-# Run the CLI binary using Nix.
-run-nix:
-    nix run
+# Run the CLI binary using Nix, passing args through (e.g. `just run-nix version`).
+run-nix *ARGS:
+    nix run . -- {{ARGS}}
 
 # Run all tests.
 test:
