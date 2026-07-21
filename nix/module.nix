@@ -14,6 +14,13 @@ let
     serveCfg.host == "127.0.0.1"
     || serveCfg.host == "::1"
     || serveCfg.host == "localhost";
+
+  # Passed as repeated flags rather than PHASIONARY_SERVE_ALLOWED_HOSTS: viper
+  # reads a bound env var as one opaque string, so a comma-separated list
+  # arrives as a single hostname and silently matches nothing.
+  allowedHostFlags = lib.concatMapStringsSep " " (
+    host: "--allowed-host ${lib.escapeShellArg host}"
+  ) serveCfg.allowedHosts;
 in
 {
   options.services.phasionary = {
@@ -52,7 +59,26 @@ in
         description = ''
           Path to a file containing the auth token. The file is read by systemd
           via `LoadCredential` and exposed to the service as
-          `PHASIONARY_SERVE_TOKEN`. Required when `host` is not loopback.
+          `PHASIONARY_SERVE_TOKEN`. Required whenever `serve.enable` is set.
+
+          It is not optional even on loopback: without it, `phasionary serve`
+          generates a token on first run and prints it to stdout, which under
+          systemd means the token is written to the journal and stays there.
+        '';
+      };
+
+      allowedHosts = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        example = [ "phasionary.example.com" ];
+        description = ''
+          Additional `Host` header values to accept, passed as repeated
+          `--allowed-host` flags.
+
+          The server accepts IP literals and `localhost` unconditionally, so a
+          LAN or Tailscale IP needs nothing here. Any other name — a reverse
+          proxy's domain, a Tailscale MagicDNS name — is refused with 421 until
+          it is listed, which is what closes off DNS rebinding.
         '';
       };
 
@@ -81,8 +107,9 @@ in
         type = lib.types.bool;
         default = false;
         description = ''
-          Whether to open `port` in the firewall. Only takes effect for
-          non-loopback binds.
+          Whether to open `port` in the firewall. Ignored for loopback binds,
+          where an open port would grant nothing — including behind a reverse
+          proxy, which reaches the service without traversing the firewall.
         '';
       };
     };
@@ -91,8 +118,16 @@ in
   config = lib.mkIf serveCfg.enable {
     assertions = [
       {
-        assertion = isLoopback || serveCfg.tokenFile != null;
-        message = "services.phasionary.serve.tokenFile must be set when host is not loopback.";
+        assertion = serveCfg.tokenFile != null;
+        message = ''
+          services.phasionary.serve.tokenFile must be set.
+
+          Without it phasionary generates a token on first run and prints it to
+          stdout, which systemd captures into the journal — leaving a
+          full-access credential readable by the journal-reading groups for the
+          life of the log. This applies to loopback binds too, which is the
+          usual shape behind a TLS reverse proxy.
+        '';
       }
     ];
 
@@ -108,9 +143,16 @@ in
       phasionary = { };
     };
 
-    networking.firewall = lib.mkIf serveCfg.openFirewall {
+    networking.firewall = lib.mkIf (serveCfg.openFirewall && !isLoopback) {
       allowedTCPPorts = [ serveCfg.port ];
     };
+
+    # StateDirectory only covers the default path. A custom dataDir is named in
+    # ReadWritePaths, and systemd refuses to start a unit whose ReadWritePaths
+    # entry does not exist, so it has to be created here.
+    systemd.tmpfiles.rules = lib.mkIf (serveCfg.dataDir != "/var/lib/phasionary") [
+      "d ${serveCfg.dataDir} 0700 ${serveCfg.user} ${serveCfg.group} -"
+    ];
 
     systemd.services.phasionary-serve = {
       description = "Phasionary JSON API server";
@@ -131,38 +173,49 @@ in
 
         StateDirectory = lib.mkIf (serveCfg.dataDir == "/var/lib/phasionary") "phasionary";
 
-        LoadCredential = lib.mkIf (serveCfg.tokenFile != null) [
-          "token:${toString serveCfg.tokenFile}"
-        ];
+        LoadCredential = [ "token:${toString serveCfg.tokenFile}" ];
+
+        # Data files inherit this; config.json sets 0600 itself, but the store
+        # is written with the process umask.
+        UMask = "0077";
 
         NoNewPrivileges = true;
         PrivateTmp = true;
+        PrivateDevices = true;
         ProtectSystem = "strict";
         ProtectHome = true;
         ReadWritePaths = [ serveCfg.dataDir ];
         ProtectKernelTunables = true;
         ProtectKernelModules = true;
+        ProtectKernelLogs = true;
         ProtectControlGroups = true;
+        ProtectClock = true;
+        ProtectHostname = true;
+        ProtectProc = "invisible";
+        ProcSubset = "pid";
         RestrictAddressFamilies = [
           "AF_UNIX"
           "AF_INET"
           "AF_INET6"
         ];
         RestrictNamespaces = true;
+        RestrictRealtime = true;
+        RestrictSUIDSGID = true;
         LockPersonality = true;
+        CapabilityBoundingSet = [ "" ];
         SystemCallArchitectures = "native";
+        SystemCallFilter = [
+          "@system-service"
+          "~@privileged"
+          "~@resources"
+        ];
       };
 
-      script =
-        if serveCfg.tokenFile != null then
-          ''
-            export PHASIONARY_SERVE_TOKEN="$(cat "$CREDENTIALS_DIRECTORY/token")"
-            exec ${cfg.package}/bin/phasionary serve
-          ''
-        else
-          ''
-            exec ${cfg.package}/bin/phasionary serve
-          '';
+      # tokenFile is asserted non-null above, so the credential always exists.
+      script = ''
+        export PHASIONARY_SERVE_TOKEN="$(cat "$CREDENTIALS_DIRECTORY/token")"
+        exec ${cfg.package}/bin/phasionary serve ${allowedHostFlags}
+      '';
     };
   };
 }
