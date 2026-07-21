@@ -90,8 +90,9 @@ just test       # JVM unit tests (no device needed)
 
 ## Connect the app to the server
 
-Start the server with a token, then set **Base URL** + **Token** in the app's
-**⚙ Settings**. Two ways to reach it:
+`phasionary serve` generates a token on first run, saves it to `config.json` and
+prints it once; pass `--token` only if you want to supply your own. Set **Base
+URL** + **Token** in the app's **⚙ Settings**. Two ways to reach it:
 
 - **Desk loop (via `just run`'s `adb reverse`):** run the server bound to
   localhost, and use `localhost` in the app:
@@ -105,10 +106,19 @@ Start the server with a token, then set **Base URL** + **Token** in the app's
   tailnet IP / MagicDNS name in the app:
 
   ```bash
-  phasionary serve --host 0.0.0.0 --port 7777 --token <TOKEN>
+  phasionary serve --host 0.0.0.0 --port 7777
   # or PHASIONARY_SERVE_TOKEN=<TOKEN> phasionary serve ...
   ```
   App Base URL → `http://100.x.y.z:7777`.
+
+  A tailnet **IP** works as-is. To use a **MagicDNS name** instead, permit it —
+  the server accepts IP addresses and `localhost` by default and refuses other
+  names, which is what stops a web page from reaching it by re-pointing its own
+  domain at your machine:
+
+  ```bash
+  phasionary serve --host 0.0.0.0 --allowed-host phasionary.tail1a2b.ts.net
+  ```
 
 Include `http://` in the Base URL. The app allows cleartext HTTP
 (`usesCleartextTraffic=true`) because the server speaks plain HTTP over a
@@ -177,6 +187,11 @@ justfile          task runner (sdk / run / install / apk / logs / test)
 
 - **Token storage:** plaintext DataStore — acceptable for a single-user, private
   (Tailscale-only) setup. Move to an encrypted store before any wider use.
+  Backups are disabled (`allowBackup="false"` plus `data_extraction_rules.xml`)
+  so that plaintext token is never copied off the device — neither to the user's
+  Drive by Auto Backup, nor via `adb backup` on the Android 8–11 devices
+  `minSdk 26` still supports. Nothing here is worth restoring anyway: the app's
+  whole persisted state is a URL and a token.
 - **Task order:** rendered as the server returns it (matches the TUI); no
   client-side re-sort. Projects are sorted server-side by `updated_at` for this
   client only — the TUI picker keeps its own manual order.

@@ -65,6 +65,24 @@ Run `phasionary --help` for the full surface (projects, categories, config, comp
 
 Every release also ships `phasionary-android.apk` — a native Android client, sideloaded from the [releases page](https://github.com/ilyasturki/phasionary/releases). It's a thin, online-only client for the `/api/v1` JSON API that `phasionary serve` exposes; point it at your machine over a private network (Tailscale) and the same projects, categories and fold state show up on your phone.
 
+`phasionary serve` requires a bearer token on every request. The first run generates one, saves it to `config.json` and prints it once:
+
+```
+phasionary serve                    # prints the generated token
+```
+
+Enter that token in the app's settings alongside the server URL. To use your own instead, pass `--token` or set `PHASIONARY_SERVE_TOKEN`.
+
+The server binds to `127.0.0.1:7777` by default; reach it from your phone over Tailscale (`--host 0.0.0.0`) or an SSH tunnel (`ssh -L 7777:localhost:7777 your-server`). Requests are accepted when the `Host` header is an IP address or `localhost`, which covers both routes — if you reach the server by a name instead, such as a Tailscale MagicDNS name, permit it with `--allowed-host`:
+
+```
+phasionary serve --host 0.0.0.0 --allowed-host phasionary.tail1a2b.ts.net
+```
+
+Authentication is not optional, even on loopback: binding to `127.0.0.1` does not keep a web page out, because a page the browser loads can re-point its own domain at the loopback address and reach the server. The token and the `Host` check are what actually close that off.
+
+> **Upgrading from a version without tokens:** the phone will get `401`s until you enter the token that `phasionary serve` prints on its next run.
+
 Setup, the API surface it uses, and build instructions: [`android/README.md`](android/README.md).
 
 ## Configuration
@@ -76,6 +94,9 @@ Config lives at `~/.config/phasionary/config.json`. Override with `phasionary co
 | `status_display` | `text`, `icons` | `icons` | How task status renders in the TUI |
 | `default_project` | project UUID | (none) | Project to open on launch |
 | `priority_color` | `full`, `icon`, `none` | `full` | How priority is colored — full row, icon only, or off |
+| `serve_token` | token string | (generated) | Bearer token `phasionary serve` requires; created on first serve |
+
+Because it holds `serve_token`, `config.json` is kept at mode `0600` and is tightened automatically if it was created by an earlier version.
 
 Paths can be relocated with `PHASIONARY_CONFIG_PATH` and `PHASIONARY_DATA_PATH` — both name a directory; `PHASIONARY_CONFIG_PATH` also accepts a path ending in `config.json` for convenience.
 
