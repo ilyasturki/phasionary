@@ -77,6 +77,14 @@ func (s *Store) ListProjects() ([]domain.Project, error) {
 }
 
 func (s *Store) LoadProjectByID(id string) (domain.Project, error) {
+	// Every read reaches the filesystem through here, so this is where an ID
+	// earns the right to become a path component. An ID that isn't well-formed
+	// cannot name a project that exists, so it is reported as not-found rather
+	// than as a distinct error — that keeps the API's 404 from confirming
+	// anything about the shape of the path that was probed.
+	if err := domain.ValidateID(id); err != nil {
+		return domain.Project{}, ErrProjectNotFound
+	}
 	path := s.projectPath(id)
 	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		return domain.Project{}, ErrProjectNotFound
@@ -142,9 +150,15 @@ func (s *Store) writeProjectBytes(id string, data []byte) error {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return err
 	}
-	path := s.projectPath(id)
-	tmp := s.tmpPath(id)
-	if err := writeFileSync(tmp, data, 0o644); err != nil {
+	return writeFileAtomic(s.projectPath(id), s.tmpPath(id), data, 0o644)
+}
+
+// writeFileAtomic writes data to path via tmp: an fsync'd temp file, renamed
+// into place, then a directory fsync so the rename survives a crash. A reader
+// therefore sees either the old file or the new one, never a half-written one.
+// It performs no locking or existence check; callers layer those on.
+func writeFileAtomic(path, tmp string, data []byte, perm os.FileMode) error {
+	if err := writeFileSync(tmp, data, perm); err != nil {
 		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
@@ -152,7 +166,7 @@ func (s *Store) writeProjectBytes(id string, data []byte) error {
 		return err
 	}
 	// Flush the directory entry so the rename survives a crash.
-	if dir, derr := os.Open(s.Dir); derr == nil {
+	if dir, derr := os.Open(filepath.Dir(path)); derr == nil {
 		_ = dir.Sync()
 		_ = dir.Close()
 	}
@@ -216,6 +230,13 @@ func (s *Store) createNewProjectLocked(name string, prepare func() (domain.Proje
 }
 
 func (s *Store) CreateProject(name string) (domain.Project, error) {
+	// Project names render in the TUI picker and the CLI list, so they get the
+	// same single-line treatment task titles do. ImportProject validates its own
+	// name via ValidateProjectText, which is why the check sits here rather than
+	// in the shared createNewProjectLocked spine.
+	if err := domain.ValidateLine(name); err != nil {
+		return domain.Project{}, err
+	}
 	return s.createNewProjectLocked(name, func() (domain.Project, error) {
 		project, err := domain.NewProject(name)
 		if err != nil {
@@ -241,8 +262,19 @@ func (s *Store) CreateProject(name string) (domain.Project, error) {
 // silently overwrite (and destroy) another project — re-importing a project
 // that still exists is rejected by the duplicate-name check instead.
 func (s *Store) ImportProject(project domain.Project) (domain.Project, error) {
+	// An imported file is the one genuinely untrusted input this tool takes, and
+	// it never passes through the operations layer where writes are normally
+	// validated — so it is checked here instead.
+	if err := domain.ValidateProjectText(project); err != nil {
+		return domain.Project{}, fmt.Errorf("importing project: %w", err)
+	}
 	return s.createNewProjectLocked(project.Name, func() (domain.Project, error) {
-		if project.ID == "" || s.projectExists(project.ID) {
+		// ValidateID comes before projectExists so a malformed ID is never used
+		// to stat a path; an ID like "../../x" would otherwise have become a
+		// file written outside the data directory. A bad ID is replaced rather
+		// than refused, matching how a blank or colliding one is already
+		// handled — the ID is an internal detail the user never chose.
+		if domain.ValidateID(project.ID) != nil || s.projectExists(project.ID) {
 			id, err := domain.NewID()
 			if err != nil {
 				return domain.Project{}, err
@@ -261,6 +293,9 @@ func (s *Store) ImportProject(project domain.Project) (domain.Project, error) {
 // from other processes. excludeID lets the duplicate check skip the
 // project being renamed.
 func (s *Store) RenameProject(id, newName string) (domain.Project, error) {
+	if err := domain.ValidateLine(newName); err != nil {
+		return domain.Project{}, err
+	}
 	g, err := s.acquireGlobalLock()
 	if err != nil {
 		return domain.Project{}, err
@@ -346,6 +381,12 @@ func (s *Store) loadProjectFile(path string) (domain.Project, error) {
 	if err := json.Unmarshal(data, &project); err != nil {
 		return domain.Project{}, err
 	}
+	// Repair rather than reject: a project containing control characters —
+	// written before these checks existed, or hand-edited — still opens, minus
+	// the bytes a terminal would execute. Rejecting here would make a single
+	// injected byte enough to lock the user out of their own project with no
+	// in-app way to fix it. The stripped form becomes canonical on the next save.
+	domain.StripProjectText(&project)
 	return project, nil
 }
 

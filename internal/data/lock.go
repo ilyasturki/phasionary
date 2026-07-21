@@ -93,6 +93,11 @@ func (s *Store) saveNewProjectLocked(project domain.Project) error {
 // does not exist; this avoids unauthenticated 404 spam littering the data dir
 // with empty lock files.
 func (s *Store) WithProjectLocked(id string, fn func(*domain.Project) error) (domain.Project, error) {
+	// Checked before the stat so a malformed ID never reaches the filesystem at
+	// all, not even to probe whether a path outside the data directory exists.
+	if err := domain.ValidateID(id); err != nil {
+		return domain.Project{}, ErrProjectNotFound
+	}
 	if _, err := os.Stat(s.projectPath(id)); errors.Is(err, fs.ErrNotExist) {
 		return domain.Project{}, ErrProjectNotFound
 	}
@@ -117,6 +122,14 @@ func (s *Store) WithProjectLocked(id string, fn func(*domain.Project) error) (do
 }
 
 func (s *Store) acquireProjectLock(id string) (*os.File, error) {
+	// Every write and delete takes this lock before touching a file, so
+	// validating here covers the write half of the store the way
+	// LoadProjectByID covers the read half — including any future caller that
+	// forgets to check for itself. Without it, .lock creation would happily
+	// follow "../" out of the data directory.
+	if err := domain.ValidateID(id); err != nil {
+		return nil, ErrProjectNotFound
+	}
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return nil, err
 	}
