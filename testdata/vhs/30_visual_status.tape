@@ -43,6 +43,8 @@ Screenshot "/tmp/phas-vt/vhs-out/30_status_unified.png"
 Space
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/30_status_advanced.png"
+# Let the final capture land before quitting (see run.sh).
+Sleep 500ms
 
 # (Shift+Space walks the block back one step; VHS can't encode that keystroke,
 # so the reverse direction is covered by TestVisualCycleStatus_ReverseWalksBackwards.)
