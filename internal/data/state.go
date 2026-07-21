@@ -10,10 +10,26 @@ import (
 	"sync"
 )
 
+// Cursor records which row the TUI was focused on, addressed by stable IDs
+// rather than by row index: the list is rebuilt from scratch every session, and
+// the CLI or the phone may have added or removed rows in between, so an index
+// would point at an unrelated task. Kind is a plain string rather than the TUI's
+// FocusKind so state.json stays readable and survives a reorder of that enum.
+type Cursor struct {
+	Kind       string `json:"kind"`
+	CategoryID string `json:"category_id,omitempty"`
+	TaskID     string `json:"task_id,omitempty"`
+}
+
+func (c Cursor) IsZero() bool {
+	return c.Kind == ""
+}
+
 type State struct {
 	DirectoryProjects map[string]string   `json:"directory_projects,omitempty"`
 	ProjectOrder      []string            `json:"project_order,omitempty"`
 	FoldedCategories  map[string][]string `json:"folded_categories,omitempty"`
+	Cursors           map[string]Cursor   `json:"cursors,omitempty"`
 }
 
 // StateRepository abstracts persistence of UI state. Implemented by *StateManager.
@@ -25,6 +41,9 @@ type StateRepository interface {
 	GetFoldedCategories(projectID string) []string
 	SetFoldedCategories(projectID string, categoryIDs []string) error
 	DeleteFoldedCategories(projectID string) error
+	GetCursor(projectID string) Cursor
+	SetCursor(projectID string, cursor Cursor) error
+	DeleteCursor(projectID string) error
 }
 
 // StateManager reads and writes state.json. Two processes share that file — the
@@ -75,6 +94,7 @@ func (m *StateManager) load() error {
 		DirectoryProjects map[string]string   `json:"directory_projects,omitempty"`
 		ProjectOrder      []string            `json:"project_order,omitempty"`
 		FoldedCategories  map[string][]string `json:"folded_categories,omitempty"`
+		Cursors           map[string]Cursor   `json:"cursors,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -83,6 +103,7 @@ func (m *StateManager) load() error {
 	m.state.DirectoryProjects = raw.DirectoryProjects
 	m.state.ProjectOrder = raw.ProjectOrder
 	m.state.FoldedCategories = raw.FoldedCategories
+	m.state.Cursors = raw.Cursors
 	if m.state.DirectoryProjects == nil {
 		m.state.DirectoryProjects = make(map[string]string)
 	}
@@ -231,6 +252,61 @@ func (m *StateManager) DeleteFoldedCategories(projectID string) error {
 			return false
 		}
 		delete(s.FoldedCategories, projectID)
+		return true
+	})
+}
+
+// GetCursor returns the remembered cursor for a project, or the zero Cursor when
+// none is stored. Like GetFoldedCategories it re-reads state.json first: the TUI
+// reads this at project open, and a second TUI instance may have written its own
+// cursor since this manager last loaded.
+func (m *StateManager) GetCursor(projectID string) Cursor {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	// A failed reload leaves the cache intact; a stale cursor beats no cursor,
+	// and there is no error channel here to report on.
+	_ = m.load()
+	if m.state.Cursors == nil {
+		return Cursor{}
+	}
+	return m.state.Cursors[projectID]
+}
+
+// SetCursor stores the focused row for a project. A zero Cursor clears the
+// entry, so a project left with nothing selected does not pin the next session
+// to a row that no longer means anything.
+func (m *StateManager) SetCursor(projectID string, cursor Cursor) error {
+	return m.update(func(s *State) bool {
+		if cursor.IsZero() {
+			if s.Cursors == nil {
+				return false
+			}
+			if _, ok := s.Cursors[projectID]; !ok {
+				return false
+			}
+			delete(s.Cursors, projectID)
+			return true
+		}
+		if s.Cursors == nil {
+			s.Cursors = make(map[string]Cursor)
+		}
+		if s.Cursors[projectID] == cursor {
+			return false
+		}
+		s.Cursors[projectID] = cursor
+		return true
+	})
+}
+
+func (m *StateManager) DeleteCursor(projectID string) error {
+	return m.update(func(s *State) bool {
+		if s.Cursors == nil {
+			return false
+		}
+		if _, ok := s.Cursors[projectID]; !ok {
+			return false
+		}
+		delete(s.Cursors, projectID)
 		return true
 	})
 }

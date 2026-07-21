@@ -81,7 +81,7 @@ Paths can be relocated with `PHASIONARY_CONFIG_PATH` and `PHASIONARY_DATA_PATH` 
 
 ## Data
 
-One project per JSON file under `~/.local/share/phasionary/projects/{uuid}.json`. UI state (fold state, last project per directory) sits next to it in `state.json`. Every change is written synchronously — no undo, but nothing is ever in-flight.
+One project per JSON file under `~/.local/share/phasionary/projects/{uuid}.json`. UI state (fold state, cursor position, last project per directory) sits next to it in `state.json`. Every change is written synchronously — no undo, but nothing is ever in-flight.
 
 ## License
 

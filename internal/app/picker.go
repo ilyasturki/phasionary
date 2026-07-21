@@ -165,6 +165,7 @@ func (m *model) confirmDeleteProject() {
 
 	m.removeProjectFromOrder(deleteID)
 	_ = m.deps.StateManager.DeleteFoldedCategories(deleteID)
+	_ = m.deps.StateManager.DeleteCursor(deleteID)
 
 	if m.project.ID == deleteID {
 		projects, err := m.deps.Store.ListProjects()
@@ -181,8 +182,11 @@ func (m *model) confirmDeleteProject() {
 			m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(m.project.ID))
 			m.ui.History.Reset()
 			m.rebuildPositions()
-			m.ui.Selection.SetSelected(findFirstTaskIndex(m.ui.Selection.Positions()))
+			m.applyStoredCursor()
+			// Reset first: centering is a no-op on an empty project, which would
+			// otherwise inherit the deleted project's scroll offset.
 			m.ui.Screen.ScrollOffset = 0
+			m.centerOnSelected()
 		}
 	}
 
@@ -269,6 +273,9 @@ func (m *model) createProjectFromPicker() {
 	order = append(order, project.ID)
 	_ = m.deps.StateManager.SetProjectOrder(order)
 
+	// The project we are leaving keeps its cursor for the next time it is opened.
+	m.saveCursorState()
+
 	m.project = project
 	m.ui.Filter = NewFilterState()
 	m.ui.Fold = NewFoldState()
@@ -310,15 +317,24 @@ func (m *model) selectProject() {
 	// The link is changed deliberately via `project link`/`add`.
 	linkDirIfUnset(m.deps.StateManager, project.ID)
 
+	// Hand the outgoing project its cursor back before adopting the incoming
+	// project's, so switching away and back returns to the same row.
+	m.saveCursorState()
+
 	m.project = project
 	m.ui.Filter = NewFilterState()
 	m.ui.Fold = NewFoldStateFrom(m.deps.StateManager.GetFoldedCategories(project.ID))
 	m.ui.History.Reset()
 	m.rebuildPositions()
-	m.ui.Selection.SetSelected(findFirstTaskIndex(m.ui.Selection.Positions()))
+	m.applyStoredCursor()
+	// Reset first: centering is a no-op on an empty project, which would
+	// otherwise inherit the previous project's scroll offset.
 	m.ui.Screen.ScrollOffset = 0
+	// Center rather than ensureVisible — reopening a project carries no
+	// information about where the view sat, so a restored row deep in the list
+	// would otherwise arrive pinned to the bottom edge.
+	m.centerOnSelected()
 
-	m.ensureVisible()
 	m.ui.Screen.StatusMsg = fmt.Sprintf("Switched to: %s", project.Name)
 	m.ui.Picker.reset()
 	m.ui.Modes.ToNormal()

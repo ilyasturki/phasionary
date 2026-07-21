@@ -1,6 +1,7 @@
 package data
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -140,6 +141,99 @@ func TestStateManagerConcurrentWritesAreSerialized(t *testing.T) {
 
 	if got := newLoadedStateManager(t, dir, "").GetFoldedCategories("p1"); !slices.Equal(got, []string{"cat"}) {
 		t.Fatalf("want [cat], got %v", got)
+	}
+}
+
+func TestCursorRoundTripsThroughDisk(t *testing.T) {
+	dir := t.TempDir()
+	m := newLoadedStateManager(t, dir, "")
+
+	want := Cursor{Kind: "task", CategoryID: "c1", TaskID: "t2"}
+	if err := m.SetCursor("p1", want); err != nil {
+		t.Fatalf("set cursor: %v", err)
+	}
+
+	if got := newLoadedStateManager(t, dir, "").GetCursor("p1"); got != want {
+		t.Fatalf("cursor: want %+v, got %+v", want, got)
+	}
+	if got := newLoadedStateManager(t, dir, "").GetCursor("p2"); !got.IsZero() {
+		t.Fatalf("unset project should have no cursor, got %+v", got)
+	}
+}
+
+// The TUI stores the zero cursor for a project left with nothing selected; that
+// must clear the entry rather than persist a meaningless row.
+func TestSetCursorZeroClearsProject(t *testing.T) {
+	dir := t.TempDir()
+	m := newLoadedStateManager(t, dir, "")
+
+	if err := m.SetCursor("p1", Cursor{Kind: "task", CategoryID: "c1", TaskID: "t1"}); err != nil {
+		t.Fatalf("set cursor: %v", err)
+	}
+	if err := m.SetCursor("p1", Cursor{}); err != nil {
+		t.Fatalf("clear cursor: %v", err)
+	}
+
+	if got := newLoadedStateManager(t, dir, "").GetCursor("p1"); !got.IsZero() {
+		t.Fatalf("want cursor cleared, got %+v", got)
+	}
+}
+
+func TestDeleteCursorRemovesEntry(t *testing.T) {
+	dir := t.TempDir()
+	m := newLoadedStateManager(t, dir, "")
+
+	if err := m.SetCursor("p1", Cursor{Kind: "category", CategoryID: "c1"}); err != nil {
+		t.Fatalf("set cursor: %v", err)
+	}
+	if err := m.DeleteCursor("p1"); err != nil {
+		t.Fatalf("delete cursor: %v", err)
+	}
+
+	if got := newLoadedStateManager(t, dir, "").GetCursor("p1"); !got.IsZero() {
+		t.Fatalf("cursor survived delete: %+v", got)
+	}
+}
+
+// The TUI writes its cursor on exit while `phasionary serve` may be writing
+// folds; neither whole-file rewrite may drop the other's key.
+func TestCursorAndFoldWritersDoNotClobber(t *testing.T) {
+	dir := t.TempDir()
+	tui := newLoadedStateManager(t, dir, "")
+	serve := newLoadedStateManager(t, dir, "")
+
+	cursor := Cursor{Kind: "task", CategoryID: "c1", TaskID: "t1"}
+	if err := tui.SetCursor("p1", cursor); err != nil {
+		t.Fatalf("set cursor: %v", err)
+	}
+	if err := serve.SetFoldedCategories("p1", []string{"cat-a"}); err != nil {
+		t.Fatalf("set folds: %v", err)
+	}
+
+	fresh := newLoadedStateManager(t, dir, "")
+	if got := fresh.GetCursor("p1"); got != cursor {
+		t.Fatalf("cursor clobbered by a fold write: %+v", got)
+	}
+	if got := fresh.GetFoldedCategories("p1"); !slices.Equal(got, []string{"cat-a"}) {
+		t.Fatalf("folds clobbered by a cursor write: %v", got)
+	}
+}
+
+// A state.json written before cursors existed must load cleanly and simply
+// report no cursor.
+func TestLoadStateWithoutCursorsIsNotAnError(t *testing.T) {
+	dir := t.TempDir()
+	legacy := `{"directory_projects":{"":"p1"},"folded_categories":{"p1":["c1"]}}`
+	if err := os.WriteFile(filepath.Join(dir, "state.json"), []byte(legacy), 0o644); err != nil {
+		t.Fatalf("write legacy state: %v", err)
+	}
+
+	m := newLoadedStateManager(t, dir, "")
+	if got := m.GetCursor("p1"); !got.IsZero() {
+		t.Fatalf("want no cursor, got %+v", got)
+	}
+	if got := m.GetProjectForDir(); got != "p1" {
+		t.Fatalf("legacy dir link lost: %q", got)
 	}
 }
 

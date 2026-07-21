@@ -68,6 +68,12 @@ type Screen struct {
 	// a line once wheelScrollDivisor events pile up (see wheelTick). Sign tracks
 	// direction; a reversal resets it.
 	WheelAccum int
+	// PendingCenter defers centering the restored cursor until the first
+	// WindowSizeMsg. Height is still 0 when Run restores it, and centering
+	// against a zero height pins the row to the top — the very thing centering
+	// exists to avoid. Cleared once consumed, so later resizes go back to
+	// ensureVisible rather than yanking the view out from under the user.
+	PendingCenter bool
 }
 
 type HelpState struct {

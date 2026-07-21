@@ -7,20 +7,25 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"phasionary/internal/app/selection"
+	"phasionary/internal/data"
 )
 
 type stubStateManager struct {
-	folded map[string][]string
+	folded  map[string][]string
+	cursors map[string]data.Cursor
 }
 
 func newStubStateManager() *stubStateManager {
-	return &stubStateManager{folded: make(map[string][]string)}
+	return &stubStateManager{
+		folded:  make(map[string][]string),
+		cursors: make(map[string]data.Cursor),
+	}
 }
 
-func (s *stubStateManager) GetProjectForDir() string                { return "" }
-func (s *stubStateManager) SetProjectForDir(id string) error        { return nil }
-func (s *stubStateManager) GetProjectOrder() []string               { return nil }
-func (s *stubStateManager) SetProjectOrder(order []string) error    { return nil }
+func (s *stubStateManager) GetProjectForDir() string             { return "" }
+func (s *stubStateManager) SetProjectForDir(id string) error     { return nil }
+func (s *stubStateManager) GetProjectOrder() []string            { return nil }
+func (s *stubStateManager) SetProjectOrder(order []string) error { return nil }
 func (s *stubStateManager) GetFoldedCategories(projectID string) []string {
 	return s.folded[projectID]
 }
@@ -30,6 +35,21 @@ func (s *stubStateManager) SetFoldedCategories(projectID string, categoryIDs []s
 }
 func (s *stubStateManager) DeleteFoldedCategories(projectID string) error {
 	delete(s.folded, projectID)
+	return nil
+}
+func (s *stubStateManager) GetCursor(projectID string) data.Cursor {
+	return s.cursors[projectID]
+}
+func (s *stubStateManager) SetCursor(projectID string, cursor data.Cursor) error {
+	if cursor.IsZero() {
+		delete(s.cursors, projectID)
+		return nil
+	}
+	s.cursors[projectID] = cursor
+	return nil
+}
+func (s *stubStateManager) DeleteCursor(projectID string) error {
+	delete(s.cursors, projectID)
 	return nil
 }
 

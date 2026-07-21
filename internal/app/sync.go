@@ -41,25 +41,7 @@ func (m *model) reloadProject() {
 		return
 	}
 
-	var (
-		prevKind   selection.FocusKind
-		prevCatID  string
-		prevTaskID string
-		hadSel     bool
-	)
-	if pos, ok := m.selectedPosition(); ok {
-		hadSel = true
-		prevKind = pos.Kind
-		if pos.Kind == selection.FocusCategory || pos.Kind == selection.FocusTask {
-			if pos.CategoryIndex >= 0 && pos.CategoryIndex < len(m.project.Categories) {
-				cat := m.project.Categories[pos.CategoryIndex]
-				prevCatID = cat.ID
-				if pos.Kind == selection.FocusTask && pos.TaskIndex >= 0 && pos.TaskIndex < len(cat.Tasks) {
-					prevTaskID = cat.Tasks[pos.TaskIndex].ID
-				}
-			}
-		}
-	}
+	prev, hadSel := m.currentCursor()
 
 	project, err := m.deps.Store.LoadProject(m.project.ID)
 	if err != nil {
@@ -71,26 +53,23 @@ func (m *model) reloadProject() {
 	m.ui.History.Reset()
 	m.rebuildPositions()
 
-	if hadSel {
-		restored := m.restoreSelection(prevKind, prevCatID, prevTaskID)
-		if !restored {
-			idx := findFirstTaskIndex(m.ui.Selection.Positions())
-			m.ui.Selection.SetSelected(idx)
-		}
+	if hadSel && !m.restoreCursor(prev) {
+		idx := findFirstTaskIndex(m.ui.Selection.Positions())
+		m.ui.Selection.SetSelected(idx)
 	}
 
 	m.ensureVisible()
 	m.ui.Screen.StatusMsg = "Reloaded from disk"
 }
 
+// restoreSelection moves the cursor onto the row identified by (kind, catID,
+// taskID), reporting whether it landed. A row addressed by task ID that no
+// longer exists degrades to its category header rather than failing outright, so
+// deleting a task leaves the cursor nearby instead of at the top of the list.
 func (m *model) restoreSelection(kind selection.FocusKind, catID, taskID string) bool {
 	categories := m.project.Categories
-	switch kind {
-	case selection.FocusProject:
-		return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-			return p.Kind == selection.FocusProject
-		})
-	case selection.FocusCategory:
+
+	selectCategory := func() bool {
 		if catID == "" {
 			return false
 		}
@@ -99,28 +78,36 @@ func (m *model) restoreSelection(kind selection.FocusKind, catID, taskID string)
 				p.CategoryIndex >= 0 && p.CategoryIndex < len(categories) &&
 				categories[p.CategoryIndex].ID == catID
 		})
-	case selection.FocusTask:
-		if taskID != "" {
-			if m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-				if p.Kind != selection.FocusTask {
-					return false
-				}
-				if p.CategoryIndex < 0 || p.CategoryIndex >= len(categories) {
-					return false
-				}
-				cat := categories[p.CategoryIndex]
-				return p.TaskIndex >= 0 && p.TaskIndex < len(cat.Tasks) && cat.Tasks[p.TaskIndex].ID == taskID
-			}) {
-				return true
+	}
+	selectTaskRow := func(want selection.FocusKind) bool {
+		if taskID == "" {
+			return false
+		}
+		return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			if p.Kind != want || p.CategoryIndex < 0 || p.CategoryIndex >= len(categories) {
+				return false
 			}
-		}
-		if catID != "" {
-			return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-				return p.Kind == selection.FocusCategory &&
-					p.CategoryIndex >= 0 && p.CategoryIndex < len(categories) &&
-					categories[p.CategoryIndex].ID == catID
-			})
-		}
+			cat := categories[p.CategoryIndex]
+			return p.TaskIndex >= 0 && p.TaskIndex < len(cat.Tasks) && cat.Tasks[p.TaskIndex].ID == taskID
+		})
+	}
+
+	switch kind {
+	case selection.FocusProject:
+		return m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
+			return p.Kind == selection.FocusProject
+		})
+	case selection.FocusCategory:
+		return selectCategory()
+	case selection.FocusTask, selection.FocusSeparator:
+		return selectTaskRow(kind) || selectCategory()
+	case selection.FocusDescription:
+		// A description row only exists while descriptions are expanded, which is
+		// a config toggle that may differ from the session that saved it — land on
+		// the parent task instead of drifting to the top.
+		return selectTaskRow(selection.FocusDescription) ||
+			selectTaskRow(selection.FocusTask) ||
+			selectCategory()
 	}
 	return false
 }

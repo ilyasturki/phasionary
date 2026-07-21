@@ -63,7 +63,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.ui.Screen.Width = msg.Width
 		m.ui.Screen.Height = msg.Height
-		m.ensureVisible()
+		// The first size message is the earliest point a restored cursor can be
+		// centered; every later one is a real resize, where the user has the view
+		// in front of them and only wants the cursor kept on screen.
+		if m.ui.Screen.PendingCenter {
+			m.ui.Screen.PendingCenter = false
+			m.centerOnSelected()
+		} else {
+			m.ensureVisible()
+		}
 		if m.ui.Modes.IsProjectPicker() {
 			m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 		}
@@ -812,6 +820,12 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 	}
 	m.ui.Fold = foldState
 	m.ui.Screen.ExpandDescriptions = expandDescriptions
+	// Reopen on the row this project was last left on. Runs after the fold state
+	// is in place so a cursor inside a folded category resolves to that
+	// category's header rather than to a row that isn't rendered. The viewport
+	// can only be centered on it once the terminal size arrives.
+	m.applyStoredCursor()
+	m.ui.Screen.PendingCenter = true
 
 	if startMode == modes.ModeProjectPicker {
 		ordered := orderProjects(projects, stateManager.GetProjectOrder())
@@ -831,8 +845,14 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 	}
 
 	program := tea.NewProgram(m)
-	_, err = program.Run()
-	return err
+	finalModel, runErr := program.Run()
+	// Save the cursor from the model the event loop actually ended with, which
+	// covers every quit path (q, ctrl+c, the picker, an error) in one place
+	// instead of one call per tea.Quit site.
+	if final, ok := finalModel.(model); ok {
+		final.saveCursorState()
+	}
+	return runErr
 }
 
 func findFirstTaskIndex(positions []selection.Position) int {
