@@ -6,7 +6,9 @@
 
     <application
         android:name=".PhasionaryApp"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -14,7 +16,15 @@
         android:theme="@style/Theme.Phasionary"
         android:usesCleartextTraffic="true">
         <!-- usesCleartextTraffic: the server speaks plain HTTP and is reached over
-             a private Tailscale network, so plaintext is acceptable here. -->
+             a private Tailscale network, so plaintext is acceptable here.
+
+             allowBackup=false: the settings DataStore holds the bearer token in
+             plaintext, and that token grants full read/write access to every
+             project. With backups enabled it would be copied off the device —
+             into the user's Drive by Auto Backup, and on the Android 8-11
+             devices minSdk 26 still supports, straight out via `adb backup`.
+             Nothing here is worth restoring anyway: the app is an online-only
+             client whose entire state is a URL and a token. -->
 
         <activity
             android:name=".MainActivity"
