@@ -60,15 +60,15 @@ func renderProjectLine(name string, selected, focused, filtered, visualMode bool
 func (m model) renderEditProjectLine() string {
 	prefix := "> "
 	icon := "■ "
-	split := splitAtCursor(m.ui.Edit.input.Value(), m.ui.Edit.input.Position())
 	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
-	return fmt.Sprintf(
-		"%s%s%s%s%s",
-		prefix,
-		ui.HeaderStyle.Render(icon),
-		ui.HeaderStyle.Render(split.left),
-		cursorStyle.Render(split.cursorCh),
-		ui.HeaderStyle.Render(split.right),
+	return renderCursorLine(
+		m.ui.Edit.input.Value(),
+		m.ui.Edit.input.Position(),
+		m.ui.Screen.Width,
+		ansi.StringWidth(prefix+icon),
+		prefix+ui.HeaderStyle.Render(icon),
+		ui.HeaderStyle,
+		cursorStyle,
 	)
 }
 
@@ -149,8 +149,7 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 	suffixWidth := len(statusBadgeText) + len(estimateBadgeText) + ansi.StringWidth(cutBadgeText)
 	foldWidth := 2
 	available := safeWidth(width, prefixWidth+foldWidth+suffixWidth)
-	wrapped := ansi.Wrap(name, available, "")
-	lines := strings.Split(wrapped, "\n")
+	lines := ui.WrapClamped(name, available, ui.MaxLineRows, ui.FirstMatchIndex(name, searchQuery))
 	indent := strings.Repeat(" ", prefixWidth+foldWidth)
 
 	var result []string
@@ -263,11 +262,7 @@ func (m model) renderEditCategoryLine() string {
 	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
 		placeholder := ui.MutedStyle.Render("Enter category name...")
 		styledText := cursorStyle.Render(" ") + placeholder
-		if m.ui.Screen.Width > 0 {
-			wrapped := wrapWithPrefix(styledText, m.ui.Screen.Width, prefixWidth, prefix)
-			return strings.Join(wrapped.lines, "\n")
-		}
-		return prefix + styledText
+		return prefixLine(styledText, m.ui.Screen.Width, prefixWidth, prefix)
 	}
 	return renderCursorLine(m.ui.Edit.input.Value(), m.ui.Edit.input.Position(), m.ui.Screen.Width, prefixWidth, prefix, ui.CategoryStyle, cursorStyle)
 }
@@ -297,21 +292,7 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
 		placeholder := ui.MutedStyle.Render("Enter task title...")
 		styledText := cursorStyle.Render(" ") + placeholder
-		if m.ui.Screen.Width > 0 {
-			available := safeWidth(m.ui.Screen.Width, overhead)
-			wrapped := ansi.Wrap(styledText, available, "")
-			lines := strings.Split(wrapped, "\n")
-			indent := strings.Repeat(" ", overhead)
-			for i, line := range lines {
-				if i == 0 {
-					lines[i] = prefixPart + line
-				} else {
-					lines[i] = indent + line
-				}
-			}
-			return strings.Join(lines, "\n")
-		}
-		return prefixPart + styledText
+		return prefixLine(styledText, m.ui.Screen.Width, overhead, prefixPart)
 	}
 	edited := m.ui.Edit.input.Value()
 	if edited == "" {
@@ -422,8 +403,7 @@ func (m model) renderEditSeparatorLine() string {
 	if m.ui.Edit.input.Value() == "" {
 		placeholder := ui.MutedStyle.Render("Enter separator label...")
 		styledText := cursorStyle.Render(" ") + placeholder
-		wrapped := wrapWithPrefix(styledText, m.ui.Screen.Width, overhead, styledPrefix)
-		return strings.Join(wrapped.lines, "\n")
+		return prefixLine(styledText, m.ui.Screen.Width, overhead, styledPrefix)
 	}
 	return renderCursorLine(m.ui.Edit.input.Value(), m.ui.Edit.input.Position(), m.ui.Screen.Width, overhead, styledPrefix, ui.HeaderStyle, cursorStyle)
 }

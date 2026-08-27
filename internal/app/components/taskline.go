@@ -348,8 +348,7 @@ func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, leading 
 	overhead := ansi.StringWidth(prefixPart)
 	suffixWidth := ansi.StringWidth(suffixText)
 	available := safeWidth(r.width, overhead+leadingWidth+suffixWidth)
-	wrapped := ansi.Wrap(title, available, "")
-	wrapLines := strings.Split(wrapped, "\n")
+	wrapLines := r.clampTitle(title, available)
 	indent := strings.Repeat(" ", overhead)
 	last := len(wrapLines) - 1
 
@@ -373,8 +372,7 @@ func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, leading 
 func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart, leading string, leadingWidth, overhead int, titleStyle lipgloss.Style, suffix, suffixText string) string {
 	suffixWidth := ansi.StringWidth(suffixText)
 	available := safeWidth(r.width, overhead+leadingWidth+suffixWidth)
-	wrapped := ansi.Wrap(title, available, "")
-	wrapLines := strings.Split(wrapped, "\n")
+	wrapLines := r.clampTitle(title, available)
 	indent := strings.Repeat(" ", overhead)
 	selectedStyle := r.selectedStyle()
 	last := len(wrapLines) - 1
@@ -432,6 +430,12 @@ func statusIcon(status string) string {
 	default:
 		return " "
 	}
+}
+
+// clampTitle wraps a title into the rows a list row may occupy, with the window
+// aimed at the search match so a hit past the cap is still visible.
+func (r *TaskLineRenderer) clampTitle(title string, available int) []string {
+	return ui.WrapClamped(title, available, ui.MaxLineRows, ui.FirstMatchIndex(title, r.searchQuery))
 }
 
 func safeWidth(totalWidth, overhead int) int {

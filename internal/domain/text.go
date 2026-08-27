@@ -19,11 +19,10 @@ import (
 // at each of the three sinks: one gate the CLI, TUI, API and import all pass
 // through beats three that each have to stay correct forever.
 
-// MaxLineLen caps single-line fields (task titles, separator labels, category
-// and project names) in runes. Long titles are not a correctness problem but a
-// render-cost one: the TUI re-wraps every visible title each frame, so a title
-// of unbounded length turns one write into thousands of laid-out rows.
-const MaxLineLen = 1024
+// Length is deliberately not one of the limits: a single-line field may be as
+// long as the user cares to type. What a long one must not do is push the
+// screen out of reach, and that is bounded where it arises — the list renders
+// such a field into at most ui.MaxLineRows rows, whatever its length.
 
 var (
 	// ErrControlCharacters is returned when text carries control characters a
@@ -33,9 +32,6 @@ var (
 	// ErrInvalidUTF8 is returned when text is not valid UTF-8. Invalid bytes
 	// reach the terminal undecoded, so they get the same treatment.
 	ErrInvalidUTF8 = errors.New("text must be valid UTF-8")
-
-	// ErrTextTooLong is returned when a single-line field exceeds MaxLineLen.
-	ErrTextTooLong = errors.New("text is too long")
 )
 
 // isControl reports whether r is a control character: C0 (below space), DEL, or
@@ -45,15 +41,12 @@ func isControl(r rune) bool {
 	return r < 0x20 || r == 0x7F || (r >= 0x80 && r <= 0x9F)
 }
 
-// ValidateLine checks a single-line field: valid UTF-8, no control characters
-// at all (a title has no legitimate use for a newline or a tab), and at most
-// MaxLineLen runes.
+// ValidateLine checks a single-line field: valid UTF-8 and no control
+// characters at all (a title has no legitimate use for a newline or a tab).
+// Length is unbounded.
 func ValidateLine(s string) error {
 	if !utf8.ValidString(s) {
 		return ErrInvalidUTF8
-	}
-	if utf8.RuneCountInString(s) > MaxLineLen {
-		return ErrTextTooLong
 	}
 	for _, r := range s {
 		if isControl(r) {
@@ -149,11 +142,8 @@ func ValidateProjectText(p Project) error {
 			}
 		}
 	}
-	// Length is not enforced on import. The cap exists to bound render cost, not
-	// to keep the terminal safe, and rejecting a project exported before the cap
-	// existed would make a legitimate backup unrestorable.
 	for _, s := range lines {
-		if err := ValidateLine(s); err != nil && !errors.Is(err, ErrTextTooLong) {
+		if err := ValidateLine(s); err != nil {
 			return err
 		}
 	}
@@ -165,9 +155,8 @@ func ValidateProjectText(p Project) error {
 //
 // This is the load path's counterpart to ValidateProjectText: projects written
 // before these checks existed, or edited by hand, still open — just without the
-// bytes that would drive the terminal. Length is deliberately not enforced
-// here; truncating a title on load would destroy text the user typed, whereas a
-// control character was never legitimate content.
+// bytes that would drive the terminal. Nothing here truncates: a control
+// character was never legitimate content, whereas the text around it is.
 func StripProjectText(p *Project) {
 	p.ID = StripControl(p.ID, false)
 	p.Name = StripControl(p.Name, false)

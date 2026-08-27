@@ -406,6 +406,18 @@ func (m model) handleInfoKey(msg tea.KeyPressMsg) model {
 	switch msg.String() {
 	case "q", "esc":
 		m.ui.Modes.ToNormal()
+	case "j", "down":
+		m.scrollInfo(1)
+	case "k", "up":
+		m.scrollInfo(-1)
+	case "ctrl+d":
+		m.scrollInfo(m.infoViewportHeight() / 2)
+	case "ctrl+u":
+		m.scrollInfo(-m.infoViewportHeight() / 2)
+	case "g":
+		m.ui.Info.ScrollOffset = 0
+	case "G":
+		m.ui.Info.ScrollOffset = m.infoMaxScroll()
 	}
 	return m
 }

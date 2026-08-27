@@ -104,6 +104,13 @@ func TestView_FillsScreen_StatusOnProjectLine(t *testing.T) {
 					{ID: "t2", Title: "short2", Status: domain.StatusTodo},
 					{ID: "t3", Title: "short3", Status: domain.StatusTodo},
 					{ID: "t4", Title: "a very long task title that will definitely wrap over multiple lines to occupy more vertical space than a single row, with extra text appended so the row overflows regardless of whether status renders as text or as an icon", Status: domain.StatusTodo},
+					// The long title above is clamped to ui.MaxLineRows, so overflow
+					// has to come from the number of rows, not from one tall one.
+					{ID: "t5", Title: "short5", Status: domain.StatusTodo},
+					{ID: "t6", Title: "short6", Status: domain.StatusTodo},
+					{ID: "t7", Title: "short7", Status: domain.StatusTodo},
+					{ID: "t8", Title: "short8", Status: domain.StatusTodo},
+					{ID: "t9", Title: "short9", Status: domain.StatusTodo},
 				},
 			},
 		},

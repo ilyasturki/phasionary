@@ -76,6 +76,12 @@ type Screen struct {
 	PendingCenter bool
 }
 
+// InfoState holds the info dialog's scroll position. The dialog shows fields in
+// full that the list clamps, so its body can outgrow the screen.
+type InfoState struct {
+	ScrollOffset int
+}
+
 type HelpState struct {
 	Focused      int
 	ScrollOffset int
@@ -101,6 +107,7 @@ type UIState struct {
 	URLPicker      components.URLPickerState
 	YankPicker     components.YankPickerState
 	Help           HelpState
+	Info           InfoState
 	Clipboard      ClipboardState
 	TagClip        TagClipboard
 	// TagCopiedLast records whether the most recent copy gesture was a tag copy

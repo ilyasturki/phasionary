@@ -134,7 +134,7 @@ var normalBindings = []keyBinding{
 	{keys: []string{"d"}, desc: "delete selected item", section: sectionActions,
 		action: void((*model).deleteSelected)},
 	{keys: []string{"i"}, prefix: 'g', display: "gi", desc: "show item info", section: sectionActions,
-		action: func(m *model) tea.Cmd { m.ui.Modes.ToInfo(); return nil }},
+		action: func(m *model) tea.Cmd { m.ui.Info.ScrollOffset = 0; m.ui.Modes.ToInfo(); return nil }},
 	{keys: []string{"r"}, desc: "reload project from disk", section: sectionActions,
 		action: void((*model).reloadProject)},
 	{keys: []string{"u"}, desc: "undo last change", section: sectionActions,

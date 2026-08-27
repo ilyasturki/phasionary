@@ -13,55 +13,62 @@ import (
 // uppercase rune, in which case it is case-sensitive. Ranges are
 // non-overlapping and left-to-right. Returns nil when query is empty or absent.
 func MatchIndices(text, query string) [][2]int {
-	if query == "" {
+	needle := []rune(query)
+	if len(needle) == 0 {
 		return nil
 	}
 	caseSensitive := hasUpper(query)
-	hay := []rune(text)
-	needle := []rune(query)
-	if len(needle) == 0 || len(needle) > len(hay) {
-		return nil
-	}
-
-	// Byte offset of every rune boundary in text, so the returned ranges slice
-	// text correctly even when it contains multi-byte runes.
-	offsets := make([]int, len(hay)+1)
-	b := 0
-	for i, r := range hay {
-		offsets[i] = b
-		b += utf8.RuneLen(r)
-	}
-	offsets[len(hay)] = b
-
-	eq := func(a, c rune) bool {
-		if caseSensitive {
-			return a == c
-		}
-		return unicode.ToLower(a) == unicode.ToLower(c)
-	}
 
 	var out [][2]int
-	for i := 0; i+len(needle) <= len(hay); {
-		matched := true
-		for j := 0; j < len(needle); j++ {
-			if !eq(hay[i+j], needle[j]) {
-				matched = false
-				break
-			}
+	for at := 0; at < len(text); {
+		if end := matchAt(text, at, needle, caseSensitive); end >= 0 {
+			out = append(out, [2]int{at, end})
+			at = end
+			continue
 		}
-		if matched {
-			out = append(out, [2]int{offsets[i], offsets[i+len(needle)]})
-			i += len(needle)
-		} else {
-			i++
-		}
+		_, size := utf8.DecodeRuneInString(text[at:])
+		at += size
 	}
 	return out
 }
 
+// FirstMatchIndex returns the byte offset where the first smartcase match of
+// query begins in text, or -1 when there is none. It is used to aim a clamped
+// display window at a match instead of at the start of the string (see
+// WrapClamped), on fields that carry no length limit.
+func FirstMatchIndex(text, query string) int {
+	needle := []rune(query)
+	if len(needle) == 0 {
+		return -1
+	}
+	caseSensitive := hasUpper(query)
+	for at := range text {
+		if matchAt(text, at, needle, caseSensitive) >= 0 {
+			return at
+		}
+	}
+	return -1
+}
+
+// matchAt returns the byte offset just past a match of needle beginning at at,
+// or -1 when text does not match there.
+func matchAt(text string, at int, needle []rune, caseSensitive bool) int {
+	for _, n := range needle {
+		if at >= len(text) {
+			return -1
+		}
+		r, size := utf8.DecodeRuneInString(text[at:])
+		if r != n && (caseSensitive || unicode.ToLower(r) != unicode.ToLower(n)) {
+			return -1
+		}
+		at += size
+	}
+	return at
+}
+
 // Contains reports whether text contains query under smartcase semantics.
 func Contains(text, query string) bool {
-	return len(MatchIndices(text, query)) > 0
+	return FirstMatchIndex(text, query) >= 0
 }
 
 // HighlightMatches renders text with base, except every smartcase match of

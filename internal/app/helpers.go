@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"phasionary/internal/app/selection"
+	"phasionary/internal/ui"
 )
 
 func (m model) positions() []selection.Position {
@@ -90,44 +91,29 @@ func safeWidth(totalWidth, overhead int) int {
 	return available
 }
 
-type wrappedLines struct {
-	lines  []string
-	indent string
-}
-
-func wrapWithPrefix(text string, width, overhead int, prefix string) wrappedLines {
+// prefixLine renders already-styled text on a single row behind prefix,
+// truncating rather than wrapping. Edit rows are sized by the layout as one row
+// (see renderCursorLine), so their placeholders have to stay on one too.
+func prefixLine(text string, width, overhead int, prefix string) string {
 	if width <= 0 {
-		return wrappedLines{lines: []string{prefix + text}, indent: strings.Repeat(" ", len(prefix))}
+		return prefix + text
 	}
-	available := safeWidth(width, overhead)
-	wrapped := ansi.Wrap(text, available, "")
-	lines := strings.Split(wrapped, "\n")
-	indent := strings.Repeat(" ", overhead)
-	result := make([]string, len(lines))
-	for i, line := range lines {
-		if i == 0 {
-			result[i] = prefix + line
-		} else {
-			result[i] = indent + line
-		}
-	}
-	return wrappedLines{lines: result, indent: indent}
+	return prefix + ansi.Truncate(text, safeWidth(width, overhead), ui.Ellipsis)
 }
 
+// countWrappedLines sizes a single-line field's row under the same clamp the
+// renderers apply, so the height reserved here always matches the height drawn.
 func countWrappedLines(text string, width, overhead int) int {
 	if width <= 0 {
 		return 1
 	}
-	available := safeWidth(width, overhead)
-	wrapped := ansi.Wrap(text, available, "")
-	return strings.Count(wrapped, "\n") + 1
+	return ui.CountClamped(text, safeWidth(width, overhead), ui.MaxLineRows)
 }
 
 type cursorSplit struct {
-	left      string
-	cursorCh  string
-	right     string
-	cursorPos int
+	left     string
+	cursorCh string
+	right    string
 }
 
 func splitAtCursor(text string, cursor int) cursorSplit {
@@ -135,13 +121,7 @@ func splitAtCursor(text string, cursor int) cursorSplit {
 		text = " "
 	}
 	runes := []rune(text)
-	pos := cursor
-	if pos < 0 {
-		pos = 0
-	}
-	if pos > len(runes) {
-		pos = len(runes)
-	}
+	pos := min(max(cursor, 0), len(runes))
 	left := string(runes[:pos])
 	right := string(runes[pos:])
 	cursorCh := " "
@@ -149,74 +129,64 @@ func splitAtCursor(text string, cursor int) cursorSplit {
 		cursorCh = string(runes[pos])
 		right = string(runes[pos+1:])
 	}
-	return cursorSplit{left: left, cursorCh: cursorCh, right: right, cursorPos: pos}
+	return cursorSplit{left: left, cursorCh: cursorCh, right: right}
 }
 
+// renderCursorLine draws an inline editor as exactly one row: a horizontal
+// window onto the buffer, positioned to keep the cursor visible, with an
+// ellipsis at either end marking text scrolled out of view.
+//
+// It stays one row on purpose. The layout sizes an edited row from the *stored*
+// value, so a growing buffer that wrapped would push the rest of the screen —
+// and the bottom bar — off the terminal as the user typed. A window can't: it is
+// always exactly as tall as the row the layout reserved, whatever gets typed.
 func renderCursorLine(text string, cursor int, width, overhead int, prefix string, textStyle, cursorStyle lipgloss.Style) string {
 	if width <= 0 {
 		split := splitAtCursor(text, cursor)
 		return prefix + textStyle.Render(split.left) + cursorStyle.Render(split.cursorCh) + textStyle.Render(split.right)
 	}
-	if text == "" {
-		text = " "
+	runes := []rune(text)
+	pos := min(max(cursor, 0), len(runes))
+
+	// The cursor needs a cell of its own past the last rune when it sits at the
+	// end of the buffer, so the window is measured over that virtual cell too.
+	span := len(runes)
+	if pos == span {
+		span++
 	}
 	available := safeWidth(width, overhead)
-	wrapped := ansi.Wrap(text, available, "")
-	wrapLines := strings.Split(wrapped, "\n")
-	indent := strings.Repeat(" ", overhead)
-	runes := []rune(text)
-	srcPos := 0
-	var result []string
-	for i, line := range wrapLines {
-		lineRunes := []rune(line)
-		lineLen := len(lineRunes)
-		lineEnd := srcPos + lineLen
-
-		nextStart := lineEnd
-		if i < len(wrapLines)-1 {
-			for nextStart < len(runes) && runes[nextStart] == ' ' {
-				nextStart++
-			}
-		}
-
-		var styledLine string
-		if cursor >= srcPos && cursor < lineEnd {
-			offset := cursor - srcPos
-			l := string(lineRunes[:offset])
-			c := string(lineRunes[offset])
-			r := string(lineRunes[offset+1:])
-			styledLine = textStyle.Render(l) + cursorStyle.Render(c) + textStyle.Render(r)
-		} else if cursor >= lineEnd && (i == len(wrapLines)-1 || cursor < nextStart) {
-			styledLine = textStyle.Render(line) + cursorStyle.Render(" ")
-		} else {
-			styledLine = textStyle.Render(line)
-		}
-		if i == 0 {
-			result = append(result, prefix+styledLine)
-		} else {
-			result = append(result, indent+styledLine)
-		}
-		srcPos = nextStart
+	// An ellipsis costs a cell at whichever end it appears. Reserving both ends
+	// whenever the buffer overflows leaves at most one column unused, which a
+	// left-aligned row doesn't show, and spares the render a fixpoint.
+	content := available
+	if span > available {
+		content = max(available-2, 1)
 	}
-	return strings.Join(result, "\n")
+	start, end := cursorWindow(span, pos, content)
+	end = min(end, len(runes))
+
+	line := prefix
+	if start > 0 {
+		line += textStyle.Render(ui.Ellipsis)
+	}
+	cursorCh, right := " ", ""
+	if pos < end {
+		cursorCh = string(runes[pos])
+		right = string(runes[pos+1 : end])
+	}
+	line += textStyle.Render(string(runes[start:pos])) + cursorStyle.Render(cursorCh) + textStyle.Render(right)
+	if end < len(runes) {
+		line += textStyle.Render(ui.Ellipsis)
+	}
+	return line
 }
 
-func wrapAndStyleLines(text string, width, overhead int, prefix string, style lipgloss.Style) string {
-	if width <= 0 {
-		return style.Render(prefix + text)
+// cursorWindow returns the [start, end) rune window of the given width that
+// contains pos, sliding only as far as it must to keep the cursor in view.
+func cursorWindow(span, pos, width int) (int, int) {
+	if span <= width {
+		return 0, span
 	}
-	available := safeWidth(width, overhead)
-	wrapped := ansi.Wrap(text, available, "")
-	lines := strings.Split(wrapped, "\n")
-	indent := strings.Repeat(" ", overhead)
-	var result []string
-	for i, line := range lines {
-		styledLine := style.Render(line)
-		if i == 0 {
-			result = append(result, prefix+styledLine)
-		} else {
-			result = append(result, indent+styledLine)
-		}
-	}
-	return strings.Join(result, "\n")
+	start := min(max(pos-width+1, 0), span-width)
+	return start, start + width
 }

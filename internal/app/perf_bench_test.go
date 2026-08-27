@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"phasionary/internal/app/modes"
@@ -83,6 +84,26 @@ func BenchmarkRenderAfterEdit(b *testing.B) {
 	for _, s := range sizes {
 		m := benchModel(benchProject(s.cats, s.tasksPer), false)
 		b.Run(s.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				m.invalidateLayout()
+				_ = m.renderView()
+			}
+		})
+	}
+}
+
+// BenchmarkRenderLongTitle measures a title far past any length a cap would have
+// allowed. Titles are unbounded, so the guarantee that replaces the old cap is
+// this one: the clamp slices the text down to a screenful before it reaches
+// ansi.Wrap, so cost stops tracking length. Every size here should come out
+// flat, in time and in allocations both.
+func BenchmarkRenderLongTitle(b *testing.B) {
+	for _, n := range []int{64, 1024, 65536, 1_000_000} {
+		p := benchProject(1, 3)
+		p.Categories[0].Tasks[1].Title = strings.Repeat("word ", n/5)
+		m := benchModel(p, false)
+		b.Run(fmt.Sprintf("len_%d", n), func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				m.invalidateLayout()

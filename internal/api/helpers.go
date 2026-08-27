@@ -54,8 +54,6 @@ func errorStatus(err error) (int, string) {
 		return http.StatusBadRequest, "text must not contain control characters"
 	case errors.Is(err, domain.ErrInvalidUTF8):
 		return http.StatusBadRequest, "text must be valid UTF-8"
-	case errors.Is(err, domain.ErrTextTooLong):
-		return http.StatusBadRequest, "text is too long"
 	default:
 		return http.StatusInternalServerError, "internal server error"
 	}

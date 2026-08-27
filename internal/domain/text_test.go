@@ -51,11 +51,12 @@ func TestValidateLine(t *testing.T) {
 		assert.ErrorIs(t, ValidateLine("bad \xff\xfe"), ErrInvalidUTF8)
 	})
 
-	t.Run("enforces the length cap in runes, not bytes", func(t *testing.T) {
-		assert.NoError(t, ValidateLine(strings.Repeat("a", MaxLineLen)))
-		assert.ErrorIs(t, ValidateLine(strings.Repeat("a", MaxLineLen+1)), ErrTextTooLong)
-		// Multi-byte runes must not count against the cap more than once.
-		assert.NoError(t, ValidateLine(strings.Repeat("é", MaxLineLen)))
+	t.Run("does not cap length", func(t *testing.T) {
+		// A title may be as long as the user cares to type. What a long one must
+		// not do is push the screen out of reach, and that is bounded at render
+		// time (ui.WrapClamped), not here.
+		assert.NoError(t, ValidateLine(strings.Repeat("a", 100_000)))
+		assert.NoError(t, ValidateLine(strings.Repeat("é", 100_000)))
 	})
 }
 
@@ -70,7 +71,7 @@ func TestValidateMultiline(t *testing.T) {
 	})
 
 	t.Run("is not length-capped", func(t *testing.T) {
-		assert.NoError(t, ValidateMultiline(strings.Repeat("a", MaxLineLen*4)))
+		assert.NoError(t, ValidateMultiline(strings.Repeat("a", 100_000)))
 	})
 }
 
@@ -150,9 +151,7 @@ func TestValidateProjectText(t *testing.T) {
 	})
 
 	t.Run("allows over-long text", func(t *testing.T) {
-		// The cap bounds render cost, not terminal safety. Enforcing it here
-		// would make a project exported before the cap existed unrestorable.
-		assert.NoError(t, ValidateProjectText(withTitle(strings.Repeat("a", MaxLineLen*2))))
+		assert.NoError(t, ValidateProjectText(withTitle(strings.Repeat("a", 100_000))))
 	})
 }
 

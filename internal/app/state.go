@@ -309,7 +309,6 @@ func (p *ProjectPickerState) setVirtual(v int) {
 func (p *ProjectPickerState) startAdding() {
 	p.isAdding = true
 	p.input = textinput.New()
-	p.input.CharLimit = domain.MaxLineLen
 	p.input.Focus()
 }
 
@@ -416,7 +415,6 @@ type EditState struct {
 
 func (e *EditState) reset() {
 	e.input = textinput.New()
-	e.input.CharLimit = domain.MaxLineLen
 	e.isAdding = false
 	e.newItemID = ""
 	e.itemType = selection.FocusProject
@@ -424,9 +422,8 @@ func (e *EditState) reset() {
 
 func newEditState(value string, isAdding bool, newID string, kind selection.FocusKind) EditState {
 	ti := textinput.New()
-	// Matches the validator the write will hit, so the cap is felt as the key
-	// simply not registering rather than as a rejected save after the fact.
-	ti.CharLimit = domain.MaxLineLen
+	// No CharLimit: a title may be any length. The row it renders into is what
+	// stays bounded (see renderCursorLine and ui.WrapClamped), not the buffer.
 	ti.SetValue(value)
 	ti.SetCursor(len([]rune(value)))
 	ti.Focus()

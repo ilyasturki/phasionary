@@ -12,25 +12,66 @@ import (
 )
 
 func (m model) infoView() string {
-	pos, ok := m.selectedPosition()
-	if !ok {
+	lines := m.infoLines()
+	if len(lines) == 0 {
 		return ""
 	}
 
-	var lines []string
+	// The dialog holds the full text of fields the list only shows clamped, so
+	// its body is unbounded: a long title alone can outgrow the terminal.
+	// Without a window, placeOverlay silently drops whatever falls past the last
+	// screen row — including the hint that says how to close the dialog.
+	height := m.infoViewportHeight()
+	start := min(m.ui.Info.ScrollOffset, m.infoMaxScroll())
+	end := min(start+height, len(lines))
+
+	var out []string
+	if start > 0 {
+		out = append(out, ui.MutedStyle.Render(scrollMoreAbove))
+	}
+	out = append(out, lines[start:end]...)
+	if end < len(lines) {
+		out = append(out, ui.MutedStyle.Render(scrollMoreBelow))
+	}
+	out = append(out, "", ui.RenderHints([]ui.Hint{{Key: "esc/q", Label: "close"}}))
+	return ui.HelpDialogStyle.Render(strings.Join(out, "\n"))
+}
+
+// infoLines builds the dialog body for whatever the cursor is on. Reported
+// separately from infoView so scrolling can measure the body without rendering.
+func (m model) infoLines() []string {
+	pos, ok := m.selectedPosition()
+	if !ok {
+		return nil
+	}
 	switch pos.Kind {
 	case selection.FocusProject:
-		lines = m.projectInfoLines()
+		return m.projectInfoLines()
 	case selection.FocusCategory:
-		lines = m.categoryInfoLines(pos.CategoryIndex)
+		return m.categoryInfoLines(pos.CategoryIndex)
 	case selection.FocusSeparator:
-		lines = m.separatorInfoLines(pos.CategoryIndex, pos.TaskIndex)
+		return m.separatorInfoLines(pos.CategoryIndex, pos.TaskIndex)
 	case selection.FocusTask, selection.FocusDescription:
-		lines = m.taskInfoLines(pos.CategoryIndex, pos.TaskIndex)
+		return m.taskInfoLines(pos.CategoryIndex, pos.TaskIndex)
 	}
+	return nil
+}
 
-	lines = append(lines, "", ui.RenderHints([]ui.Hint{{Key: "esc/q", Label: "close"}}))
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+// infoViewportHeight is how many body rows the dialog can show: the screen less
+// its border, padding, hint block and scroll indicators.
+func (m model) infoViewportHeight() int {
+	const chrome = 8
+	return max(m.ui.Screen.Height-chrome, 5)
+}
+
+// infoMaxScroll is the largest offset that still fills the window.
+func (m model) infoMaxScroll() int {
+	return max(len(m.infoLines())-m.infoViewportHeight(), 0)
+}
+
+// scrollInfo moves the dialog's window by delta rows, stopping at either end.
+func (m *model) scrollInfo(delta int) {
+	m.ui.Info.ScrollOffset = min(max(m.ui.Info.ScrollOffset+delta, 0), m.infoMaxScroll())
 }
 
 func (m model) taskInfoLines(catIdx, taskIdx int) []string {
