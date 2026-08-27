@@ -522,8 +522,9 @@ func (m model) handleNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 // copyTextForPosition returns the plain text that `y` copies for the item at
-// pos: the name for a project/category, the title for a task or separator, and
-// the body for a description row. Empty when there is nothing to copy.
+// pos: the name for a project/category, the title for a separator, the title
+// plus description (blank-line separated) for a task, and the body alone for a
+// description row. Empty when there is nothing to copy.
 func (m *model) copyTextForPosition(pos selection.Position) string {
 	switch pos.Kind {
 	case selection.FocusProject:
@@ -531,7 +532,11 @@ func (m *model) copyTextForPosition(pos selection.Position) string {
 	case selection.FocusCategory:
 		return m.project.Categories[pos.CategoryIndex].Name
 	case selection.FocusTask, selection.FocusSeparator:
-		return m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title
+		task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
+		if pos.Kind == selection.FocusTask && task.Description != "" {
+			return task.Title + "\n\n" + task.Description
+		}
+		return task.Title
 	case selection.FocusDescription:
 		return m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Description
 	}
@@ -695,8 +700,8 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 		if m.ui.Modes.IsEdit() && isCursor {
 			return m.renderEditSeparatorLine()
 		}
-		label := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex].Title
-		return m.renderSeparatorLine(label, isSelected, focused, visualMode, isCursor, m.ui.Screen.Width, m.searchQuery(), m.searchMatchStyle(isCursor))
+		sep := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]
+		return m.renderSeparatorLine(sep.Title, isSelected, focused, visualMode, isCursor, m.isTaskCut(sep.ID), m.ui.Screen.Width, m.searchQuery(), m.searchMatchStyle(isCursor))
 
 	case LayoutDescription:
 		task := m.project.Categories[item.CategoryIndex].Tasks[item.TaskIndex]

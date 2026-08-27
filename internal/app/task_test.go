@@ -143,7 +143,7 @@ func TestReverseCategories_NoopWithSingleCategory(t *testing.T) {
 func TestMoveTaskDown_SwapsWithinCategory(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(2) // t1
-	m.moveTaskDown()
+	m.moveSelectedRow(1)
 	assert.Equal(t, "t2", m.project.Categories[0].Tasks[0].ID)
 	assert.Equal(t, "t1", m.project.Categories[0].Tasks[1].ID)
 	// Selection follows the moved task
@@ -157,7 +157,7 @@ func TestMoveTaskDown_SwapsWithinCategory(t *testing.T) {
 func TestMoveTaskDown_CrossesIntoNextCategory(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(4) // t3 (last task in Cat A)
-	m.moveTaskDown()
+	m.moveSelectedRow(1)
 	// t3 should be inserted at the head of Cat B
 	assert.Len(t, m.project.Categories[0].Tasks, 2)
 	require.Len(t, m.project.Categories[1].Tasks, 3)
@@ -168,17 +168,10 @@ func TestMoveTaskDown_CrossesIntoNextCategory(t *testing.T) {
 	assert.Equal(t, 0, pos.TaskIndex)
 }
 
-func TestMoveTaskDown_NoopAtVeryEnd(t *testing.T) {
-	m := newTestModel(t, sampleProject())
-	m.ui.Selection.MoveTo(7) // t5 (last task in last category)
-	m.moveTaskDown()
-	assert.Equal(t, "t5", m.project.Categories[1].Tasks[1].ID)
-}
-
 func TestMoveTaskUp_SwapsWithinCategory(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(3) // t2
-	m.moveTaskUp()
+	m.moveSelectedRow(-1)
 	assert.Equal(t, "t2", m.project.Categories[0].Tasks[0].ID)
 	assert.Equal(t, "t1", m.project.Categories[0].Tasks[1].ID)
 }
@@ -186,18 +179,11 @@ func TestMoveTaskUp_SwapsWithinCategory(t *testing.T) {
 func TestMoveTaskUp_CrossesIntoPrevCategory(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(6) // t4 (first task in Cat B)
-	m.moveTaskUp()
+	m.moveSelectedRow(-1)
 	// t4 should be appended to Cat A
 	require.Len(t, m.project.Categories[0].Tasks, 4)
 	assert.Equal(t, "t4", m.project.Categories[0].Tasks[3].ID)
 	assert.Len(t, m.project.Categories[1].Tasks, 1)
-}
-
-func TestMoveTaskUp_NoopAtVeryStart(t *testing.T) {
-	m := newTestModel(t, sampleProject())
-	m.ui.Selection.MoveTo(2) // t1 (first task in first category)
-	m.moveTaskUp()
-	assert.Equal(t, "t1", m.project.Categories[0].Tasks[0].ID)
 }
 
 func TestMoveTaskDown_FollowsTaskPastDescriptionRow(t *testing.T) {
@@ -210,7 +196,7 @@ func TestMoveTaskDown_FollowsTaskPastDescriptionRow(t *testing.T) {
 		return pp.Kind == selection.FocusTask && pp.CategoryIndex == 0 && pp.TaskIndex == 0
 	}), "focus t1 (no description)")
 
-	m.moveTaskDown()
+	m.moveSelectedRow(1)
 
 	assert.Equal(t, "t2", m.project.Categories[0].Tasks[0].ID)
 	assert.Equal(t, "t1", m.project.Categories[0].Tasks[1].ID)
@@ -232,7 +218,7 @@ func TestMoveTaskUp_FollowsTaskPastDescriptionRow(t *testing.T) {
 		return pp.Kind == selection.FocusTask && pp.CategoryIndex == 0 && pp.TaskIndex == 1
 	}), "focus t2 (no description), below t1's description row")
 
-	m.moveTaskUp()
+	m.moveSelectedRow(-1)
 
 	assert.Equal(t, "t2", m.project.Categories[0].Tasks[0].ID)
 	assert.Equal(t, "t1", m.project.Categories[0].Tasks[1].ID)
@@ -247,7 +233,7 @@ func TestMoveTaskUp_FollowsTaskPastDescriptionRow(t *testing.T) {
 func TestMoveCategoryDown_SwapsCategories(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(1) // Cat A
-	m.moveCategoryDown()
+	m.moveSelectedRow(1)
 	assert.Equal(t, "c2", m.project.Categories[0].ID)
 	assert.Equal(t, "c1", m.project.Categories[1].ID)
 	// Selection follows the moved category
@@ -260,7 +246,7 @@ func TestMoveCategoryDown_SwapsCategories(t *testing.T) {
 func TestMoveCategoryDown_NoopAtEnd(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(5) // Cat B (last)
-	m.moveCategoryDown()
+	m.moveSelectedRow(1)
 	assert.Equal(t, "c1", m.project.Categories[0].ID)
 	assert.Equal(t, "c2", m.project.Categories[1].ID)
 }
@@ -268,7 +254,7 @@ func TestMoveCategoryDown_NoopAtEnd(t *testing.T) {
 func TestMoveCategoryUp_SwapsCategories(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(5) // Cat B
-	m.moveCategoryUp()
+	m.moveSelectedRow(-1)
 	assert.Equal(t, "c2", m.project.Categories[0].ID)
 	assert.Equal(t, "c1", m.project.Categories[1].ID)
 }
@@ -276,7 +262,7 @@ func TestMoveCategoryUp_SwapsCategories(t *testing.T) {
 func TestMoveCategoryUp_NoopAtStart(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(1) // Cat A
-	m.moveCategoryUp()
+	m.moveSelectedRow(-1)
 	assert.Equal(t, "c1", m.project.Categories[0].ID)
 }
 

@@ -21,6 +21,7 @@ func copyProject() domain.Project {
 			Tasks: []domain.Task{
 				{ID: "t1", Title: "Alpha", Description: "the body of alpha", Status: domain.StatusTodo},
 				{ID: "sep", Title: "— divider —", Status: domain.StatusTodo, Kind: domain.KindSeparator},
+				{ID: "t2", Title: "Bravo", Status: domain.StatusTodo},
 			},
 		}},
 	}
@@ -36,9 +37,10 @@ func TestCopyTextForPosition(t *testing.T) {
 	}{
 		{"project", selection.Position{Kind: selection.FocusProject}, "My Project"},
 		{"category", selection.Position{Kind: selection.FocusCategory, CategoryIndex: 0}, "Cat A"},
-		{"task", selection.Position{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0}, "Alpha"},
+		{"task", selection.Position{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 0}, "Alpha\n\nthe body of alpha"},
 		{"description", selection.Position{Kind: selection.FocusDescription, CategoryIndex: 0, TaskIndex: 0}, "the body of alpha"},
 		{"separator", selection.Position{Kind: selection.FocusSeparator, CategoryIndex: 0, TaskIndex: 1}, "— divider —"},
+		{"task without description", selection.Position{Kind: selection.FocusTask, CategoryIndex: 0, TaskIndex: 2}, "Bravo"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -80,7 +80,7 @@ func TestUndo_DeleteCategory(t *testing.T) {
 func TestUndo_MoveTaskDown(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(2) // t1
-	m.moveTaskDown()
+	m.moveSelectedRow(1)
 	require.Equal(t, "t2", m.project.Categories[0].Tasks[0].ID)
 
 	m.undo()
@@ -94,7 +94,7 @@ func TestUndo_MoveTaskDown(t *testing.T) {
 func TestUndo_MoveCategoryDown(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(1) // Cat A
-	m.moveCategoryDown()
+	m.moveSelectedRow(1)
 	require.Equal(t, "c2", m.project.Categories[0].ID)
 
 	m.undo()
@@ -310,7 +310,7 @@ func TestUndoRedo_TapeSequenceMirror(t *testing.T) {
 	m.increasePriority()
 	require.Equal(t, domain.PriorityHigh, m.project.Categories[0].Tasks[1].Priority)
 	// J: move down
-	m.moveTaskDown()
+	m.moveSelectedRow(1)
 	require.Equal(t, "t2", m.project.Categories[0].Tasks[2].ID)
 	require.Equal(t, domain.PriorityHigh, m.project.Categories[0].Tasks[2].Priority)
 	// u: undo move (priority survives)
@@ -341,7 +341,7 @@ func TestUndoRedo_PriorityThenMove_UndoMoveOnlyRevertsMove(t *testing.T) {
 	m.increasePriority()
 	require.Equal(t, domain.PriorityHigh, m.project.Categories[0].Tasks[1].Priority)
 
-	m.moveTaskDown()
+	m.moveSelectedRow(1)
 	require.Equal(t, "t2", m.project.Categories[0].Tasks[2].ID, "t2 should have moved down")
 	require.Equal(t, domain.PriorityHigh, m.project.Categories[0].Tasks[2].Priority)
 

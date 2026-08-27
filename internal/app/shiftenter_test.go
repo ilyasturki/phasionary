@@ -3,8 +3,8 @@ package app
 import (
 	"testing"
 
-	uv "github.com/charmbracelet/ultraviolet"
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

@@ -124,6 +124,62 @@ func (r *TaskLineRenderer) padToWidth(rendered string) string {
 
 const descriptionBar = "▎ "
 
+// DescriptionPreviewLines is how many description lines an unfocused row shows
+// before truncating to a "… +N more lines" tail row.
+const DescriptionPreviewLines = 3
+
+// wrapDescriptionLines returns the description body as the plain wrapped lines
+// it renders as with `available` content columns (<= 0 disables wrapping, so
+// each \n-separated paragraph stays one line).
+func wrapDescriptionLines(description string, available int) []string {
+	if description == "" {
+		return nil
+	}
+	var lines []string
+	for _, paragraph := range strings.Split(description, "\n") {
+		if paragraph == "" || available <= 0 {
+			lines = append(lines, paragraph)
+			continue
+		}
+		lines = append(lines, strings.Split(ansi.Wrap(paragraph, available, ""), "\n")...)
+	}
+	return lines
+}
+
+// truncateDescriptionLines applies the preview rule: unless full is set, at
+// most DescriptionPreviewLines lines are shown — but only when that saves at
+// least one row, since the "… +N more lines" tail takes a row of its own.
+// Returns the visible lines and how many were hidden (0 = shown in full).
+func truncateDescriptionLines(lines []string, full bool) ([]string, int) {
+	if full || len(lines) <= DescriptionPreviewLines+1 {
+		return lines, 0
+	}
+	return lines[:DescriptionPreviewLines], len(lines) - DescriptionPreviewLines
+}
+
+// descriptionAvailable returns the content columns left for description text
+// after the title-column indent and the blockquote bar (0 = no wrapping).
+func descriptionAvailable(width, indent int) int {
+	available := width - indent - ansi.StringWidth(descriptionBar)
+	if width <= 0 || available < 1 {
+		return 0
+	}
+	return available
+}
+
+// DescriptionHeight returns the rows a description block occupies at the given
+// title-column indent and total width, honoring the preview rule. It is the
+// layout-side mirror of RenderDescription: both derive their lines from
+// wrapDescriptionLines/truncateDescriptionLines so the counted height always
+// matches the rendered height.
+func DescriptionHeight(description string, width, indent int, full bool) int {
+	shown, hidden := truncateDescriptionLines(wrapDescriptionLines(description, descriptionAvailable(width, indent)), full)
+	if hidden > 0 {
+		return len(shown) + 1
+	}
+	return len(shown)
+}
+
 // RenderDescription renders a task description as a standalone, focusable block
 // with a blockquote-style left bar. The bar sits at `indent` columns (aligned
 // with the title on the task row) and text follows after it. The text mirrors
@@ -135,20 +191,15 @@ func (r *TaskLineRenderer) RenderDescription(task domain.Task, indent int, selec
 		return ""
 	}
 	indentStr := strings.Repeat(" ", indent)
-	prefixWidth := indent + ansi.StringWidth(descriptionBar)
-	available := 0
-	if r.width > 0 {
-		available = r.width - prefixWidth
-		if available < 1 {
-			available = 0
-		}
-	}
+	available := descriptionAvailable(r.width, indent)
 
 	textStyle := ui.TaskTitleStyle(task.Priority, task.Status, r.priorityColor).Italic(true)
 	barStyle := ui.DescriptionBarStyle
+	tailStyle := ui.MutedStyle.Italic(true)
 	if r.cut {
 		textStyle = ui.ApplyCut(textStyle)
 		barStyle = ui.ApplyCut(barStyle)
+		tailStyle = ui.ApplyCut(tailStyle)
 	}
 
 	// When selected, every visual line gets padded to the full row width so the
@@ -156,19 +207,14 @@ func (r *TaskLineRenderer) RenderDescription(task domain.Task, indent int, selec
 	// paragraph tails produce a ragged selection band.
 	shouldPad := selected && r.width > 0
 
-	var out []string
-	for _, paragraph := range strings.Split(description, "\n") {
-		if paragraph == "" {
-			out = append(out, r.styleDescriptionLine(indentStr, "", textStyle, barStyle, selected, shouldPad))
-			continue
-		}
-		text := paragraph
-		if available > 0 {
-			text = ansi.Wrap(paragraph, available, "")
-		}
-		for _, l := range strings.Split(text, "\n") {
-			out = append(out, r.styleDescriptionLine(indentStr, l, textStyle, barStyle, selected, shouldPad))
-		}
+	shown, hidden := truncateDescriptionLines(wrapDescriptionLines(description, available), r.isCursor)
+	out := make([]string, 0, len(shown)+1)
+	for _, l := range shown {
+		out = append(out, r.styleDescriptionLine(indentStr, l, textStyle, barStyle, selected, shouldPad))
+	}
+	if hidden > 0 {
+		tail := fmt.Sprintf("… +%d more lines", hidden)
+		out = append(out, r.styleDescriptionLine(indentStr, tail, tailStyle, barStyle, selected, shouldPad))
 	}
 	return strings.Join(out, "\n")
 }

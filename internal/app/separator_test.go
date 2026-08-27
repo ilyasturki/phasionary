@@ -136,7 +136,7 @@ func TestMoveSeparatorDown(t *testing.T) {
 	m := newTestModel(t, separatorProject())
 	require.True(t, m.selectSeparator(0, 1))
 
-	m.moveTaskDown()
+	m.moveSelectedRow(1)
 
 	tasks := m.project.Categories[0].Tasks
 	assert.Equal(t, "t1", tasks[0].ID)
@@ -244,11 +244,11 @@ func TestVisualCopyText_SkipsSeparatorButClipboardKeepsIt(t *testing.T) {
 
 	sel := m.visualSelectedPositions()
 	// Copied text omits the divider row entirely.
-	assert.Equal(t, "Alpha\nBeta", m.visualTitleText(sel))
-	assert.Equal(t, "- [ ] Alpha\n- [ ] Beta", m.visualChecklistText(sel))
+	assert.Equal(t, "- Alpha\n- Beta", m.visualMarkdownText(sel, false))
+	assert.Equal(t, "- [ ] Alpha\n- [ ] Beta", m.visualMarkdownText(sel, true))
 
 	// The internal clipboard still carries the separator for a faithful paste.
-	_ = m.visualCopyTitles()
+	_ = m.visualCopyBullets()
 	require.Len(t, m.ui.Clipboard.Tasks, 3)
 	assert.True(t, m.ui.Clipboard.Tasks[1].IsSeparator())
 }
@@ -347,4 +347,22 @@ func TestVisualMoveDown_CarriesInteriorSeparator(t *testing.T) {
 
 	assert.Equal(t, []string{"t2", "t1", "s1", "t3"}, taskIDs(m.project.Categories[0]),
 		"the separator travels with its block, staying adjacent to Alpha")
+}
+
+func TestSeparatorRendersCutBadge(t *testing.T) {
+	m := newTestModel(t, separatorProject())
+	require.True(t, m.selectTaskIdx(0, 0)) // Alpha
+	m.enterVisualMode()
+	m.visualMoveCursor(2) // Alpha .. Beta, sweeping the separator
+	m.visualCut()
+
+	layout := m.buildLayout()
+	var rendered string
+	for _, item := range layout.Items {
+		if item.Kind == LayoutSeparator {
+			rendered = m.renderLayoutItem(item)
+		}
+	}
+	require.NotEmpty(t, rendered, "expected the separator row to render")
+	assert.Contains(t, rendered, "✂", "a cut separator must carry the cut badge like a cut task")
 }

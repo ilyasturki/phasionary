@@ -234,82 +234,6 @@ func (m *model) selectEstimate(minutes int) {
 	m.storeTaskUpdate()
 }
 
-func (m *model) moveTaskDown() {
-	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
-		return
-	}
-	position, ok := m.selectedPosition()
-	if !ok || !isRowKind(position.Kind) {
-		return
-	}
-	catIndex := position.CategoryIndex
-	taskIndex := position.TaskIndex
-	if taskIndex < len(m.project.Categories[catIndex].Tasks)-1 {
-		m.recordHistory()
-		_ = m.project.Categories[catIndex].MoveTask(taskIndex, 1)
-		m.project.UpdatedAt = domain.NowTimestamp()
-		m.rebuildPositions()
-		// Reselect the moved task by its new index rather than shifting the
-		// selection by one slot: with descriptions expanded, a neighbouring
-		// task contributes an extra description row, so a fixed +1 step would
-		// land on that row instead of following the task.
-		m.selectTaskOrCategory(catIndex, taskIndex+1)
-		m.ensureVisible()
-		m.storeTaskUpdate()
-		return
-	}
-	if catIndex >= len(m.project.Categories)-1 {
-		return
-	}
-	m.recordHistory()
-	task := m.project.Categories[catIndex].Tasks[taskIndex]
-	_ = m.project.Categories[catIndex].RemoveTask(taskIndex)
-	dstCatIndex := catIndex + 1
-	m.project.Categories[dstCatIndex].InsertTask(0, task)
-	m.project.UpdatedAt = domain.NowTimestamp()
-	m.rebuildPositions()
-	m.selectTaskOrCategory(dstCatIndex, 0)
-	m.ensureVisible()
-	m.storeTaskUpdate()
-}
-
-func (m *model) moveTaskUp() {
-	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
-		return
-	}
-	position, ok := m.selectedPosition()
-	if !ok || !isRowKind(position.Kind) {
-		return
-	}
-	catIndex := position.CategoryIndex
-	taskIndex := position.TaskIndex
-	if taskIndex > 0 {
-		m.recordHistory()
-		_ = m.project.Categories[catIndex].MoveTask(taskIndex, -1)
-		m.project.UpdatedAt = domain.NowTimestamp()
-		m.rebuildPositions()
-		// Reselect the moved task by its new index rather than shifting the
-		// selection by one slot: with descriptions expanded, a neighbouring
-		// task contributes an extra description row, so a fixed -1 step would
-		// land on that row instead of following the task.
-		m.selectTaskOrCategory(catIndex, taskIndex-1)
-		m.ensureVisible()
-		m.storeTaskUpdate()
-		return
-	}
-	if catIndex <= 0 {
-		return
-	}
-	m.recordHistory()
-	dstCatIndex := catIndex - 1
-	_ = m.project.MoveTask(catIndex, taskIndex, dstCatIndex)
-	dstTaskIndex := len(m.project.Categories[dstCatIndex].Tasks) - 1
-	m.rebuildPositions()
-	m.selectTaskOrCategory(dstCatIndex, dstTaskIndex)
-	m.ensureVisible()
-	m.storeTaskUpdate()
-}
-
 func (m *model) reverseCategories() {
 	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
 		return
@@ -354,50 +278,6 @@ func (m *model) selectTaskOrCategory(catIndex, taskIndex int) {
 	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
 		return p.Kind == selection.FocusCategory && p.CategoryIndex == catIndex
 	})
-}
-
-func (m *model) moveCategoryDown() {
-	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
-		return
-	}
-	position, ok := m.selectedPosition()
-	if !ok || position.Kind != selection.FocusCategory {
-		return
-	}
-	catIndex := position.CategoryIndex
-	if catIndex >= len(m.project.Categories)-1 {
-		return
-	}
-	m.recordHistory()
-	_ = m.project.MoveCategory(catIndex, 1)
-	m.rebuildPositions()
-	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-		return p.Kind == selection.FocusCategory && p.CategoryIndex == catIndex+1
-	})
-	m.ensureVisible()
-	m.storeTaskUpdate()
-}
-
-func (m *model) moveCategoryUp() {
-	if !m.ui.Modes.CanPerformAction(modes.ActionMoveItem) {
-		return
-	}
-	position, ok := m.selectedPosition()
-	if !ok || position.Kind != selection.FocusCategory {
-		return
-	}
-	catIndex := position.CategoryIndex
-	if catIndex <= 0 {
-		return
-	}
-	m.recordHistory()
-	_ = m.project.MoveCategory(catIndex, -1)
-	m.rebuildPositions()
-	m.ui.Selection.SelectByPredicate(func(p selection.Position) bool {
-		return p.Kind == selection.FocusCategory && p.CategoryIndex == catIndex-1
-	})
-	m.ensureVisible()
-	m.storeTaskUpdate()
 }
 
 func (m *model) cutSelectedTask() {

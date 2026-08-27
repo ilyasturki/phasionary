@@ -104,9 +104,9 @@ var normalBindings = []keyBinding{
 	{keys: []string{"shift+space"}, section: sectionActions,
 		action: void((*model).toggleSelectedTaskReverse)},
 	{keys: []string{"J"}, display: "J/K", desc: "reorder task/category up/down", section: sectionActions,
-		action: void(moveDown)},
+		action: func(m *model) tea.Cmd { m.moveSelectedRow(+1); return nil }},
 	{keys: []string{"K"}, section: sectionActions,
-		action: void(moveUp)},
+		action: func(m *model) tea.Cmd { m.moveSelectedRow(-1); return nil }},
 	{keys: []string{"S"}, desc: "reverse category order", section: sectionActions,
 		action: void((*model).reverseCategories)},
 	{keys: []string{"f"}, desc: "filter tasks", section: sectionActions,
@@ -174,22 +174,6 @@ var chordPrefixes = func() map[rune]struct{} {
 	}
 	return set
 }()
-
-func moveDown(m *model) {
-	if pos, ok := m.selectedPosition(); ok && pos.Kind == selection.FocusCategory {
-		m.moveCategoryDown()
-	} else {
-		m.moveTaskDown()
-	}
-}
-
-func moveUp(m *model) {
-	if pos, ok := m.selectedPosition(); ok && pos.Kind == selection.FocusCategory {
-		m.moveCategoryUp()
-	} else {
-		m.moveTaskUp()
-	}
-}
 
 func matchBinding(prefix rune, key string) *keyBinding {
 	for i := range normalBindings {

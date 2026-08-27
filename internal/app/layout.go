@@ -1,10 +1,9 @@
 package app
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/x/ansi"
 
+	"phasionary/internal/app/components"
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
 	"phasionary/internal/ui"
@@ -59,6 +58,11 @@ type LayoutBuilder struct {
 	filter             *FilterState
 	fold               *FoldState
 	expandDescriptions bool
+	// cursorCat/cursorTask address the description row the cursor sits on
+	// (-1/-1 when the cursor is elsewhere). That row renders in full; every
+	// other description row is capped to its preview height.
+	cursorCat  int
+	cursorTask int
 }
 
 func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filter *FilterState, fold *FoldState) *LayoutBuilder {
@@ -68,11 +72,19 @@ func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filt
 		statusDisplay: statusDisplay,
 		filter:        filter,
 		fold:          fold,
+		cursorCat:     -1,
+		cursorTask:    -1,
 	}
 }
 
 func (b *LayoutBuilder) WithExpandedDescriptions(v bool) *LayoutBuilder {
 	b.expandDescriptions = v
+	return b
+}
+
+func (b *LayoutBuilder) WithCursorDescription(catIdx, taskIdx int) *LayoutBuilder {
+	b.cursorCat = catIdx
+	b.cursorTask = taskIdx
 	return b
 }
 
@@ -208,8 +220,8 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Posi
 			posIndex++
 
 			if b.expandDescriptions && task.Description != "" {
-				descIndent := b.descriptionIndentFor(task)
-				descHeight := countDescriptionLines(task.Description, b.width, descIndent)
+				full := catIdx == b.cursorCat && taskIdx == b.cursorTask
+				descHeight := components.DescriptionHeight(task.Description, b.width, taskTitleColumn(task, b.statusDisplay), full)
 				items = append(items, LayoutItem{
 					Kind:          LayoutDescription,
 					Height:        descHeight,
@@ -244,51 +256,20 @@ func (b *LayoutBuilder) countTaskLines(task domain.Task) int {
 	return countWrappedLines(task.Title, b.width, overhead)
 }
 
-func countDescriptionLines(description string, width, indent int) int {
-	if description == "" {
-		return 0
-	}
-	available := width - indent
-	if width <= 0 || available < 1 {
-		// Falls back to no wrapping; each \n-separated paragraph is one line.
-		return strings.Count(description, "\n") + 1
-	}
-	total := 0
-	for _, paragraph := range strings.Split(description, "\n") {
-		if paragraph == "" {
-			total++
-			continue
-		}
-		wrapped := ansi.Wrap(paragraph, available, "")
-		total += strings.Count(wrapped, "\n") + 1
-	}
-	return total
-}
-
-// descriptionNestStep is how much further than the task title the description block is indented.
-const descriptionNestStep = 2
-
-// descriptionIndentFor returns the column where the description block begins,
-// aligned under the task title start and then nested one level deeper.
-func (b *LayoutBuilder) descriptionIndentFor(task domain.Task) int {
-	prefix := "  "
-	priorityIcon := ui.PriorityIcon(task.Priority)
-	statusText := statusLabel(task.Status, b.statusDisplay)
-	iconText := ""
-	if priorityIcon != "" {
-		iconText = priorityIcon + " "
-	}
-	return ansi.StringWidth(prefix+"["+statusText+"] "+iconText) + descriptionNestStep
-}
-
 func (m *model) buildLayout() *Layout {
 	w := m.ui.Screen.Width
-	if m.ui.layout.layout != nil && m.ui.layout.width == w {
-		return m.ui.layout.layout
+	cursorCat, cursorTask := -1, -1
+	if pos, ok := m.selectedPosition(); ok && pos.Kind == selection.FocusDescription {
+		cursorCat, cursorTask = pos.CategoryIndex, pos.TaskIndex
+	}
+	c := m.ui.layout
+	if c.layout != nil && c.width == w && c.cursorCat == cursorCat && c.cursorTask == cursorTask {
+		return c.layout
 	}
 	builder := NewLayoutBuilder(m.layoutConfig(), w, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold).
-		WithExpandedDescriptions(m.ui.Screen.ExpandDescriptions)
+		WithExpandedDescriptions(m.ui.Screen.ExpandDescriptions).
+		WithCursorDescription(cursorCat, cursorTask)
 	layout := builder.Build(m.project, m.positions())
-	m.ui.layout = layoutCache{width: w, layout: &layout}
+	m.ui.layout = layoutCache{width: w, cursorCat: cursorCat, cursorTask: cursorTask, layout: &layout}
 	return &layout
 }

@@ -368,7 +368,7 @@ func layoutSeparator(prefix, label string, width int) separatorLayout {
 // off from the rule. When selected the whole row takes the selection band; in
 // visual mode it takes the visual cursor or visual range band so a divider
 // swept into a task selection reads as part of the block.
-func (m model) renderSeparatorLine(label string, selected, focused, visualMode, isCursor bool, width int, searchQuery string, searchMatch lipgloss.Style) string {
+func (m model) renderSeparatorLine(label string, selected, focused, visualMode, isCursor, cut bool, width int, searchQuery string, searchMatch lipgloss.Style) string {
 	prefix := "  "
 	if selected {
 		prefix = "> "
@@ -387,17 +387,28 @@ func (m model) renderSeparatorLine(label string, selected, focused, visualMode, 
 		case visualMode:
 			style = ui.GetVisualSelectedStyle(focused)
 		}
+		if cut {
+			style = ui.ApplyCut(style)
+			return style.Render(layout.left+layout.label+layout.right) + style.Render(ui.CutMark)
+		}
 		return style.Render(layout.left + layout.label + layout.right)
 	}
 
 	ruleStyle := ui.SeparatorStyle
+	labelStyle := ui.HeaderStyle
+	cutBadge := ""
+	if cut {
+		ruleStyle = ui.ApplyCut(ruleStyle)
+		labelStyle = ui.ApplyCut(labelStyle)
+		cutBadge = ui.CutBadgeStyle.Render(ui.CutMark)
+	}
 	if layout.label == "" {
-		return ruleStyle.Render(layout.left)
+		return ruleStyle.Render(layout.left) + cutBadge
 	}
 	// Labeled: heavy rule with the label emphasized so it anchors the row,
 	// honoring any active search highlight (a no-op when the query is empty).
-	styledLabel := ui.HighlightMatches(layout.label, searchQuery, ui.HeaderStyle, searchMatch)
-	return ruleStyle.Render(layout.left) + styledLabel + ruleStyle.Render(layout.right)
+	styledLabel := ui.HighlightMatches(layout.label, searchQuery, labelStyle, searchMatch)
+	return ruleStyle.Render(layout.left) + styledLabel + ruleStyle.Render(layout.right) + cutBadge
 }
 
 // renderEditSeparatorLine draws the inline editor for a separator's label,

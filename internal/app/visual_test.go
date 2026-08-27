@@ -14,7 +14,7 @@ import (
 
 type stubConfigReader struct{ cfg config.Config }
 
-func (s *stubConfigReader) Get() config.Config                 { return s.cfg }
+func (s *stubConfigReader) Get() config.Config                   { return s.cfg }
 func (s *stubConfigReader) Update(fn func(*config.Config)) error { fn(&s.cfg); return nil }
 
 func newTestModel(t *testing.T, project domain.Project) *model {
@@ -174,7 +174,7 @@ func TestVisualYank_PopulatesInternalClipboardForPaste(t *testing.T) {
 	m.enterVisualMode()
 	m.visualMoveCursor(1) // include t2
 
-	_ = m.visualCopyTitles() // y
+	_ = m.visualCopyBullets() // y
 
 	// After yank: clipboard should hold the two tasks, NOT marked as cut.
 	require.Len(t, m.ui.Clipboard.Tasks, 2)
@@ -293,7 +293,7 @@ func TestVisualSwap_ExtendsFromSwappedEnd(t *testing.T) {
 	assert.Equal(t, 2, m.ui.Selection.Selected())
 
 	// Now extend from the anchor end downward by swapping back and growing.
-	m.visualSwap() // anchor t1, cursor t3
+	m.visualSwap()        // anchor t1, cursor t3
 	m.visualMoveCursor(1) // cursor t4 (skips Cat B header)
 	selPositions := m.visualSelectedPositions()
 	assert.Len(t, selPositions, 4)
@@ -548,23 +548,23 @@ func TestVisualMoveCursor_LandsOnDescriptionRows(t *testing.T) {
 	assert.True(t, m.isInVisualRange(3))
 }
 
-func TestVisualCopyTitles_IncludesSelectedDescriptionBody(t *testing.T) {
+func TestVisualCopyBullets_NestsSelectedDescriptionBody(t *testing.T) {
 	m := newTestModelWithDescription(t)
 	m.ui.Selection.MoveTo(2) // t1
 	m.enterVisualMode()
 	m.visualMoveCursor(2) // t1, t1-description, t2
 
-	text := m.visualTitleText(m.visualSelectedPositions())
-	assert.Equal(t, "Alpha\nalpha details\nBeta", text)
+	text := m.visualMarkdownText(m.visualSelectedPositions(), false)
+	assert.Equal(t, "- Alpha\n  alpha details\n- Beta", text)
 }
 
-func TestVisualCopyTitles_LoneDescriptionYieldsBodyOnly(t *testing.T) {
+func TestVisualCopyBullets_LoneDescriptionYieldsIndentedBody(t *testing.T) {
 	m := newTestModelWithDescription(t)
 	m.ui.Selection.MoveTo(3) // t1's description row
 	m.enterVisualMode()
 
-	text := m.visualTitleText(m.visualSelectedPositions())
-	assert.Equal(t, "alpha details", text)
+	text := m.visualMarkdownText(m.visualSelectedPositions(), false)
+	assert.Equal(t, "  alpha details", text)
 }
 
 func TestVisualChecklist_NestsDescriptionUnderItem(t *testing.T) {
@@ -573,7 +573,7 @@ func TestVisualChecklist_NestsDescriptionUnderItem(t *testing.T) {
 	m.enterVisualMode()
 	m.visualMoveCursor(1) // include t1's description
 
-	text := m.visualChecklistText(m.visualSelectedPositions())
+	text := m.visualMarkdownText(m.visualSelectedPositions(), true)
 	assert.Equal(t, "- [ ] Alpha\n  alpha details", text)
 }
 

@@ -207,9 +207,11 @@ func (m model) visualRange() (lo, hi int, active bool) {
 	return a, b, true
 }
 
-// resolveVisualAnchor finds the current position index of the visual anchor
-// by matching the stable ID pair. Returns -1 if the anchor item no longer
-// exists in the position list (e.g., it was deleted or filtered out).
+// resolveVisualAnchor finds the current position index of the visual anchor by
+// its stable ID. Returns -1 if the anchor item no longer exists in the
+// position list (e.g., it was deleted or filtered out). Task-level anchors
+// resolve by task/separator ID alone — IDs are unique project-wide, so the
+// anchor keeps resolving even after its row moves to another category.
 func (m model) resolveVisualAnchor() int {
 	positions := m.ui.Selection.Positions()
 	for i, p := range positions {
@@ -220,15 +222,14 @@ func (m model) resolveVisualAnchor() int {
 			continue
 		}
 		cat := m.project.Categories[p.CategoryIndex]
-		if cat.ID != m.ui.Visual.AnchorCategoryID {
+		if m.ui.Visual.Kind == selection.FocusCategory {
+			if cat.ID == m.ui.Visual.AnchorCategoryID {
+				return i
+			}
 			continue
 		}
-		if m.ui.Visual.Kind == selection.FocusCategory {
-			return i
-		}
-		// Task-level: match the anchor by its stable task/separator ID. A task
-		// row and its description row share that ID, so the description flag
-		// disambiguates which of the two the anchor sits on.
+		// A task row and its description row share the task's ID, so the
+		// description flag disambiguates which of the two the anchor sits on.
 		if (p.Kind == selection.FocusDescription) != m.ui.Visual.AnchorOnDescription {
 			continue
 		}
@@ -272,38 +273,18 @@ func (m model) isInVisualRange(index int) bool {
 	return matchesVisualDomain(positions[index].Kind, m.ui.Visual.Kind)
 }
 
-func (m *model) visualCopyTitles() tea.Cmd {
+func (m *model) visualCopyBullets() tea.Cmd {
 	selPositions := m.visualSelectedPositions()
 	if len(selPositions) == 0 {
 		m.exitVisualMode()
 		return nil
 	}
-	text := m.visualTitleText(selPositions)
+	text := m.visualMarkdownText(selPositions, false)
 	m.stashVisualClipboard(selPositions, false)
 	m.exitVisualMode()
 	return func() tea.Msg {
 		return clipboardResultMsg{err: clipboard.WriteAll(text)}
 	}
-}
-
-// visualTitleText joins the plain titles of the selection. The copied text
-// mirrors what is visibly selected: a description row in range contributes its
-// body after the title (or alone, if only the description is selected).
-// Separators carry no task content, so they are omitted from the copied text
-// (the internal clipboard still keeps them for a faithful paste).
-func (m model) visualTitleText(selPositions []selection.Position) string {
-	titles := make([]string, 0, len(selPositions))
-	for _, pos := range selPositions {
-		switch pos.Kind {
-		case selection.FocusTask:
-			titles = append(titles, m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Title)
-		case selection.FocusDescription:
-			titles = append(titles, m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Description)
-		case selection.FocusCategory:
-			titles = append(titles, m.project.Categories[pos.CategoryIndex].Name)
-		}
-	}
-	return strings.Join(titles, "\n")
 }
 
 func (m *model) visualCopyChecklist() tea.Cmd {
@@ -312,7 +293,7 @@ func (m *model) visualCopyChecklist() tea.Cmd {
 		m.exitVisualMode()
 		return nil
 	}
-	text := m.visualChecklistText(selPositions)
+	text := m.visualMarkdownText(selPositions, true)
 	m.stashVisualClipboard(selPositions, false)
 	m.exitVisualMode()
 	return func() tea.Msg {
@@ -320,27 +301,36 @@ func (m *model) visualCopyChecklist() tea.Cmd {
 	}
 }
 
-// visualChecklistText renders the selection as a markdown checklist. As with
-// visualTitleText, separators are omitted from the copied text, and a selected
-// description row nests its body under the parent's checklist item.
-func (m model) visualChecklistText(selPositions []selection.Position) string {
+// visualMarkdownText renders the selection as a markdown list — a bullet per
+// task ("- [ ]"/"- [x]" instead when checkboxes is set), with a selected
+// description row's body indented under its parent's item. Separators carry no
+// task content, so they are omitted from the copied text (the internal
+// clipboard still keeps them for a faithful paste).
+func (m model) visualMarkdownText(selPositions []selection.Position, checkboxes bool) string {
 	lines := make([]string, 0, len(selPositions))
 	for _, pos := range selPositions {
 		switch pos.Kind {
 		case selection.FocusTask:
 			task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
-			mark := " "
-			if task.Status == domain.StatusCompleted {
-				mark = "x"
+			if checkboxes {
+				mark := " "
+				if task.Status == domain.StatusCompleted {
+					mark = "x"
+				}
+				lines = append(lines, fmt.Sprintf("- [%s] %s", mark, task.Title))
+			} else {
+				lines = append(lines, "- "+task.Title)
 			}
-			lines = append(lines, fmt.Sprintf("- [%s] %s", mark, task.Title))
 		case selection.FocusDescription:
 			desc := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex].Description
-			for _, l := range strings.Split(desc, "\n") {
-				lines = append(lines, "  "+l)
-			}
+			lines = append(lines, "  "+strings.ReplaceAll(desc, "\n", "\n  "))
 		case selection.FocusCategory:
-			lines = append(lines, "## "+m.project.Categories[pos.CategoryIndex].Name)
+			name := m.project.Categories[pos.CategoryIndex].Name
+			if checkboxes {
+				lines = append(lines, "## "+name)
+			} else {
+				lines = append(lines, "- "+name)
+			}
 		}
 	}
 	return strings.Join(lines, "\n")
@@ -501,15 +491,8 @@ func (m *model) removeTaskByIDIfExists(id string) bool {
 	return false
 }
 
-// visualMoveDown shifts the visual selection block one position down,
-// preserving the block's contents and the anchor/cursor orientation.
-// Categories shift across the whole project; tasks shift within their
-// category, and at a category boundary the whole block crosses into the
-// adjacent category (top when moving down, bottom when moving up), mirroring
-// the single-task moveTaskDown/moveTaskUp behavior. No-op if the selection has
-// no room to move, the block already spans multiple categories (tasks only),
-// or it is not source-contiguous in task indices (e.g. a filter excludes
-// interleaving tasks).
+// visualMoveDown/visualMoveUp shift the visual selection block one row through
+// the shared engine in move.go, mirroring the single-row J/K behavior.
 func (m *model) visualMoveDown() {
 	m.visualShift(+1)
 }
@@ -523,83 +506,31 @@ func (m *model) visualShift(dir int) {
 	if len(selPositions) == 0 {
 		return
 	}
+	var reason string
 	switch m.ui.Visual.Kind {
 	case selection.FocusCategory:
-		m.visualShiftCategories(selPositions, dir)
+		reason = m.shiftCategories(selPositions[0].CategoryIndex, selPositions[len(selPositions)-1].CategoryIndex, dir)
 	case selection.FocusTask:
-		m.visualShiftTasks(visualRoundUpPositions(selPositions), dir)
+		reason = m.visualShiftTaskBlock(visualRoundUpPositions(selPositions), dir)
+	}
+	if reason != "" {
+		m.ui.Screen.StatusMsg = reason
 	}
 }
 
-func (m *model) visualShiftCategories(selPositions []selection.Position, dir int) {
-	lo := selPositions[0].CategoryIndex
-	hi := selPositions[len(selPositions)-1].CategoryIndex
-	var neighbor, dst int
-	if dir > 0 {
-		if hi >= len(m.project.Categories)-1 {
-			return
-		}
-		neighbor = hi + 1
-		dst = lo
-	} else {
-		if lo <= 0 {
-			return
-		}
-		neighbor = lo - 1
-		dst = hi
-	}
-	m.recordHistory()
-	moved := m.project.Categories[neighbor]
-	_ = m.project.RemoveCategory(neighbor)
-	m.project.InsertCategory(dst, moved)
-	m.rebuildPositions()
-	m.ui.Selection.MoveBy(dir)
-	m.ensureVisible()
-	m.storeTaskUpdate()
-}
-
-func (m *model) visualShiftTasks(selPositions []selection.Position, dir int) {
+func (m *model) visualShiftTaskBlock(selPositions []selection.Position, dir int) string {
 	catIdx := selPositions[0].CategoryIndex
 	for _, p := range selPositions[1:] {
 		if p.CategoryIndex != catIdx {
-			return
+			return "Can't move: selection spans multiple categories"
 		}
 	}
 	taskLo := selPositions[0].TaskIndex
 	taskHi := selPositions[len(selPositions)-1].TaskIndex
 	if taskHi-taskLo+1 != len(selPositions) {
-		return
+		return "Can't move: selection isn't contiguous (rows hidden by filter)"
 	}
-	cat := &m.project.Categories[catIdx]
-	var neighbor, dst int
-	if dir > 0 {
-		if taskHi >= len(cat.Tasks)-1 {
-			m.visualShiftTasksAcross(catIdx, taskLo, taskHi, dir)
-			return
-		}
-		neighbor = taskHi + 1
-		dst = taskLo
-	} else {
-		if taskLo <= 0 {
-			m.visualShiftTasksAcross(catIdx, taskLo, taskHi, dir)
-			return
-		}
-		neighbor = taskLo - 1
-		dst = taskHi
-	}
-	cursorID, cursorOnDesc := m.visualCursorRowID()
-	m.recordHistory()
-	moved := cat.Tasks[neighbor]
-	_ = cat.RemoveTask(neighbor)
-	cat.InsertTask(dst, moved)
-	m.project.UpdatedAt = domain.NowTimestamp()
-	m.rebuildPositions()
-	// The hopped neighbor may span one row or two (task + expanded
-	// description), so the cursor re-attaches by ID instead of shifting by a
-	// fixed row count.
-	m.selectTaskLevelRow(cursorID, cursorOnDesc)
-	m.ensureVisible()
-	m.storeTaskUpdate()
+	return m.shiftTasks(catIdx, taskLo, taskHi, dir)
 }
 
 // visualCursorRowID captures the cursor's task ID and whether the cursor sits
@@ -633,56 +564,6 @@ func (m *model) selectTaskLevelRow(id string, onDescription bool) {
 		}
 		return m.project.Categories[p.CategoryIndex].Tasks[p.TaskIndex].ID == id
 	})
-}
-
-// visualShiftTasksAcross moves the contiguous task block [taskLo, taskHi] out
-// of category catIdx and into the adjacent category in direction dir: moving
-// down drops the block at the top of the next category, moving up at the
-// bottom of the previous one. The cursor follows its task by ID, and the
-// ID-based anchor re-resolves so the range still covers the moved block. No-op
-// when there is no adjacent category.
-func (m *model) visualShiftTasksAcross(catIdx, taskLo, taskHi, dir int) {
-	var dstCatIdx int
-	if dir > 0 {
-		dstCatIdx = catIdx + 1
-		if dstCatIdx >= len(m.project.Categories) {
-			return
-		}
-	} else {
-		dstCatIdx = catIdx - 1
-		if dstCatIdx < 0 {
-			return
-		}
-	}
-
-	cursorID, cursorOnDesc := m.visualCursorRowID()
-
-	m.recordHistory()
-	src := &m.project.Categories[catIdx]
-	moved := make([]domain.Task, taskHi-taskLo+1)
-	copy(moved, src.Tasks[taskLo:taskHi+1])
-	// Remove from the bottom up so earlier indices stay valid.
-	for i := taskHi; i >= taskLo; i-- {
-		_ = src.RemoveTask(i)
-	}
-
-	dst := &m.project.Categories[dstCatIdx]
-	insertAt := 0
-	if dir < 0 {
-		insertAt = len(dst.Tasks)
-	}
-	for i, t := range moved {
-		dst.InsertTask(insertAt+i, t)
-	}
-
-	m.project.UpdatedAt = domain.NowTimestamp()
-	// The anchor task crossed with the block, so its recorded category ID must
-	// follow or resolveVisualAnchor can no longer find it.
-	m.ui.Visual.AnchorCategoryID = m.project.Categories[dstCatIdx].ID
-	m.rebuildPositions()
-	m.selectTaskLevelRow(cursorID, cursorOnDesc)
-	m.ensureVisible()
-	m.storeTaskUpdate()
 }
 
 func (m *model) visualCut() {
@@ -1024,7 +905,7 @@ func (m model) handleVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.visualSwap()
 		return m, nil
 	case "y":
-		return m, m.visualCopyTitles()
+		return m, m.visualCopyBullets()
 	case "Y":
 		return m, m.visualCopyChecklist()
 	case "x":

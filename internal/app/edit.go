@@ -306,6 +306,9 @@ func (m model) forwardToInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if m.ui.Modes.IsEdit() {
+		if paste, ok := msg.(tea.PasteMsg); ok && m.pasteLinesWhileAdding(paste.Content) {
+			return m, nil
+		}
 		var cmd tea.Cmd
 		m.ui.Edit.input, cmd = m.ui.Edit.input.Update(msg)
 		sanitizeInput(&m.ui.Edit.input)

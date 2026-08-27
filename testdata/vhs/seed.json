@@ -18,7 +18,7 @@
           "updated_at": "2026-05-23T16:37:34Z",
           "priority": "high",
           "estimate_minutes": 480,
-          "description": "Top-level overview screen.\n\nShows status counts, recent activity, and the current focus task. Pulls from the existing project store; no new data sources."
+          "description": "Top-level overview screen.\n\nShows status counts, recent activity, and the current focus task. Pulls from the existing project store; no new data sources.\n\nOpen questions:\n- refresh cadence\n- empty-state copy\n- how much history to keep"
         },
         {
           "id": "d3f0a043-ad9a-593a-9a5a-7c46c39eabde",
