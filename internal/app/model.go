@@ -119,6 +119,7 @@ type UIState struct {
 	TagEdit         TagEditState
 	History         HistoryState
 	Search          SearchState
+	Cursor          cursorTracker
 	layout          layoutCache
 }
 
@@ -129,6 +130,22 @@ type projectSaver interface {
 	Enqueue(domain.Project)
 	Results() <-chan error
 	Close()
+}
+
+// cursorSaver records the focused row off the event loop, coalescing bursts of
+// movement into one write. Satisfied by *data.CursorSaver; nil in tests, where
+// trackCursor becomes a no-op.
+type cursorSaver interface {
+	Set(projectID string, cursor data.Cursor)
+	Drop(projectID string)
+}
+
+// cursorTracker remembers what was last handed to the cursor saver, so the many
+// events that leave the cursor where it was cost nothing. The project ID is part
+// of it: the same row means a different thing after a project switch.
+type cursorTracker struct {
+	projectID string
+	cursor    data.Cursor
 }
 
 // layoutCache memoizes the built Layout so navigation and scroll math don't
@@ -149,6 +166,7 @@ type Dependencies struct {
 	CfgManager   config.Reader
 	StateManager data.StateRepository
 	Saver        projectSaver
+	CursorSaver  cursorSaver
 }
 
 func NewUIState(sel *selection.Manager, modeMachine *modes.Machine) *UIState {

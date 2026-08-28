@@ -166,6 +166,7 @@ func (m *model) confirmDeleteProject() {
 	m.removeProjectFromOrder(deleteID)
 	_ = m.deps.StateManager.DeleteFoldedCategories(deleteID)
 	_ = m.deps.StateManager.DeleteCursor(deleteID)
+	m.forgetPendingCursor(deleteID)
 
 	if m.project.ID == deleteID {
 		projects, err := m.deps.Store.ListProjects()

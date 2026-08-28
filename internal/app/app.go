@@ -58,7 +58,19 @@ func (m model) listenSaveErrors() tea.Cmd {
 	}
 }
 
+// Update runs the event and then records where the cursor ended up. Doing it
+// here rather than in each of the many handlers that can move the cursor means
+// no new movement can be added without being remembered.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	if updated, ok := next.(model); ok {
+		updated.trackCursor()
+		return updated, cmd
+	}
+	return next, cmd
+}
+
+func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.ui.Screen.Width = msg.Width
@@ -776,6 +788,12 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 		return err
 	}
 
+	// Records the focused row as it moves, so the cursor is already on disk when
+	// the process dies without running any exit code. Close flushes the last
+	// interval, which covers every ordinary quit path.
+	cursorSaver := data.NewCursorSaver(stateManager)
+	defer cursorSaver.Close()
+
 	projects, err := store.ListProjects()
 	if err != nil {
 		return err
@@ -830,6 +848,7 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 
 	deps := NewDependencies(store, cfgManager, stateManager)
 	deps.Saver = saver
+	deps.CursorSaver = cursorSaver
 	m := model{
 		project: project,
 		ui:      NewUIState(selMgr, modeMachine),
@@ -861,15 +880,8 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 		m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 	}
 
-	program := tea.NewProgram(m)
-	finalModel, runErr := program.Run()
-	// Save the cursor from the model the event loop actually ended with, which
-	// covers every quit path (q, ctrl+c, the picker, an error) in one place
-	// instead of one call per tea.Quit site.
-	if final, ok := finalModel.(model); ok {
-		final.saveCursorState()
-	}
-	return runErr
+	_, err = tea.NewProgram(m).Run()
+	return err
 }
 
 func findFirstTaskIndex(positions []selection.Position) int {

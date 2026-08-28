@@ -57,10 +57,10 @@ func (m model) currentCursor() (data.Cursor, bool) {
 	return cursor, true
 }
 
-// saveCursorState persists the focused row for the current project. Called when
-// the project changes and once on exit — not on every move, which would rewrite
-// state.json on every keystroke (the file is shared with `phasionary serve`, and
-// each write reloads and rewrites it whole).
+// saveCursorState writes the focused row for the current project straight to
+// disk. Leaving a project has to do this rather than queue it: switching A → B →
+// A inside one save interval would otherwise restore A's stale row, since
+// applyStoredCursor reads back what is stored, not what is queued.
 func (m *model) saveCursorState() {
 	if m.deps.StateManager == nil || m.project.ID == "" {
 		return
@@ -69,6 +69,33 @@ func (m *model) saveCursorState() {
 	// left over from when it still had rows.
 	cursor, _ := m.currentCursor()
 	_ = m.deps.StateManager.SetCursor(m.project.ID, cursor)
+	m.forgetPendingCursor(m.project.ID)
+	m.ui.Cursor = cursorTracker{projectID: m.project.ID, cursor: cursor}
+}
+
+// trackCursor hands the focused row to the background saver whenever it moves.
+// Recording continuously is what makes the cursor survive a force quit: a
+// SIGKILL, a crash, or a terminal that goes away never reaches the save on exit,
+// and until this existed such a session simply forgot where it was.
+func (m *model) trackCursor() {
+	if m.deps.CursorSaver == nil || m.project.ID == "" {
+		return
+	}
+	cursor, _ := m.currentCursor()
+	if m.ui.Cursor.projectID == m.project.ID && m.ui.Cursor.cursor == cursor {
+		return
+	}
+	m.ui.Cursor = cursorTracker{projectID: m.project.ID, cursor: cursor}
+	m.deps.CursorSaver.Set(m.project.ID, cursor)
+}
+
+// forgetPendingCursor discards a queued cursor for a project whose stored entry
+// has just been settled some other way, so the background writer cannot land on
+// top of it.
+func (m *model) forgetPendingCursor(projectID string) {
+	if m.deps.CursorSaver != nil {
+		m.deps.CursorSaver.Drop(projectID)
+	}
 }
 
 // restoreCursor moves the selection onto a previously saved row, reporting
