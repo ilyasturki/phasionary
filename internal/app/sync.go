@@ -6,9 +6,9 @@ import (
 )
 
 // storeTaskUpdate persists the in-memory project to disk under the project
-// flock. The lock makes the WRITE atomic vs. concurrent `phasionary serve`
-// activity, but the TUI's load-mutate-save cycle still wins blindly over any
-// edits serve made in the meantime — use reloadProject (R) to pick up
+// flock. The lock makes the WRITE atomic vs. concurrent writers (the CLI, a
+// second TUI), but the TUI's load-mutate-save cycle still wins blindly over
+// any edits made in the meantime — use reloadProject (R) to pick up
 // out-of-band changes before continuing to edit.
 func (m *model) storeTaskUpdate() {
 	// Content changed: the memoized layout no longer matches the project.

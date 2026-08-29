@@ -54,9 +54,9 @@ func CreateTask(p *domain.Project, categoryID string, f TaskFields) (domain.Task
 // category, plus everything CreateTask returns.
 // validateTaskText screens the free-text fields of a write.
 //
-// This is the single gate all four writers share — TUI, CLI, JSON API and the
-// HTML endpoint all build a TaskFields and hand it here — which is why the
-// check lives at this layer rather than in each front door. Titles and tag
+// This is the single gate every writer shares — the TUI and the CLI both
+// build a TaskFields and hand it here — which is why the check lives at this
+// layer rather than in each front door. Titles and tag
 // labels render on one line and reject every control character; descriptions
 // are legitimately multi-line, so they keep newlines and tabs and reject the
 // rest.
@@ -194,7 +194,7 @@ func SetTaskStatus(p *domain.Project, categoryID, taskID, status string) (domain
 }
 
 // TaskUpdate carries a partial task edit: a nil field is left untouched. The
-// pointers exist so the JSON API can tell an omitted field from one explicitly
+// pointers exist so a caller can tell an omitted field from one explicitly
 // set to its zero value — clearing a description and not touching it are
 // different requests.
 type TaskUpdate struct {

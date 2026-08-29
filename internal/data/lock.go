@@ -37,7 +37,7 @@ func (s *Store) acquireGlobalLock() (*os.File, error) {
 
 // SaveProjectLocked saves a project while holding an exclusive flock on a
 // per-project lock file. Use this when multiple processes may write to the
-// same data directory (e.g. TUI + `phasionary serve` at the same time).
+// same data directory (e.g. TUI + CLI at the same time).
 //
 // The lock file lives next to the project JSON at `{id}.json.lock` and is
 // kept on disk between calls; only the flock state matters. Closing the fd

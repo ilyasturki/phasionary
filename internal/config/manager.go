@@ -32,8 +32,9 @@ func NewManager(configPath string) *Manager {
 	}
 }
 
-// configFileMode is the permission the config file is kept at. It holds the
-// serve token, so it is owner-only.
+// configFileMode is the permission the config file is kept at. Owner-only:
+// past versions stored a credential here and a future sync client may again,
+// so the file never opens wider than it needs to be.
 const configFileMode fs.FileMode = 0o600
 
 // Load reads the config from disk. Creates a default config file if missing.
@@ -57,12 +58,10 @@ func (m *Manager) Load() error {
 
 // tightenPermissions narrows an existing config file to configFileMode.
 //
-// Files created before the token lived here were written 0644, and Save alone
-// would not fix them: it writes through to the existing inode, which keeps the
-// old mode. Without this, upgrading and then generating a token would leave the
-// token world-readable. Failure is ignored — a config that cannot be chmodded
-// (unusual ownership, odd filesystem) should not stop the tool from running,
-// and serve refuses to use a token it cannot protect anyway.
+// Files created by early versions were written 0644, and Save alone would not
+// fix them: it writes through to the existing inode, which keeps the old mode.
+// Failure is ignored — a config that cannot be chmodded (unusual ownership,
+// odd filesystem) should not stop the tool from running.
 func (m *Manager) tightenPermissions() {
 	info, err := os.Stat(m.path)
 	if err != nil || info.Mode().Perm() == configFileMode {
@@ -86,7 +85,7 @@ func (m *Manager) Save() error {
 	}
 	// WriteFile only applies the mode when it creates the file, so an existing
 	// 0644 config would keep its old permissions after a write. Chmod
-	// unconditionally so saving a token always lands on an owner-only file.
+	// unconditionally so a save always lands on an owner-only file.
 	if err := os.Chmod(m.path, configFileMode); err != nil {
 		return fmt.Errorf("securing config %s: %w", m.path, err)
 	}

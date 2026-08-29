@@ -9,15 +9,15 @@ import (
 // Text limits and validation.
 //
 // Every string a user stores here eventually reaches a terminal — the TUI
-// renders it, the CLI prints it, and `serve` logs around it. A terminal treats
+// renders it and the CLI prints it. A terminal treats
 // some byte sequences as commands rather than text: ESC (0x1B) opens an escape
 // sequence, and in UTF-8 mode U+009B acts as a bare CSI. A title carrying those
 // bytes is not data the terminal displays, it is instructions the terminal
 // obeys — OSC 52, for instance, writes the reader's clipboard.
 //
 // So control characters are rejected at the write boundary rather than escaped
-// at each of the three sinks: one gate the CLI, TUI, API and import all pass
-// through beats three that each have to stay correct forever.
+// at each sink: one gate the CLI, TUI and import all pass through beats
+// several that each have to stay correct forever.
 
 // Length is deliberately not one of the limits: a single-line field may be as
 // long as the user cares to type. What a long one must not do is push the
@@ -57,8 +57,8 @@ func ValidateLine(s string) error {
 }
 
 // ValidateMultiline checks a field that may span lines (a task description).
-// Newline and tab are legitimate here — the API deliberately preserves interior
-// newlines — so only the remaining control characters are rejected.
+// Newline and tab are legitimate here — interior newlines are preserved by
+// design — so only the remaining control characters are rejected.
 func ValidateMultiline(s string) error {
 	if !utf8.ValidString(s) {
 		return ErrInvalidUTF8
@@ -119,8 +119,8 @@ func StripControl(s string, allowNewlines bool) string {
 // ValidateProjectText checks every string a project carries.
 //
 // This is the import gate. A project file received from someone else is the one
-// genuinely untrusted input this tool accepts, and unlike an API write it
-// arrives fully formed — bypassing the operations layer where the per-field
+// genuinely untrusted input this tool accepts, and unlike an interactive write
+// it arrives fully formed — bypassing the operations layer where the per-field
 // checks live. So it is validated wholesale here instead, and rejected rather
 // than repaired: a file that fails is one the user should know about.
 //

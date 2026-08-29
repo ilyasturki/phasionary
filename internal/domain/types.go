@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -58,13 +59,40 @@ var (
 	ErrTaskNotFound          = errors.New("task not found")
 )
 
+// ProjectSchemaVersion is the version of the on-disk project format this
+// binary reads and writes. Files written before versioning existed carry no
+// schema field and are read as version 1. Bump it only for a change an older
+// binary would misread — a new optional field does not need a bump — and
+// never reuse a number.
+const ProjectSchemaVersion = 1
+
+// ErrSchemaTooNew is returned when a project file declares a schema version
+// newer than this binary understands. Refusing beats loading: saving through a
+// partially-understood format would silently drop the fields the newer version
+// added. Callers wrap it with the file's identity.
+var ErrSchemaTooNew = errors.New("written by a newer phasionary; upgrade phasionary to open it")
+
 // Project is stored as a single JSON file.
 type Project struct {
+	// Schema versions the on-disk format; see ProjectSchemaVersion. Zero means
+	// the file predates versioning and is read as version 1. Saves stamp the
+	// current version.
+	Schema     int        `json:"schema,omitempty"`
 	ID         string     `json:"id"`
 	Name       string     `json:"name"`
 	CreatedAt  string     `json:"created_at"`
 	UpdatedAt  string     `json:"updated_at"`
 	Categories []Category `json:"categories"`
+}
+
+// CheckSchema reports whether a decoded project's schema version is one this
+// binary can safely operate on.
+func CheckSchema(p Project) error {
+	if p.Schema > ProjectSchemaVersion {
+		return fmt.Errorf("schema version %d, this build reads up to %d: %w",
+			p.Schema, ProjectSchemaVersion, ErrSchemaTooNew)
+	}
+	return nil
 }
 
 type Category struct {

@@ -160,6 +160,9 @@ func importJSON(r io.Reader, overrideName string) (domain.Project, error) {
 	if err := json.Unmarshal(data, &p); err != nil {
 		return domain.Project{}, fmt.Errorf("invalid JSON: %w", err)
 	}
+	if err := domain.CheckSchema(p); err != nil {
+		return domain.Project{}, err
+	}
 
 	if overrideName != "" {
 		p.Name = overrideName

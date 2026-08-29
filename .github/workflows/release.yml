@@ -9,9 +9,9 @@ permissions:
     contents: write
 
 jobs:
-    # VERSION is the source for the APK versionCode and the nix package
-    # version, while the tag stamps the Go binaries and AUR packages; a
-    # release with the two out of sync must not ship anything.
+    # VERSION is the source for the nix package version, while the tag stamps
+    # the Go binaries and AUR packages; a release with the two out of sync
+    # must not ship anything.
     check-version:
         runs-on: ubuntu-latest
         steps:
@@ -63,59 +63,14 @@ jobs:
                       phasionary-linux-x64
                       phasionary-linux-arm64
 
-    build-android:
-        needs: check-version
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v6
-
-            - name: Setup Java
-              uses: actions/setup-java@v5
-              with:
-                  distribution: temurin
-                  java-version: 17
-                  cache: gradle
-
-            - name: Write signing config
-              working-directory: android
-              env:
-                  KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-                  KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-              run: |
-                  echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
-                  cat > keystore.properties << EOF
-                  storeFile=release.keystore
-                  storePassword=${KEYSTORE_PASSWORD}
-                  keyAlias=phasionary
-                  keyPassword=${KEYSTORE_PASSWORD}
-                  EOF
-
-            - name: Test and build signed APK
-              working-directory: android
-              run: |
-                  ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleRelease
-                  cp app/build/outputs/apk/release/app-release.apk ../phasionary-android.apk
-
-            - name: Verify APK signature
-              run: |
-                  apksigner="$(printf '%s\n' "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
-                  "$apksigner" verify --print-certs phasionary-android.apk
-
-            - name: Upload APK
-              uses: actions/upload-artifact@v7
-              with:
-                  name: android-apk
-                  path: phasionary-android.apk
-
     github-release:
-        needs: [build, build-android]
+        needs: build
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
               uses: actions/checkout@v6
 
-            - name: Download binaries and APK
+            - name: Download binaries
               uses: actions/download-artifact@v8
               with:
                   merge-multiple: true
@@ -127,7 +82,6 @@ jobs:
                   files: |
                       phasionary-linux-x64
                       phasionary-linux-arm64
-                      phasionary-android.apk
 
     aur:
         needs: github-release

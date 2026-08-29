@@ -80,8 +80,8 @@ func (s *Store) LoadProjectByID(id string) (domain.Project, error) {
 	// Every read reaches the filesystem through here, so this is where an ID
 	// earns the right to become a path component. An ID that isn't well-formed
 	// cannot name a project that exists, so it is reported as not-found rather
-	// than as a distinct error — that keeps the API's 404 from confirming
-	// anything about the shape of the path that was probed.
+	// than as a distinct error — malformed and missing look identical to every
+	// caller, confirming nothing about the shape of the path that was probed.
 	if err := domain.ValidateID(id); err != nil {
 		return domain.Project{}, ErrProjectNotFound
 	}
@@ -140,6 +140,9 @@ func (s *Store) LoadProject(selector string) (domain.Project, error) {
 // goroutine where the fsync cost is hidden from the UI.
 func (s *Store) marshalProject(project domain.Project) ([]byte, error) {
 	project.UpdatedAt = domain.NowTimestamp()
+	// Stamping on every save is also the migration: a pre-versioning file
+	// gains the schema field the first time it is written back.
+	project.Schema = domain.ProjectSchemaVersion
 	return json.MarshalIndent(project, "", "  ")
 }
 
@@ -380,6 +383,13 @@ func (s *Store) loadProjectFile(path string) (domain.Project, error) {
 	var project domain.Project
 	if err := json.Unmarshal(data, &project); err != nil {
 		return domain.Project{}, err
+	}
+	// A file from a newer binary is refused, not repaired: in a fleet of
+	// machines sharing a data directory, a half-upgraded member must fail
+	// loudly rather than rewrite the file through an older format and drop
+	// whatever the newer version added.
+	if err := domain.CheckSchema(project); err != nil {
+		return domain.Project{}, fmt.Errorf("%s: %w", filepath.Base(path), err)
 	}
 	// Repair rather than reject: a project containing control characters —
 	// written before these checks existed, or hand-edited — still opens, minus

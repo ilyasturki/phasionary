@@ -12,8 +12,8 @@ import (
 
 // Cursor records which row the TUI was focused on, addressed by stable IDs
 // rather than by row index: the list is rebuilt from scratch every session, and
-// the CLI or the phone may have added or removed rows in between, so an index
-// would point at an unrelated task. Kind is a plain string rather than the TUI's
+// the CLI may have added or removed rows in between, so an index would point
+// at an unrelated task. Kind is a plain string rather than the TUI's
 // FocusKind so state.json stays readable and survives a reorder of that enum.
 type Cursor struct {
 	Kind       string `json:"kind"`
@@ -46,10 +46,10 @@ type StateRepository interface {
 	DeleteCursor(projectID string) error
 }
 
-// StateManager reads and writes state.json. Two processes share that file — the
-// TUI and `phasionary serve` (which the mobile app talks to) — and every save
-// rewrites it whole, so writes go through update: reload, apply, save. The mutex
-// covers the API server's concurrent request goroutines.
+// StateManager reads and writes state.json. Multiple processes may share that
+// file — the TUI, the CLI, a second TUI on the same data dir — and every save
+// rewrites it whole, so writes go through update: reload, apply, save. The
+// mutex covers concurrent goroutines within one process.
 type StateManager struct {
 	mu         sync.Mutex
 	path       string
@@ -142,10 +142,10 @@ func (m *StateManager) save() error {
 }
 
 // update re-reads state.json, applies fn to the fresh state, and writes it back
-// when fn reports a change. The reload is what keeps the TUI and the serve
-// process from clobbering each other: without it, a TUI save built from a cache
-// loaded at startup would drop folds the phone wrote in the meantime (and vice
-// versa), because each save rewrites the entire file.
+// when fn reports a change. The reload is what keeps two processes from
+// clobbering each other: without it, a save built from a cache loaded at
+// startup would drop keys another process wrote in the meantime, because each
+// save rewrites the entire file.
 func (m *StateManager) update(fn func(*State) bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -218,9 +218,9 @@ func (m *StateManager) SetProjectOrder(order []string) error {
 }
 
 // GetFoldedCategories returns the collapsed category IDs for a project. It
-// re-reads state.json first: the phone folds categories through the API while
-// the TUI is running, and the TUI reads this at project open, so a cached read
-// would show yesterday's folds until a restart.
+// re-reads state.json first: another process may fold categories while the TUI
+// is running, and the TUI reads this at project open, so a cached read would
+// show yesterday's folds until a restart.
 func (m *StateManager) GetFoldedCategories(projectID string) []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

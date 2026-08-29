@@ -166,3 +166,54 @@ func TestLoadProjectByID_RejectsBlankIDFile(t *testing.T) {
 	_, err := store.LoadProjectByID("broken")
 	assert.ErrorIs(t, err, ErrProjectNotFound)
 }
+
+func TestSchemaStampedOnSave(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+	require.NoError(t, store.Ensure())
+
+	project, err := store.CreateProject("Versioned")
+	require.NoError(t, err)
+
+	loaded, err := store.LoadProjectByID(project.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.ProjectSchemaVersion, loaded.Schema)
+}
+
+// A file written before versioning existed has no schema field; it must load
+// as version 1 and gain the field on its next save.
+func TestSchemaLegacyFileLoadsAndMigrates(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+	require.NoError(t, store.Ensure())
+
+	legacy := `{"id":"legacy-1","name":"Old","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","categories":[]}`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "legacy-1.json"), []byte(legacy), 0o644))
+
+	project, err := store.LoadProjectByID("legacy-1")
+	require.NoError(t, err)
+	assert.Zero(t, project.Schema, "legacy file carries no schema before a save")
+
+	require.NoError(t, store.SaveProjectLocked(project))
+	migrated, err := store.LoadProjectByID("legacy-1")
+	require.NoError(t, err)
+	assert.Equal(t, domain.ProjectSchemaVersion, migrated.Schema)
+}
+
+// A half-upgraded machine sharing a data directory must refuse a file from a
+// newer binary instead of rewriting it through an older format.
+func TestSchemaTooNewRefused(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := NewStore(tmpDir)
+	require.NoError(t, store.Ensure())
+
+	future := `{"schema":99,"id":"future-1","name":"Future","created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","categories":[]}`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "future-1.json"), []byte(future), 0o644))
+
+	_, err := store.LoadProjectByID("future-1")
+	require.ErrorIs(t, err, domain.ErrSchemaTooNew)
+	assert.Contains(t, err.Error(), "future-1.json", "error must name the file")
+
+	_, err = store.ListProjects()
+	require.ErrorIs(t, err, domain.ErrSchemaTooNew)
+}

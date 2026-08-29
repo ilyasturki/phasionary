@@ -1,8 +1,6 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,26 +28,6 @@ type Config struct {
 	// HelpExpanded remembers whether the help dialog opens on the full
 	// shortcut reference rather than the essentials card.
 	HelpExpanded bool `json:"help_expanded"`
-
-	// ServeToken is the bearer token `phasionary serve` requires. It is
-	// generated on first serve rather than defaulted, so an empty value here
-	// means "not yet generated" and never "authentication disabled".
-	//
-	// This is the only secret the file holds, and it is why the whole file is
-	// written 0600: a full-access credential in a world-readable file would be
-	// readable by every other account on the machine.
-	ServeToken string `json:"serve_token,omitempty"`
-}
-
-// NewServeToken returns a fresh 256-bit bearer token, base64url-encoded without
-// padding so it survives a URL, a shell argument and a phone's text field
-// unescaped.
-func NewServeToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // DefaultConfig returns a Config with default values.

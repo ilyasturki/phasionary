@@ -17,7 +17,8 @@ const cursorSaveInterval = 500 * time.Millisecond
 // whole burst of navigation.
 //
 // Writes go through StateRepository, which reloads and merges before writing,
-// so they stay safe against `phasionary serve` touching the same file.
+// so they stay safe against another process (the CLI, a second TUI) touching
+// the same file.
 type CursorSaver struct {
 	repo     StateRepository
 	interval time.Duration

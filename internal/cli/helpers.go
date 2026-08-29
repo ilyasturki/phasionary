@@ -111,8 +111,8 @@ func withProject(selector string, fn func(*data.Store, *domain.Project) error) e
 		return err
 	}
 	// Resolve the (possibly fuzzy) selector to an exact ID first, then load
-	// and save under the project flock so concurrent writes from
-	// `phasionary serve` can't clobber our update.
+	// and save under the project flock so a concurrent writer (the TUI, a
+	// second CLI) can't clobber our update.
 	initial, err := store.LoadProject(selector)
 	if err != nil {
 		return err

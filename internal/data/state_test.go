@@ -17,19 +17,19 @@ func newLoadedStateManager(t *testing.T, dir, currentDir string) *StateManager {
 	return m
 }
 
-// The TUI and `phasionary serve` each hold their own StateManager over the same
+// The TUI and another process each hold their own StateManager over the same
 // file, and every save rewrites it whole. Without the reload-before-write, the
 // second manager's save would drop the first manager's key.
 func TestStateManagerConcurrentWritersDoNotClobber(t *testing.T) {
 	dir := t.TempDir()
 	tui := newLoadedStateManager(t, dir, "/work/project")
-	serve := newLoadedStateManager(t, dir, "/work/project")
+	other := newLoadedStateManager(t, dir, "/work/project")
 
 	if err := tui.SetProjectOrder([]string{"p1", "p2"}); err != nil {
 		t.Fatalf("set order: %v", err)
 	}
-	// serve's cache predates the write above; its own save must not erase it.
-	if err := serve.SetFoldedCategories("p1", []string{"cat-a"}); err != nil {
+	// other's cache predates the write above; its own save must not erase it.
+	if err := other.SetFoldedCategories("p1", []string{"cat-a"}); err != nil {
 		t.Fatalf("set folds: %v", err)
 	}
 
@@ -42,17 +42,17 @@ func TestStateManagerConcurrentWritersDoNotClobber(t *testing.T) {
 	}
 }
 
-// The phone folds a category while the TUI has the project open; the TUI reads
-// folds at project open, so its next read must see the new value.
+// Another process folds a category while the TUI has the project open; the TUI
+// reads folds at project open, so its next read must see the new value.
 func TestGetFoldedCategoriesSeesOtherProcessWrites(t *testing.T) {
 	dir := t.TempDir()
 	tui := newLoadedStateManager(t, dir, "")
-	serve := newLoadedStateManager(t, dir, "")
+	other := newLoadedStateManager(t, dir, "")
 
 	if got := tui.GetFoldedCategories("p1"); len(got) != 0 {
 		t.Fatalf("want no folds initially, got %v", got)
 	}
-	if err := serve.SetFoldedCategories("p1", []string{"cat-a", "cat-b"}); err != nil {
+	if err := other.SetFoldedCategories("p1", []string{"cat-a", "cat-b"}); err != nil {
 		t.Fatalf("set folds: %v", err)
 	}
 
@@ -195,18 +195,18 @@ func TestDeleteCursorRemovesEntry(t *testing.T) {
 	}
 }
 
-// The TUI writes its cursor on exit while `phasionary serve` may be writing
+// The TUI writes its cursor on exit while another process may be writing
 // folds; neither whole-file rewrite may drop the other's key.
 func TestCursorAndFoldWritersDoNotClobber(t *testing.T) {
 	dir := t.TempDir()
 	tui := newLoadedStateManager(t, dir, "")
-	serve := newLoadedStateManager(t, dir, "")
+	other := newLoadedStateManager(t, dir, "")
 
 	cursor := Cursor{Kind: "task", CategoryID: "c1", TaskID: "t1"}
 	if err := tui.SetCursor("p1", cursor); err != nil {
 		t.Fatalf("set cursor: %v", err)
 	}
-	if err := serve.SetFoldedCategories("p1", []string{"cat-a"}); err != nil {
+	if err := other.SetFoldedCategories("p1", []string{"cat-a"}); err != nil {
 		t.Fatalf("set folds: %v", err)
 	}
 
