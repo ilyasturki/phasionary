@@ -106,7 +106,7 @@ func computeHelpRows() ([]helpRow, []int) {
 		helpTextRow("space", "cycle status of whole range forward/back"),
 		helpTextRow("y", "copy as bullet list"),
 		helpTextRow("Y", "copy as markdown checklist"),
-		helpTextRow("x", "cut range (then p to paste)"),
+		helpTextRow("x", "cut range (p to paste, esc cancels)"),
 		helpTextRow("d", "delete range (with confirmation)"),
 		helpTextRow("esc", "exit visual mode"),
 	)

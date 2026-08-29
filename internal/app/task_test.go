@@ -442,3 +442,61 @@ func TestDeleteCategory_RemovesEntireCategory(t *testing.T) {
 	require.Len(t, m.project.Categories, 1)
 	assert.Equal(t, "c2", m.project.Categories[0].ID)
 }
+
+func TestEscCancelsPendingCut(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.cutSelectedTask()
+	require.True(t, m.isTaskCut("t1"))
+
+	m.dispatchNormalKey("esc")
+	assert.False(t, m.ui.Clipboard.IsCut)
+	assert.Nil(t, m.ui.Clipboard.Task)
+	assert.False(t, m.isTaskCut("t1"))
+	assert.Equal(t, "Cut cancelled", m.ui.Screen.StatusMsg)
+}
+
+func TestEscKeepsCopiedTaskOnClipboard(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.copySelected()
+	require.NotNil(t, m.ui.Clipboard.Task)
+
+	m.dispatchNormalKey("esc")
+	assert.NotNil(t, m.ui.Clipboard.Task, "a plain copy survives esc — nothing on screen marks it")
+}
+
+func TestEscClearsSearchBeforeCut(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	withStubStateManager(m)
+	m.ui.Selection.MoveTo(2) // t1
+	m.cutSelectedTask()
+	typeSearch(m, "ta")
+	m.commitSearch()
+	require.NotEmpty(t, m.ui.Search.query)
+
+	// The first esc only drops the highlight, so hunting for the paste target
+	// with `/` cannot cost the cut.
+	m.dispatchNormalKey("esc")
+	assert.Empty(t, m.ui.Search.query)
+	assert.True(t, m.isTaskCut("t1"), "cut survives the first esc")
+
+	m.dispatchNormalKey("esc")
+	assert.False(t, m.isTaskCut("t1"))
+}
+
+func TestEscClearsPendingChordBeforeCut(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.cutSelectedTask()
+
+	m.dispatchNormalKey("g") // chord prefix, awaiting its second key
+	require.NotZero(t, m.ui.Screen.PendingKey)
+
+	m.dispatchNormalKey("esc")
+	assert.Zero(t, m.ui.Screen.PendingKey)
+	assert.True(t, m.isTaskCut("t1"), "backing out of a chord doesn't cost the cut")
+
+	m.dispatchNormalKey("esc")
+	assert.False(t, m.isTaskCut("t1"))
+}

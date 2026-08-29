@@ -727,3 +727,19 @@ func TestVisualCycleStatus_RoundsDescriptionUpToParentOnce(t *testing.T) {
 
 	assert.Equal(t, domain.StatusInProgress, m.project.Categories[0].Tasks[0].Status)
 }
+
+func TestEscCancelsVisualCut(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Selection.MoveTo(2) // t1
+	m.enterVisualMode()
+	m.visualMoveCursor(1) // include t2
+	m.visualCut()
+	require.True(t, m.isTaskCut("t1"))
+
+	m.dispatchNormalKey("esc")
+	assert.False(t, m.ui.Clipboard.IsCut)
+	assert.Empty(t, m.ui.Clipboard.TaskIDs)
+	assert.False(t, m.isTaskCut("t1"))
+	assert.False(t, m.isTaskCut("t2"))
+	assert.Equal(t, "Cut cancelled", m.ui.Screen.StatusMsg)
+}

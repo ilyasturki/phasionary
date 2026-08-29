@@ -125,7 +125,7 @@ var normalBindings = []keyBinding{
 		action: func(m *model) tea.Cmd { return m.copySelected() }},
 	{keys: []string{"Y"}, section: sectionActions,
 		action: func(m *model) tea.Cmd { return m.copyCategoryContent() }},
-	{keys: []string{"x"}, desc: "mark task for cut", section: sectionActions,
+	{keys: []string{"x"}, desc: "mark task for cut (esc cancels)", section: sectionActions,
 		action: void((*model).cutSelectedTask)},
 	{keys: []string{"p"}, desc: "paste copied tag (if copied last) or cut task", section: sectionActions,
 		action: void((*model).paste)},
@@ -191,12 +191,21 @@ func matchBinding(prefix rune, key string) *keyBinding {
 }
 
 func (m *model) dispatchNormalKey(key string) tea.Cmd {
-	// Esc cancels a pending chord and clears an active search highlight (the
-	// vim `:nohlsearch` gesture). It otherwise stays a no-op in normal mode.
+	// Esc undoes one thing per press, innermost first: a pending chord, then an
+	// active search highlight (the vim `:nohlsearch` gesture), then a pending
+	// cut. The cut goes last so that cutting, searching for the destination and
+	// pressing esc only drops the highlight — the cut survives, and a second esc
+	// clears it. Only a cut is dropped, never a plain copy: nothing on screen
+	// marks a copy, so clearing it would be invisible.
 	if key == "esc" {
-		m.ui.Screen.PendingKey = 0
-		if m.ui.Search.query != "" {
+		switch {
+		case m.ui.Screen.PendingKey != 0:
+			m.ui.Screen.PendingKey = 0
+		case m.ui.Search.query != "":
 			m.clearSearch()
+		case m.ui.Clipboard.IsCut:
+			m.ui.Clipboard = ClipboardState{}
+			m.ui.Screen.StatusMsg = "Cut cancelled"
 		}
 		return nil
 	}
