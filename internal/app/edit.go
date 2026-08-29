@@ -306,7 +306,7 @@ func (m model) forwardToInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if m.ui.Modes.IsEdit() {
-		if paste, ok := msg.(tea.PasteMsg); ok && m.pasteLinesWhileAdding(paste.Content) {
+		if paste, ok := msg.(tea.PasteMsg); ok && m.pasteLinesInEdit(paste.Content) {
 			return m, nil
 		}
 		var cmd tea.Cmd

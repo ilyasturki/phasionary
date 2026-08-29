@@ -328,11 +328,12 @@ func TestPasteTask_AfterCopy_KeepsOriginal(t *testing.T) {
 	assert.Equal(t, "Pasted!", m.ui.Screen.StatusMsg)
 }
 
-func TestPasteTask_EmptyClipboardSetsStatus(t *testing.T) {
+func TestPasteTask_EmptyClipboardFallsBackToSystemClipboard(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Selection.MoveTo(2)
-	m.pasteFromClipboard()
-	assert.Equal(t, "Nothing to paste", m.ui.Screen.StatusMsg)
+	cmd := m.pasteFromClipboard()
+	require.NotNil(t, cmd)
+	assert.Empty(t, m.ui.Screen.StatusMsg)
 }
 
 func TestRemoveTaskByID(t *testing.T) {

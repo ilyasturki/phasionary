@@ -95,6 +95,8 @@ func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.ui.Screen.StatusMsg = "Copied!"
 		}
+	case clipboardLinesMsg:
+		m.pasteClipboardLines(msg)
 	case openURLResultMsg:
 		m.handleOpenURLResult(msg)
 	case editorFinishedMsg:

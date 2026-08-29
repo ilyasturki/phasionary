@@ -5,54 +5,129 @@ import (
 	"regexp"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+	"github.com/atotto/clipboard"
+
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
 )
 
-// pastedTaskLine is one task parsed out of a multi-line paste: the title with
-// any leading list marker stripped, and the status its checkbox implies.
-type pastedTaskLine struct {
-	title  string
-	status string
+// A separator with an empty title renders as a bare rule.
+type pastedRow struct {
+	title     string
+	status    string
+	separator bool
 }
 
-// listMarkerPattern matches a leading bullet ("-", "*", "+", "•") or numbered
-// ("1.", "1)") list marker, optionally followed by a "[ ]"/"[x]" checkbox.
-var listMarkerPattern = regexp.MustCompile(`^\s*(?:[-*+•]|\d+[.)])\s+(?:\[([ xX])\]\s*)?`)
+var (
+	bulletPattern = regexp.MustCompile(`^\s*(?:[-*+•]|\d+[.)])\s+`)
+	// The markers are the ones the app's own markdown copy writes.
+	checkboxPattern = regexp.MustCompile(`^\s*\[([ xX~-])\]\s*`)
+	headingPattern  = regexp.MustCompile(`^\s*#{1,6}\s+`)
+	rulePattern     = regexp.MustCompile(`^\s*(?:-{3,}|\*{3,}|_{3,})\s*$`)
+)
 
-// parsePastedTaskLines splits pasted text into one task per non-empty line.
-func parsePastedTaskLines(text string) []pastedTaskLine {
-	text = strings.ReplaceAll(text, "\r", "\n")
-	var out []pastedTaskLine
-	for _, line := range strings.Split(text, "\n") {
-		title := line
-		status := domain.StatusTodo
-		if m := listMarkerPattern.FindStringSubmatch(line); m != nil {
-			title = line[len(m[0]):]
-			if m[1] == "x" || m[1] == "X" {
-				status = domain.StatusCompleted
-			}
-		}
-		title = strings.TrimSpace(title)
-		if title == "" {
+func parsePastedRows(text string) []pastedRow {
+	var rows []pastedRow
+	var bare []int
+	hasMarked := false
+
+	for _, raw := range strings.Split(strings.ReplaceAll(text, "\r", "\n"), "\n") {
+		if strings.TrimSpace(raw) == "" {
 			continue
 		}
-		out = append(out, pastedTaskLine{title: title, status: status})
+		if rulePattern.MatchString(raw) {
+			rows = append(rows, pastedRow{separator: true})
+			continue
+		}
+		if m := headingPattern.FindString(raw); m != "" {
+			label := strings.Clone(strings.TrimSpace(raw[len(m):]))
+			rows = append(rows, pastedRow{title: label, separator: true})
+			continue
+		}
+
+		body := raw
+		marked := false
+		if m := bulletPattern.FindString(body); m != "" {
+			body = body[len(m):]
+			marked = true
+		}
+		status := domain.StatusTodo
+		if m := checkboxPattern.FindStringSubmatch(body); m != nil {
+			body = body[len(m[0]):]
+			marked = true
+			switch m[1] {
+			case "x", "X":
+				status = domain.StatusCompleted
+			case "~":
+				status = domain.StatusInProgress
+			case "-":
+				status = domain.StatusCancelled
+			}
+		}
+		body = strings.Clone(strings.TrimSpace(body))
+		if body == "" {
+			continue
+		}
+		if marked {
+			hasMarked = true
+		} else {
+			bare = append(bare, len(rows))
+		}
+		rows = append(rows, pastedRow{title: body, status: status})
 	}
-	return out
+
+	// Bare lines standing beside bulleted ones are the separators that group
+	// them; headings and rules say nothing about the shape of the rest.
+	if hasMarked {
+		for _, i := range bare {
+			rows[i] = pastedRow{title: rows[i].title, separator: true}
+		}
+	}
+	return rows
 }
 
-// pasteLinesWhileAdding turns a multi-line paste during the add-task flow into
-// a batch add, one task per line, then closes the edit. Reports false —
-// leaving the paste to the plain single-line input path — when not adding a
-// task or when the paste holds fewer than two usable lines. The whole batch
-// undoes in one step via the history entry startAddingTask already recorded.
-func (m *model) pasteLinesWhileAdding(text string) bool {
-	if !m.ui.Edit.isAdding || m.ui.Edit.itemType != selection.FocusTask {
+func newTaskForRow(row pastedRow) (domain.Task, error) {
+	if row.separator {
+		sep, err := domain.NewSeparator()
+		sep.Title = row.title
+		return sep, err
+	}
+	task, err := domain.NewTask(row.title)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	_ = task.SetStatus(row.status)
+	return task, nil
+}
+
+func pastedRowsSummary(rows []pastedRow) string {
+	seps := 0
+	for _, r := range rows {
+		if r.separator {
+			seps++
+		}
+	}
+	tasks := len(rows) - seps
+	var parts []string
+	if tasks > 0 {
+		parts = append(parts, fmt.Sprintf("%d %s", tasks, plural(tasks, "task", "tasks")))
+	}
+	if seps > 0 {
+		parts = append(parts, fmt.Sprintf("%d %s", seps, plural(seps, "separator", "separators")))
+	}
+	return "Added " + strings.Join(parts, ", ")
+}
+
+// pasteLinesInEdit turns a multi-line paste made in the inline task editor into
+// a batch insert. Reports false so the paste falls back to the plain
+// single-line input path.
+func (m *model) pasteLinesInEdit(text string) bool {
+	if !m.ui.Modes.IsEdit() || m.ui.Edit.itemType != selection.FocusTask {
 		return false
 	}
-	lines := parsePastedTaskLines(text)
-	if len(lines) < 2 {
+	rows := parsePastedRows(text)
+	if len(rows) < 2 {
 		return false
 	}
 	pos, ok := m.selectedPosition()
@@ -60,37 +135,119 @@ func (m *model) pasteLinesWhileAdding(text string) bool {
 		return false
 	}
 
-	if typed := strings.TrimSpace(m.ui.Edit.input.Value()); typed != "" {
-		lines[0].title = typed + " " + lines[0].title
+	adding := m.ui.Edit.isAdding
+	typed := strings.TrimSpace(m.ui.Edit.input.Value())
+	fold := adding || !rows[0].separator
+	rest := rows
+	if fold {
+		if typed != "" {
+			rows[0].title = strings.TrimSpace(typed + " " + rows[0].title)
+		}
+		rest = rows[1:]
 	}
 
-	// Mint every task up front so a mid-loop NewID failure cannot leave a
-	// half-inserted batch.
-	newTasks := make([]domain.Task, 0, len(lines)-1)
-	for _, ln := range lines[1:] {
-		task, err := domain.NewTask(ln.title)
+	// Mint up front: a mid-loop ID failure must not leave a half-inserted batch.
+	newRows := make([]domain.Task, 0, len(rest))
+	for _, row := range rest {
+		task, err := newTaskForRow(row)
 		if err != nil {
 			m.ui.Screen.StatusMsg = "Failed to create task ID"
 			return true
 		}
-		_ = task.SetStatus(ln.status)
-		newTasks = append(newTasks, task)
+		newRows = append(newRows, task)
+	}
+
+	// Adding already recorded its snapshot; editing records its own here.
+	if !adding {
+		m.recordHistory()
 	}
 
 	cat := &m.project.Categories[pos.CategoryIndex]
-	pending := &cat.Tasks[pos.TaskIndex]
-	pending.Title = lines[0].title
-	_ = pending.SetStatus(lines[0].status)
-	for i, task := range newTasks {
+	edited := &cat.Tasks[pos.TaskIndex]
+	switch {
+	case adding:
+		edited.Title = rows[0].title
+		if rows[0].separator {
+			edited.Kind = domain.KindSeparator
+			edited.Status = ""
+		} else {
+			_ = edited.SetStatus(rows[0].status)
+		}
+	case fold:
+		edited.Title = rows[0].title
+	case typed != "":
+		edited.Title = typed
+	}
+	edited.UpdatedAt = domain.NowTimestamp()
+	for i, task := range newRows {
 		cat.InsertTask(pos.TaskIndex+1+i, task)
 	}
 
 	m.ui.Modes.ToNormal()
 	m.ui.Edit.reset()
 	m.rebuildPositions()
-	m.selectTaskByID(newTasks[len(newTasks)-1].ID)
+	m.selectTaskLevelRow(newRows[len(newRows)-1].ID, false)
 	m.ensureVisible()
 	m.storeTaskUpdate()
-	m.ui.Screen.StatusMsg = fmt.Sprintf("Added %d tasks", len(lines))
+	added := rest
+	if adding {
+		added = rows
+	}
+	m.ui.Screen.StatusMsg = pastedRowsSummary(added)
 	return true
+}
+
+type clipboardLinesMsg struct {
+	text string
+	err  error
+}
+
+func readClipboardLines() tea.Cmd {
+	return func() tea.Msg {
+		text, err := clipboard.ReadAll()
+		return clipboardLinesMsg{text: text, err: err}
+	}
+}
+
+func (m *model) pasteClipboardLines(msg clipboardLinesMsg) {
+	rows := parsePastedRows(msg.text)
+	if msg.err != nil || len(rows) == 0 {
+		m.ui.Screen.StatusMsg = "Nothing to paste"
+		return
+	}
+	pos, ok := m.selectedPosition()
+	if !ok || len(m.project.Categories) == 0 {
+		m.ui.Screen.StatusMsg = "No category to paste into"
+		return
+	}
+
+	catIndex := pos.CategoryIndex
+	taskIndex := 0
+	switch pos.Kind {
+	case selection.FocusProject:
+		catIndex = 0
+	case selection.FocusTask, selection.FocusDescription, selection.FocusSeparator:
+		taskIndex = pos.TaskIndex + 1
+	}
+
+	newRows := make([]domain.Task, 0, len(rows))
+	for _, row := range rows {
+		task, err := newTaskForRow(row)
+		if err != nil {
+			m.ui.Screen.StatusMsg = "Failed to create task ID"
+			return
+		}
+		newRows = append(newRows, task)
+	}
+
+	m.recordHistory()
+	for i, task := range newRows {
+		m.project.Categories[catIndex].InsertTask(taskIndex+i, task)
+	}
+
+	m.rebuildPositions()
+	m.selectTaskLevelRow(newRows[len(newRows)-1].ID, false)
+	m.ensureVisible()
+	m.storeTaskUpdate()
+	m.ui.Screen.StatusMsg = pastedRowsSummary(rows)
 }

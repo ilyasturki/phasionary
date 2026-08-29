@@ -1,6 +1,8 @@
 package app
 
 import (
+	tea "charm.land/bubbletea/v2"
+
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
@@ -304,19 +306,18 @@ func (m *model) cutSelectedTask() {
 	m.ui.Screen.StatusMsg = "Marked for cut: " + title
 }
 
-func (m *model) pasteFromClipboard() {
+func (m *model) pasteFromClipboard() tea.Cmd {
 	if m.pasteMulti() {
-		return
+		return nil
 	}
-	m.pasteTask()
+	if m.ui.Clipboard.Task != nil {
+		m.pasteTask()
+		return nil
+	}
+	return readClipboardLines()
 }
 
 func (m *model) pasteTask() {
-	if m.ui.Clipboard.Task == nil {
-		m.ui.Screen.StatusMsg = "Nothing to paste"
-		return
-	}
-
 	newID, err := domain.NewID()
 	if err != nil {
 		m.ui.Screen.StatusMsg = "Failed to create task ID"

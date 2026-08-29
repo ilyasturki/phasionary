@@ -263,15 +263,14 @@ func (m *model) copyTagFromSelected() tea.Cmd {
 	}
 }
 
-// paste routes the normal-mode `p`: when the last copy gesture was a tag copy
-// (gt), it paints the copied tag onto the focused task; otherwise it pastes the
-// cut or copied task/category from the clipboard.
-func (m *model) paste() {
+// paste routes the normal-mode `p`: a tag copied last wins, then the internal
+// clipboard, then the system clipboard.
+func (m *model) paste() tea.Cmd {
 	if m.ui.TagCopiedLast && m.ui.TagClip.Set {
 		m.pasteTagOntoSelected()
-		return
+		return nil
 	}
-	m.pasteFromClipboard()
+	return m.pasteFromClipboard()
 }
 
 // pasteTagOntoSelected applies the copied tag to the focused task, replacing its
