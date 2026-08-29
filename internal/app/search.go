@@ -2,12 +2,10 @@ package app
 
 import (
 	"fmt"
-	"strings"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/ui"
@@ -329,37 +327,8 @@ func (m model) matchCount(query string) int {
 	return count
 }
 
-// renderSearchBar draws the bottom prompt while typing: "/<query>" on the left
-// and a match-count (or "no matches") indicator on the right.
+// renderSearchBar draws the bottom prompt while typing.
 func (m model) renderSearchBar() string {
 	value := m.ui.Search.input.Value()
-	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
-	split := splitAtCursor(value, m.ui.Search.input.Position())
-	left := "/" + split.left + cursorStyle.Render(split.cursorCh) + split.right
-
-	status := ""
-	if value != "" {
-		if c := m.matchCount(value); c == 0 {
-			status = ui.MutedStyle.Render("no matches")
-		} else {
-			status = ui.MutedStyle.Render(fmt.Sprintf("%d %s", c, plural(c, "match", "matches")))
-		}
-	}
-
-	width := m.ui.Screen.Width
-	if width <= 0 {
-		if status == "" {
-			return left
-		}
-		return left + "  " + status
-	}
-	leftW := ansi.StringWidth(left)
-	statusW := ansi.StringWidth(status)
-	if status == "" || leftW+2+statusW > width {
-		if leftW > width {
-			return ansi.Truncate(left, width, "")
-		}
-		return left
-	}
-	return left + strings.Repeat(" ", width-leftW-statusW) + status
+	return m.filterPromptRow(m.ui.Search.input, value, m.matchCount(value), m.ui.Screen.Width)
 }

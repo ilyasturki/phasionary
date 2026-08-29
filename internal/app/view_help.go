@@ -2,30 +2,345 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
+	"charm.land/lipgloss/v2"
+
+	"phasionary/internal/config"
 	"phasionary/internal/ui"
 )
 
-type helpRow struct {
-	text         string
-	focusable    bool
-	disabled     bool
+const (
+	// The dialog's own rows around the body: title, the blank under it, the
+	// blank above the footer, the footer.
+	helpOwnRows = 4
+	// helpCardBody is taller than the card itself, because it is also the
+	// window the `/` filter scrolls its matches inside.
+	helpCardBody = 11
+	// Floor on a short terminal: overflow rather than collapse to nothing.
+	helpMinBody = 5
+	// The longest display string plus a gap.
+	helpKeyCol     = 17
+	helpCardKeyCol = 8
+)
+
+type helpEntry struct {
+	keys         string
+	desc         string
 	bindingIndex int
-	// header marks a section title row (e.g. "Actions:"). It groups the content
-	// rows beneath it so the `/` filter can drop empty sections.
-	header bool
-	// filter is the plain "key label" text a row matches against under the `/`
-	// filter, in natural case (smartcase applies). Empty for headers and spacers,
-	// which are never matched directly.
-	filter string
+	// false for a shortcut Enter must not fire: one that only exists inside
+	// editing or visual mode, or `?` itself.
+	runnable bool
 }
 
-var helpHint = []ui.Hint{
-	{Key: "ctrl+d/u", Label: "page"},
-	{Key: "/", Label: "filter"},
-	{Key: "enter", Label: "run"},
-	{Key: "?/esc", Label: "close"},
+// Natural case, so smartcase applies.
+func (e helpEntry) filterText() string { return e.keys + " " + e.desc }
+
+// Exactly one of header, entry and note is set.
+type helpCell struct {
+	header string
+	entry  *helpEntry
+	note   string
+}
+
+// The full reference uses one cell per line; the essentials card lays two
+// columns side by side.
+type helpLine []helpCell
+
+type helpCursor struct {
+	line int
+	col  int
+}
+
+type helpBody struct {
+	lines []helpLine
+	// The shortcut cells the cursor can land on, in the order j/k walks them.
+	targets []helpCursor
+}
+
+func (b helpBody) entryAt(c helpCursor) *helpEntry {
+	return b.lines[c.line][c.col].entry
+}
+
+type helpSection struct {
+	title   string
+	entries []helpEntry
+}
+
+// Reference only: pressing Enter on one of these would fire it in the wrong
+// context, so every entry stays unrunnable.
+var helpModeSections = []helpSection{
+	{
+		title: "While editing text",
+		entries: []helpEntry{
+			{keys: "enter", desc: "save"},
+			{keys: "esc", desc: "cancel"},
+			{keys: "← / →", desc: "move the cursor"},
+			{keys: "ctrl+a / ctrl+e", desc: "start / end of line"},
+			{keys: "ctrl+← / ctrl+→", desc: "move by word"},
+			{keys: "ctrl+w", desc: "delete word back"},
+			{keys: "ctrl+k / ctrl+u", desc: "delete to end / start"},
+		},
+	},
+	{
+		title: "In visual mode (v)",
+		entries: []helpEntry{
+			{keys: "j / k", desc: "extend the selection"},
+			{keys: "J / K", desc: "move the selection down / up"},
+			{keys: "o", desc: "swap which end moves"},
+			{keys: "space", desc: "cycle status of every row"},
+			{keys: "y / Y", desc: "copy / copy as markdown"},
+			{keys: "x", desc: "cut (p pastes, esc cancels)"},
+			{keys: "d", desc: "delete (asks first)"},
+			{keys: "esc", desc: "leave visual mode"},
+		},
+	},
+}
+
+var helpSections = buildHelpSections()
+
+// Sections come out in declaration order, so the groups in normalBindings are
+// the one source of truth for how the reference reads.
+func buildHelpSections() []helpSection {
+	var out []helpSection
+	for i, b := range normalBindings {
+		if b.desc == "" {
+			continue
+		}
+		if len(out) == 0 || out[len(out)-1].title != b.section {
+			out = append(out, helpSection{title: b.section})
+		}
+		display := b.display
+		if display == "" {
+			display = strings.Join(b.keys, " / ")
+		}
+		last := &out[len(out)-1]
+		last.entries = append(last.entries, helpEntry{
+			keys:         display,
+			desc:         b.desc,
+			bindingIndex: i,
+			// Running `?` from the dialog would only reopen the dialog.
+			runnable: !slices.Contains(b.keys, "?"),
+		})
+	}
+	return append(out, helpModeSections...)
+}
+
+var helpShortcutCount = func() int {
+	n := 0
+	for _, s := range helpSections {
+		n += len(s.entries)
+	}
+	return n
+}()
+
+var helpReferenceLines = referenceLines(helpSections)
+
+func referenceLines(sections []helpSection) []helpLine {
+	var lines []helpLine
+	for i, s := range sections {
+		if i > 0 {
+			lines = append(lines, helpLine{{}})
+		}
+		lines = append(lines, helpLine{{header: s.title}})
+		for _, e := range s.entries {
+			lines = append(lines, helpLine{{entry: &e}})
+		}
+	}
+	return lines
+}
+
+// cardShortcut names a binding by the key that triggers it, so a shortcut that
+// no longer exists fails the card's test instead of teaching the wrong key.
+type cardShortcut struct {
+	key   string
+	label string
+	desc  string
+}
+
+type cardGroup struct {
+	title     string
+	shortcuts []cardShortcut
+}
+
+// The essentials card: the shortcuts that cover reading, creating, changing and
+// finding. Everything else waits behind `a`.
+var helpCardColumns = [2][]cardGroup{
+	{
+		{title: "Move", shortcuts: []cardShortcut{
+			{key: "j", label: "j / k", desc: "move up / down"},
+			{key: "tab", label: "tab", desc: "fold category"},
+			{key: "/", label: "/", desc: "search"},
+		}},
+		{title: "Do", shortcuts: []cardShortcut{
+			{key: "space", label: "space", desc: "cycle status"},
+			{key: "u", label: "u", desc: "undo"},
+			{key: "f", label: "f", desc: "filter tasks"},
+		}},
+	},
+	{
+		{title: "Create & edit", shortcuts: []cardShortcut{
+			{key: "a", label: "a", desc: "add task"},
+			{key: "A", label: "A", desc: "add category"},
+			{key: "enter", label: "enter", desc: "edit"},
+			{key: "d", label: "d", desc: "delete"},
+		}},
+	},
+}
+
+var helpCardLines = cardLines()
+
+func cardLines() []helpLine {
+	columns := [2][]helpCell{}
+	for col, groups := range helpCardColumns {
+		for i, g := range groups {
+			if i > 0 {
+				columns[col] = append(columns[col], helpCell{})
+			}
+			columns[col] = append(columns[col], helpCell{header: g.title})
+			for _, s := range g.shortcuts {
+				e := s.entry()
+				columns[col] = append(columns[col], helpCell{entry: &e})
+			}
+		}
+	}
+
+	height := max(len(columns[0]), len(columns[1]))
+	lines := make([]helpLine, 0, height)
+	for i := range height {
+		line := make(helpLine, 2)
+		for col := range columns {
+			if i < len(columns[col]) {
+				line[col] = columns[col][i]
+			}
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+// entry resolves the card shortcut against the real bindings, so Enter runs the
+// same action the key would in normal mode.
+func (s cardShortcut) entry() helpEntry {
+	for i, b := range normalBindings {
+		if b.prefix == 0 && slices.Contains(b.keys, s.key) {
+			return helpEntry{keys: s.label, desc: s.desc, bindingIndex: i, runnable: true}
+		}
+	}
+	return helpEntry{keys: s.label, desc: s.desc, bindingIndex: -1}
+}
+
+func (m model) helpExpanded() bool {
+	return m.deps.CfgManager.Get().HelpExpanded
+}
+
+// Depends only on the mode and the terminal, never on what the filter matched:
+// the body is padded with blanks instead of shrinking, so the dialog keeps its
+// size and — centered on the rendered box — its position.
+func (m model) helpBodyHeight() int {
+	room := ui.DialogBodyHeight(m.ui.Screen.Height, helpOwnRows, helpMinBody)
+	if !m.helpExpanded() {
+		return min(helpCardBody, room)
+	}
+	return min(len(helpReferenceLines), room)
+}
+
+func (m model) helpQuery() string {
+	if !m.ui.Help.Filtering {
+		return ""
+	}
+	return m.ui.Help.Filter.Value()
+}
+
+// Filtering always searches the whole reference — including sections the
+// current mode hides — so `/` finds a shortcut wherever it lives.
+func (m model) helpBody() helpBody {
+	var lines []helpLine
+	switch {
+	case strings.TrimSpace(m.helpQuery()) != "":
+		lines = filteredReferenceLines(m.helpQuery())
+	case m.helpExpanded():
+		lines = helpReferenceLines
+	default:
+		lines = helpCardLines
+	}
+	return helpBody{lines: lines, targets: helpTargets(lines)}
+}
+
+// Down a column before moving to the next one, so the card's two columns read
+// as two lists rather than as rows.
+func helpTargets(lines []helpLine) []helpCursor {
+	var out []helpCursor
+	for col := range 2 {
+		for i, l := range lines {
+			if col < len(l) && l[col].entry != nil {
+				out = append(out, helpCursor{line: i, col: col})
+			}
+		}
+	}
+	return out
+}
+
+func filteredReferenceLines(query string) []helpLine {
+	var sections []helpSection
+	for _, s := range helpSections {
+		var matched []helpEntry
+		for _, e := range s.entries {
+			if ui.Contains(e.filterText(), query) {
+				matched = append(matched, e)
+			}
+		}
+		if len(matched) > 0 {
+			sections = append(sections, helpSection{title: s.title, entries: matched})
+		}
+	}
+	if len(sections) == 0 {
+		return []helpLine{{{note: "nothing matches that"}}}
+	}
+	return referenceLines(sections)
+}
+
+// ensureHelpVisible clamps the cursor into the current target list and scrolls
+// the body so the cursor's line is on screen.
+func (m *model) ensureHelpVisible() {
+	body := m.helpBody()
+	height := m.helpBodyHeight()
+
+	if len(body.targets) == 0 {
+		m.ui.Help.Focused = 0
+	} else {
+		m.ui.Help.Focused = min(max(m.ui.Help.Focused, 0), len(body.targets)-1)
+		line := body.targets[m.ui.Help.Focused].line
+		if line < m.ui.Help.ScrollOffset {
+			m.ui.Help.ScrollOffset = line
+		}
+		if line >= m.ui.Help.ScrollOffset+height {
+			m.ui.Help.ScrollOffset = line - height + 1
+		}
+	}
+	m.ui.Help.ScrollOffset = min(max(m.ui.Help.ScrollOffset, 0), max(len(body.lines)-height, 0))
+}
+
+func (m *model) moveHelpFocus(delta int) {
+	body := m.helpBody()
+	if len(body.targets) == 0 {
+		return
+	}
+	m.ui.Help.Focused = min(max(m.ui.Help.Focused+delta, 0), len(body.targets)-1)
+	m.ensureHelpVisible()
+}
+
+// The cursor resets to the top: the two faces share no ordering, so carrying a
+// position across would land anywhere.
+func (m *model) toggleHelpExpanded() {
+	expanded := !m.helpExpanded()
+	_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
+		cfg.HelpExpanded = expanded
+	})
+	m.ui.Help.Focused = 0
+	m.ui.Help.ScrollOffset = 0
+	m.ensureHelpVisible()
 }
 
 var helpFilterHint = []ui.Hint{
@@ -33,260 +348,116 @@ var helpFilterHint = []ui.Hint{
 	{Key: "esc", Label: "clear"},
 }
 
-func helpDisabled(b keyBinding) bool {
-	for _, k := range b.keys {
-		if k == "?" {
-			return true
-		}
-	}
-	return false
-}
-
-func helpHeaderRow(title string) helpRow {
-	return helpRow{text: ui.DialogTitleStyle.Render(title + ":"), header: true}
-}
-
-// helpTextRow builds a non-runnable reference row (Editing / Visual mode). It is
-// searchable by the `/` filter but never focusable, so Enter can't run it.
-func helpTextRow(key, desc string) helpRow {
-	return helpRow{
-		text:   fmt.Sprintf("  %-14s%s", key, desc),
-		filter: key + " " + desc,
-	}
-}
-
-var helpRowsAll, helpFocusablesAll = computeHelpRows()
-
-func computeHelpRows() ([]helpRow, []int) {
-	var rows []helpRow
-	var focusables []int
-
-	for _, section := range []string{sectionNavigation, sectionActions} {
-		rows = append(rows, helpHeaderRow(section))
-		for i, b := range normalBindings {
-			if b.section != section || b.desc == "" {
-				continue
-			}
-			display := b.display
-			if display == "" {
-				display = strings.Join(b.keys, "/")
-			}
-			line := fmt.Sprintf("  %-14s%s", display, b.desc)
-			row := helpRow{
-				text:         line,
-				focusable:    true,
-				bindingIndex: i,
-				disabled:     helpDisabled(b),
-				filter:       display + " " + b.desc,
-			}
-			if row.disabled {
-				row.text = ui.MutedStyle.Render(line)
-			}
-			focusables = append(focusables, len(rows))
-			rows = append(rows, row)
-		}
-		rows = append(rows, helpRow{})
-	}
-
-	rows = append(rows,
-		helpHeaderRow("Editing"),
-		helpTextRow("enter", "save changes"),
-		helpTextRow("esc", "cancel editing"),
-		helpTextRow("←/→", "move cursor"),
-		helpTextRow("ctrl+a/e", "start/end of line"),
-		helpTextRow("ctrl+w", "delete word backward"),
-		helpTextRow("ctrl+k/u", "delete to end/start"),
-		helpTextRow("ctrl+←/→", "word navigation"),
-		helpRow{},
-		helpHeaderRow("Visual mode"),
-		helpTextRow("v", "enter visual mode (anchor at cursor)"),
-		helpTextRow("j/k", "extend range (skips category rows)"),
-		helpTextRow("J/K", "shift range down/up"),
-		helpTextRow("o", "swap anchor and cursor"),
-		helpTextRow("space", "cycle status of whole range forward/back"),
-		helpTextRow("y", "copy as bullet list"),
-		helpTextRow("Y", "copy as markdown checklist"),
-		helpTextRow("x", "cut range (p to paste, esc cancels)"),
-		helpTextRow("d", "delete range (with confirmation)"),
-		helpTextRow("esc", "exit visual mode"),
-	)
-	return rows, focusables
-}
-
-// filteredHelpRows narrows the shortcut list to rows whose key or label matches
-// query, keeping a section header only when the section has a match. An empty
-// query returns the full list. The returned focusables index into the returned
-// rows.
-func filteredHelpRows(query string) ([]helpRow, []int) {
-	if strings.TrimSpace(query) == "" {
-		return helpRowsAll, helpFocusablesAll
-	}
-	var rows []helpRow
-	var focusables []int
-	for i := 0; i < len(helpRowsAll); {
-		if !helpRowsAll[i].header {
-			i++
-			continue
-		}
-		header := helpRowsAll[i]
-		j := i + 1
-		var matched []helpRow
-		for j < len(helpRowsAll) && !helpRowsAll[j].header {
-			r := helpRowsAll[j]
-			if r.filter != "" && ui.Contains(r.filter, query) {
-				matched = append(matched, r)
-			}
-			j++
-		}
-		if len(matched) > 0 {
-			rows = append(rows, header)
-			for _, r := range matched {
-				if r.focusable {
-					focusables = append(focusables, len(rows))
-				}
-				rows = append(rows, r)
-			}
-			rows = append(rows, helpRow{})
-		}
-		i = j
-	}
-	return rows, focusables
-}
-
-// currentHelpRows returns the rows and focusables in effect: the active filter's
-// narrowed set while filtering, otherwise the full list.
-func (m model) currentHelpRows() ([]helpRow, []int) {
+func (m model) helpHints() []ui.Hint {
 	if m.ui.Help.Filtering {
-		return filteredHelpRows(m.ui.Help.Filter.Value())
+		return helpFilterHint
 	}
-	return helpRowsAll, helpFocusablesAll
+	toggle := fmt.Sprintf("all %d shortcuts", helpShortcutCount)
+	if m.helpExpanded() {
+		toggle = "essentials"
+	}
+	return []ui.Hint{
+		{Key: "a", Label: toggle},
+		{Key: "/", Label: "find"},
+		{Key: "enter", Label: "run"},
+		{Key: "?/esc", Label: "close"},
+	}
 }
 
-func (m model) helpViewportHeight() int {
-	chrome := 8
+// The title and the filter prompt share the first row, so entering the filter
+// cannot change the dialog's height.
+func (m model) helpTitleRow(body helpBody, width int) string {
 	if m.ui.Help.Filtering {
-		chrome += 2 // the filter prompt line and its blank separator
+		return m.filterPromptRow(m.ui.Help.Filter, strings.TrimSpace(m.helpQuery()), len(body.targets), width)
 	}
-	h := m.ui.Screen.Height - chrome
-	if h < 5 {
-		return 5
-	}
-	return h
-}
 
-func (m *model) ensureHelpVisible() {
-	rows, focusables := m.currentHelpRows()
-	height := m.helpViewportHeight()
-	maxOffset := len(rows) - height
-	if maxOffset < 0 {
-		maxOffset = 0
+	title := ui.DialogTitleStyle.Render("Keyboard Shortcuts")
+	height := m.helpBodyHeight()
+	if len(body.lines) <= height {
+		return title
 	}
-	clamp := func() {
-		if m.ui.Help.ScrollOffset > maxOffset {
-			m.ui.Help.ScrollOffset = maxOffset
-		}
-		if m.ui.Help.ScrollOffset < 0 {
-			m.ui.Help.ScrollOffset = 0
-		}
-	}
-	if len(focusables) == 0 {
-		clamp()
-		return
-	}
-	if m.ui.Help.Focused < 0 {
-		m.ui.Help.Focused = 0
-	}
-	if m.ui.Help.Focused >= len(focusables) {
-		m.ui.Help.Focused = len(focusables) - 1
-	}
-	rowIdx := focusables[m.ui.Help.Focused]
-	if rowIdx < m.ui.Help.ScrollOffset {
-		m.ui.Help.ScrollOffset = rowIdx
-	}
-	if rowIdx >= m.ui.Help.ScrollOffset+height {
-		m.ui.Help.ScrollOffset = rowIdx - height + 1
-	}
-	clamp()
-}
-
-func (m *model) moveHelpFocus(delta int) {
-	_, focusables := m.currentHelpRows()
-	if len(focusables) == 0 {
-		return
-	}
-	target := m.ui.Help.Focused + delta
-	if target < 0 {
-		target = 0
-	}
-	if target >= len(focusables) {
-		target = len(focusables) - 1
-	}
-	m.ui.Help.Focused = target
-	m.ensureHelpVisible()
-}
-
-// helpFilterPrompt renders the "/query" input line shown at the top of the
-// dialog while filtering, with a block cursor at the edit position.
-func (m model) helpFilterPrompt() string {
-	value := m.ui.Help.Filter.Value()
-	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
-	split := splitAtCursor(value, m.ui.Help.Filter.Position())
-	return "/" + split.left + cursorStyle.Render(split.cursorCh) + split.right
+	first := m.ui.Help.ScrollOffset + 1
+	last := min(m.ui.Help.ScrollOffset+height, len(body.lines))
+	pos := fmt.Sprintf("%d–%d of %d", first, last, len(body.lines))
+	return ui.SplitRow(title, ui.MutedStyle.Render(pos), width)
 }
 
 func (m model) helpView() string {
-	rows, focusables := m.currentHelpRows()
+	body := m.helpBody()
+	width := m.dialogWidth()
+	height := m.helpBodyHeight()
+	query := strings.TrimSpace(m.helpQuery())
 
-	focusedRowIdx := -1
-	if len(focusables) > 0 {
-		idx := m.ui.Help.Focused
-		if idx < 0 {
-			idx = 0
+	cursor := helpCursor{line: -1}
+	if n := len(body.targets); n > 0 {
+		cursor = body.targets[min(max(m.ui.Help.Focused, 0), n-1)]
+	}
+
+	start := min(max(m.ui.Help.ScrollOffset, 0), max(len(body.lines)-height, 0))
+	lines := []string{m.helpTitleRow(body, width), ""}
+	for i := start; i < start+height; i++ {
+		if i >= len(body.lines) {
+			lines = append(lines, "")
+			continue
 		}
-		if idx >= len(focusables) {
-			idx = len(focusables) - 1
+		col := -1
+		if cursor.line == i {
+			col = cursor.col
 		}
-		focusedRowIdx = focusables[idx]
+		lines = append(lines, m.renderBodyLine(body.lines[i], col, width, query))
 	}
+	lines = append(lines, "", ui.RenderHintsToWidth(m.helpHints(), width))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
+}
 
-	height := m.helpViewportHeight()
-	start := m.ui.Help.ScrollOffset
-	if start < 0 {
-		start = 0
+// cursorCol is the column holding the cursor, or -1 when the cursor is on
+// another line.
+func (m model) renderBodyLine(line helpLine, cursorCol, width int, query string) string {
+	n := len(line)
+	keyCol := helpKeyCol
+	if n > 1 {
+		keyCol = helpCardKeyCol
 	}
-	if start > len(rows) {
-		start = len(rows)
-	}
-	end := start + height
-	if end > len(rows) {
-		end = len(rows)
-	}
-
-	var lines []string
-	if m.ui.Help.Filtering {
-		lines = append(lines, m.helpFilterPrompt(), "")
-	}
-	if start > 0 {
-		lines = append(lines, ui.MutedStyle.Render(scrollMoreAbove))
-	}
-	if len(rows) == 0 {
-		lines = append(lines, ui.MutedStyle.Render("  no matching shortcuts"))
-	}
-	for i := start; i < end; i++ {
-		text := rows[i].text
-		if i == focusedRowIdx {
-			text = ui.SelectedStyle.Render(text)
+	cellWidth := width / n
+	var b strings.Builder
+	for col, cell := range line {
+		w := cellWidth
+		if col == n-1 {
+			w = width - cellWidth*(n-1)
 		}
-		lines = append(lines, text)
+		b.WriteString(m.renderHelpCell(cell, w, keyCol, col == cursorCol, query))
 	}
-	if end < len(rows) {
-		lines = append(lines, ui.MutedStyle.Render(scrollMoreBelow))
+	return strings.TrimRight(b.String(), " ")
+}
+
+func (m model) renderHelpCell(cell helpCell, width, keyCol int, focused bool, query string) string {
+	switch {
+	case cell.header != "":
+		return ui.PadTo(ui.HeaderStyle.Render(cell.header), width)
+	case cell.note != "":
+		return ui.PadTo(ui.MutedStyle.Render("  "+cell.note), width)
+	case cell.entry == nil:
+		return strings.Repeat(" ", width)
 	}
 
-	hint := helpHint
-	if m.ui.Help.Filtering {
-		hint = helpFilterHint
+	e := *cell.entry
+	base := lipgloss.NewStyle()
+	match := ui.SearchMatchStyle
+	if focused {
+		base = ui.GetSelectedStyle(m.ui.Screen.WindowFocused)
+		match = ui.SearchCurrentMatchStyle
 	}
-	lines = append(lines, "", ui.RenderHints(hint))
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+
+	text := base.Render("  ") +
+		ui.HighlightMatches(ui.PadTo(e.keys, keyCol), query, base, match) +
+		ui.HighlightMatches(e.desc, query, base, match)
+	if !focused {
+		return ui.PadTo(text, width)
+	}
+	// Extend the band to the cell edge so the cursor is a full bar, not a
+	// ragged one that stops at the end of the description.
+	if gap := width - lipgloss.Width(text); gap > 0 {
+		text += base.Render(strings.Repeat(" ", gap))
+	}
+	return text
 }

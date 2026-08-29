@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -10,6 +11,33 @@ import (
 	"phasionary/internal/app/selection"
 	"phasionary/internal/ui"
 )
+
+func (m model) dialogWidth() int {
+	return ui.DialogContentWidth(m.ui.Screen.Width)
+}
+
+func (m model) dialogStyle() lipgloss.Style {
+	return ui.HelpDialogStyle.Width(m.dialogWidth() + ui.DialogChromeWidth)
+}
+
+// filterPromptRow draws a type-to-filter prompt: "/<query>" with a live cursor
+// on the left and the match count (or "no matches") right-aligned to width.
+// query is what matches was counted for, so an all-whitespace one shows nothing.
+func (m model) filterPromptRow(input textinput.Model, query string, matches, width int) string {
+	split := splitAtCursor(input.Value(), input.Position())
+	left := "/" + split.left +
+		ui.GetCursorStyle(m.ui.Screen.WindowFocused).Render(split.cursorCh) + split.right
+
+	status := ""
+	if query != "" {
+		text := "no matches"
+		if matches > 0 {
+			text = fmt.Sprintf("%d %s", matches, plural(matches, "match", "matches"))
+		}
+		status = ui.MutedStyle.Render(text)
+	}
+	return ui.SplitRow(left, status, width)
+}
 
 func (m model) positions() []selection.Position {
 	return m.ui.Selection.Positions()

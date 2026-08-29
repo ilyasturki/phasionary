@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"phasionary/internal/domain"
+	"phasionary/internal/ui"
 )
 
 func makeProjects(n int) []domain.Project {
@@ -114,10 +115,10 @@ func TestPickerVisibleCount_AdaptsToTerminalHeight(t *testing.T) {
 	m := newPickerModel(t, 50, 160, 30)
 	require.Equal(t, 1, m.pickerHintRows(), "test assumes single-line hints")
 
-	assert.Equal(t, 30-pickerChromeRows-1-pickerScrollReserve, m.pickerVisibleCount()) // 18
+	assert.Equal(t, 30-ui.DialogChromeHeight-pickerOwnRows-1-pickerScrollReserve, m.pickerVisibleCount()) // 18
 
 	m.ui.Screen.Height = 50
-	assert.Equal(t, 50-pickerChromeRows-1-pickerScrollReserve, m.pickerVisibleCount()) // 38
+	assert.Equal(t, 50-ui.DialogChromeHeight-pickerOwnRows-1-pickerScrollReserve, m.pickerVisibleCount()) // 38
 }
 
 func TestPickerVisibleCount_FitsAllWhenTall(t *testing.T) {

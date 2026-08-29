@@ -12,19 +12,9 @@ import (
 )
 
 const (
-	pickerWidthFraction   = 0.5
-	pickerContentMinWidth = 50
-	pickerContentMaxWidth = 70
-)
-
-var pickerDialogChromeWidth = ui.HelpDialogStyle.GetHorizontalPadding() + ui.HelpDialogStyle.GetHorizontalBorderSize()
-
-const (
-	// pickerChromeRows is the picker dialog's fixed vertical overhead, with no
-	// project rows, scroll indicators, or hint footer: rounded border (2) +
-	// vertical padding (2) + title (1) + blank under title (1) + pinned
-	// New Project row (1) + its separator (1) + blank above the hints (1).
-	pickerChromeRows = 9
+	// The picker's own rows around the project list: title, the blank under it,
+	// the pinned New Project row, its separator, the blank above the hints.
+	pickerOwnRows = 5
 	// pickerScrollReserve is the rows kept free below the project list for the
 	// up/down scroll indicators, so the dialog never overflows (and gets
 	// clipped) while scrolling. See pickerVisibleCount.
@@ -53,7 +43,7 @@ func pickerNormalHints() []ui.Hint {
 // pickerHintRows reports how many rows the footer hints occupy once wrapped to
 // the dialog's content width (1 on wide terminals, more when they wrap).
 func (m model) pickerHintRows() int {
-	rendered := lipgloss.NewStyle().Width(m.pickerContentWidth()).Render(ui.RenderHints(pickerNormalHints()))
+	rendered := lipgloss.NewStyle().Width(m.dialogWidth()).Render(ui.RenderHints(pickerNormalHints()))
 	return lipgloss.Height(rendered)
 }
 
@@ -67,45 +57,12 @@ func (m model) pickerVisibleCount() int {
 	if m.ui.Screen.Height <= 0 {
 		return min(total, pickerFallbackVisible)
 	}
-	budget := m.ui.Screen.Height - pickerChromeRows - m.pickerHintRows() - pickerScrollReserve
-	if budget < pickerMinVisible {
-		budget = pickerMinVisible
-	}
-	return min(budget, total)
-}
-
-func (m model) pickerContentWidth() int {
-	total := m.ui.Screen.Width
-	if total <= 0 {
-		return pickerContentMinWidth
-	}
-	target := int(float64(total) * pickerWidthFraction)
-	content := target - pickerDialogChromeWidth
-	if content < pickerContentMinWidth {
-		content = pickerContentMinWidth
-	}
-	if content > pickerContentMaxWidth {
-		content = pickerContentMaxWidth
-	}
-	if maxContent := total - pickerDialogChromeWidth - 2; content > maxContent && maxContent > 10 {
-		content = maxContent
-	}
-	if content < 10 {
-		content = 10
-	}
-	return content
-}
-
-func padToWidth(line string, width int) string {
-	w := lipgloss.Width(line)
-	if w >= width {
-		return line
-	}
-	return line + strings.Repeat(" ", width-w)
+	ownRows := pickerOwnRows + m.pickerHintRows() + pickerScrollReserve
+	return min(ui.DialogBodyHeight(m.ui.Screen.Height, ownRows, pickerMinVisible), total)
 }
 
 func (m model) projectPickerView() string {
-	contentWidth := m.pickerContentWidth()
+	contentWidth := m.dialogWidth()
 
 	title := fmt.Sprintf("Select Project (%d)", len(m.ui.Picker.projects))
 	// While filtering, the query prompt takes the pinned top row's place: New
@@ -159,9 +116,7 @@ func (m model) projectPickerView() string {
 	}
 	lines = append(lines, "", ui.RenderHints(hints))
 
-	// lipgloss.Width is the total block width (content + padding + border),
-	// so add both back to land on the intended content area.
-	return ui.HelpDialogStyle.Width(contentWidth + pickerDialogChromeWidth).Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
 
 func (m model) renderPickerRow(i int, isSelected bool, contentWidth int) string {
@@ -182,7 +137,7 @@ func (m model) renderPickerRow(i int, isSelected bool, contentWidth int) string 
 		// The whole row is one reverse-video band, so every segment (including
 		// the badge) renders inside it.
 		row := prefix + name + suffix + strings.Repeat(" ", gap) + badge
-		return ui.SelectedStyle.Render(padToWidth(row, contentWidth))
+		return ui.SelectedStyle.Render(ui.PadTo(row, contentWidth))
 	}
 
 	displayName := name
@@ -218,35 +173,16 @@ func (m model) renderNewProjectLine(isSelected bool, contentWidth int) string {
 	}
 
 	if isSelected {
-		return ui.SelectedStyle.Render(padToWidth(prefix+"+ New Project", contentWidth))
+		return ui.SelectedStyle.Render(ui.PadTo(prefix+"+ New Project", contentWidth))
 	}
 	// The green "+" reads as an affordance to act, not a disabled row.
 	return prefix + ui.SuccessStyle.Render("+") + " New Project"
 }
 
 // renderPickerFilterLine draws the type-to-filter prompt that replaces the New
-// Project row while filtering: "/<query>" with a live cursor on the left and a
-// match count (or "no matches") right-aligned to the content width.
+// Project row while filtering.
 func (m model) renderPickerFilterLine(contentWidth int) string {
-	split := splitAtCursor(m.ui.Picker.filter.Value(), m.ui.Picker.filter.Position())
-	left := "/" + split.left +
-		ui.GetCursorStyle(m.ui.Screen.WindowFocused).Render(split.cursorCh) + split.right
-
-	status := ""
-	if m.ui.Picker.query != "" {
-		if c := len(m.ui.Picker.projects); c == 0 {
-			status = ui.MutedStyle.Render("no matches")
-		} else {
-			status = ui.MutedStyle.Render(fmt.Sprintf("%d %s", c, plural(c, "match", "matches")))
-		}
-	}
-
-	leftW := lipgloss.Width(left)
-	statusW := lipgloss.Width(status)
-	if status == "" || leftW+2+statusW > contentWidth {
-		return left
-	}
-	return left + strings.Repeat(" ", contentWidth-leftW-statusW) + status
+	return m.filterPromptRow(m.ui.Picker.filter, m.ui.Picker.query, len(m.ui.Picker.projects), contentWidth)
 }
 
 // pickerRowLayout truncates the project name so the row fits contentWidth with

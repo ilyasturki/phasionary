@@ -234,7 +234,7 @@ func (m model) tagEditView() string {
 		{Key: "enter", Label: "save"},
 		{Key: "esc", Label: "cancel"},
 	}))
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
 
 // copyTagFromSelected grabs the focused task's tag into the tag clipboard so it

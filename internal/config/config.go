@@ -27,6 +27,10 @@ type Config struct {
 	ShowShortcutBar             bool   `json:"show_shortcut_bar"`
 	ExpandDescriptionsByDefault bool   `json:"expand_descriptions_by_default"`
 
+	// HelpExpanded remembers whether the help dialog opens on the full
+	// shortcut reference rather than the essentials card.
+	HelpExpanded bool `json:"help_expanded"`
+
 	// ServeToken is the bearer token `phasionary serve` requires. It is
 	// generated on first serve rather than defaulted, so an empty value here
 	// means "not yet generated" and never "authentication disabled".
@@ -55,6 +59,7 @@ func DefaultConfig() Config {
 		PriorityColor:               PriorityColorFull,
 		ShowShortcutBar:             true,
 		ExpandDescriptionsByDefault: false,
+		HelpExpanded:                false,
 	}
 }
 

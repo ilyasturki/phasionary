@@ -71,7 +71,7 @@ func (m model) filterHubView() string {
 	lines = append(lines, clearLine)
 
 	lines = append(lines, "", ui.RenderHints([]ui.Hint{{Key: "enter", Label: "open"}, {Key: "q/esc/f", Label: "close"}}))
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
 
 func (m model) filterStatusView() string {
@@ -84,7 +84,7 @@ func (m model) filterStatusView() string {
 		))
 	}
 	lines = append(lines, "", ui.RenderHints(filterSubHints))
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
 
 func (m model) filterPriorityView() string {
@@ -97,7 +97,7 @@ func (m model) filterPriorityView() string {
 		))
 	}
 	lines = append(lines, "", ui.RenderHints(filterSubHints))
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
 
 func (m model) filterCategoryView() string {
@@ -114,7 +114,7 @@ func (m model) filterCategoryView() string {
 		}
 	}
 	lines = append(lines, "", ui.RenderHints(filterSubHints))
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
 
 func (m model) filterTagView() string {
@@ -127,7 +127,7 @@ func (m model) filterTagView() string {
 		))
 	}
 	lines = append(lines, "", ui.RenderHints(filterSubHints))
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
 
 // formatTagFilterLabel renders a tag filter row: a colored dot plus the color

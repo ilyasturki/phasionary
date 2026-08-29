@@ -34,7 +34,7 @@ func (m model) infoView() string {
 		out = append(out, ui.MutedStyle.Render(scrollMoreBelow))
 	}
 	out = append(out, "", ui.RenderHints([]ui.Hint{{Key: "esc/q", Label: "close"}}))
-	return ui.HelpDialogStyle.Render(strings.Join(out, "\n"))
+	return m.dialogStyle().Render(strings.Join(out, "\n"))
 }
 
 // infoLines builds the dialog body for whatever the cursor is on. Reported
@@ -57,11 +57,10 @@ func (m model) infoLines() []string {
 	return nil
 }
 
-// infoViewportHeight is how many body rows the dialog can show: the screen less
-// its border, padding, hint block and scroll indicators.
+// infoViewportHeight is how many body rows the dialog can show. Its own rows
+// are the two scroll indicators, the blank above the hints, and the hints.
 func (m model) infoViewportHeight() int {
-	const chrome = 8
-	return max(m.ui.Screen.Height-chrome, 5)
+	return ui.DialogBodyHeight(m.ui.Screen.Height, 4, 5)
 }
 
 // infoMaxScroll is the largest offset that still fills the window.
@@ -83,7 +82,7 @@ func (m model) taskInfoLines(catIdx, taskIdx int) []string {
 		"",
 	}
 
-	const infoMaxWidth = 60
+	infoMaxWidth := m.dialogWidth()
 	const titleLabel = "Title:    "
 	labelWidth := len(titleLabel)
 	available := infoMaxWidth - labelWidth

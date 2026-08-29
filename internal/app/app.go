@@ -237,14 +237,20 @@ func (m model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		cmd := m.startHelpFilter()
 		return m, cmd
+	case "a":
+		m.toggleHelpExpanded()
 	case "j", "down":
 		m.moveHelpFocus(1)
 	case "k", "up":
 		m.moveHelpFocus(-1)
 	case "ctrl+d":
-		m.moveHelpFocus(m.helpViewportHeight() / 2)
+		m.moveHelpFocus(m.helpBodyHeight() / 2)
 	case "ctrl+u":
-		m.moveHelpFocus(-m.helpViewportHeight() / 2)
+		m.moveHelpFocus(-m.helpBodyHeight() / 2)
+	case "g":
+		m.moveHelpFocus(-len(m.helpBody().targets))
+	case "G":
+		m.moveHelpFocus(len(m.helpBody().targets))
 	case "enter":
 		return m.runFocusedHelpBinding()
 	}
@@ -274,10 +280,10 @@ func (m model) handleHelpFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveHelpFocus(-1)
 		return m, nil
 	case "ctrl+d":
-		m.moveHelpFocus(m.helpViewportHeight() / 2)
+		m.moveHelpFocus(m.helpBodyHeight() / 2)
 		return m, nil
 	case "ctrl+u":
-		m.moveHelpFocus(-m.helpViewportHeight() / 2)
+		m.moveHelpFocus(-m.helpBodyHeight() / 2)
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -301,23 +307,20 @@ func (m *model) startHelpFilter() tea.Cmd {
 	return cmd
 }
 
-// runFocusedHelpBinding runs the binding under the focused row (if any) and
-// closes the dialog. Display-only rows aren't focusable, so this only ever fires
-// a runnable Navigation/Actions binding.
+// runFocusedHelpBinding runs the shortcut under the cursor and closes the
+// dialog. The cursor can land on reference-only rows, so they are checked here
+// rather than being made unreachable.
 func (m model) runFocusedHelpBinding() (tea.Model, tea.Cmd) {
-	rows, focusables := m.currentHelpRows()
-	if len(focusables) == 0 {
-		return m, nil
-	}
+	body := m.helpBody()
 	idx := m.ui.Help.Focused
-	if idx < 0 || idx >= len(focusables) {
+	if idx < 0 || idx >= len(body.targets) {
 		return m, nil
 	}
-	row := rows[focusables[idx]]
-	if row.disabled {
+	entry := body.entryAt(body.targets[idx])
+	if !entry.runnable {
 		return m, nil
 	}
-	b := normalBindings[row.bindingIndex]
+	b := normalBindings[entry.bindingIndex]
 	m.ui.Modes.ToNormal()
 	return m, b.action(&m)
 }

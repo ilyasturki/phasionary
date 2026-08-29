@@ -28,11 +28,20 @@ Escape
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/25_help_filter_cleared.png"
 
+# A query that only matches sections the card doesn't show.
 Type "/"
 Sleep 200ms
 Type "markdown"
 Sleep 500ms
-Screenshot "/tmp/phas-vt/vhs-out/25_help_filter_display_only.png"
+Screenshot "/tmp/phas-vt/vhs-out/25_help_filter_hidden_section.png"
+
+Escape
+Sleep 200ms
+Type "/"
+Sleep 200ms
+Type "zzzznope"
+Sleep 500ms
+Screenshot "/tmp/phas-vt/vhs-out/25_help_filter_no_match.png"
 
 Escape
 Sleep 200ms

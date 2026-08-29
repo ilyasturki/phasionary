@@ -57,10 +57,8 @@ func (m *model) startDescriptionInlineEdit(catIdx, taskIdx int) tea.Cmd {
 		return "  "
 	})
 	ta.CharLimit = 0
-	if w := m.ui.Screen.Width; w > 4 {
-		// SetWidth must follow SetPromptFunc so it reserves the gutter width.
-		ta.SetWidth(w - 4)
-	}
+	// SetWidth must follow SetPromptFunc so it reserves the gutter width.
+	ta.SetWidth(m.dialogWidth())
 	ta.SetHeight(descriptionEditorVisibleHeight(m.ui.Screen.Height))
 	cmd := ta.Focus()
 	ta.CursorEnd()
@@ -240,7 +238,7 @@ func (m model) descriptionEditView() string {
 			{Key: "esc", Label: "cancel"},
 		}),
 	}
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
 
 func (m *model) descriptionEditTaskID() string {

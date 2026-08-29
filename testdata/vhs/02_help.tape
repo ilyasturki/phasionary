@@ -14,29 +14,36 @@ Show
 
 Type "?"
 Sleep 600ms
-Screenshot "/tmp/phas-vt/vhs-out/02_help_open.png"
+Screenshot "/tmp/phas-vt/vhs-out/02_help_card.png"
 
-Type "jjjjj"
+Type "jj"
 Sleep 400ms
-Screenshot "/tmp/phas-vt/vhs-out/02_help_focus_moved.png"
+Screenshot "/tmp/phas-vt/vhs-out/02_help_card_focus.png"
+
+# `a` switches to the full reference (and remembers the choice).
+Type "a"
+Sleep 500ms
+Screenshot "/tmp/phas-vt/vhs-out/02_help_full.png"
 
 Ctrl+D
 Sleep 400ms
 Screenshot "/tmp/phas-vt/vhs-out/02_help_scrolled.png"
 
-Ctrl+U
-Sleep 300ms
-Type "k"
-Sleep 300ms
-Screenshot "/tmp/phas-vt/vhs-out/02_help_focus_back.png"
-
-Type "?"
-Sleep 500ms
-Screenshot "/tmp/phas-vt/vhs-out/02_help_closed.png"
+# G reaches the very last row.
+Type "G"
+Sleep 400ms
+Screenshot "/tmp/phas-vt/vhs-out/02_help_bottom.png"
 
 Type "?"
 Sleep 400ms
-Type "jj"
+Type "?"
+Sleep 500ms
+Screenshot "/tmp/phas-vt/vhs-out/02_help_reopens_expanded.png"
+
+# Back to the card, then run a shortcut straight from it.
+Type "a"
+Sleep 400ms
+Type "j"
 Sleep 200ms
 Enter
 Sleep 600ms

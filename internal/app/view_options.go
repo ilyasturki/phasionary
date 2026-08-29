@@ -56,5 +56,5 @@ func (m model) optionsView() string {
 		"",
 		ui.RenderHints([]ui.Hint{{Key: "space/tab", Label: "cycle"}, {Key: "q/esc/enter", Label: "close"}}),
 	)
-	return ui.HelpDialogStyle.Render(strings.Join(lines, "\n"))
+	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
