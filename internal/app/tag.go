@@ -7,8 +7,6 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/atotto/clipboard"
-
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -257,10 +255,7 @@ func (m *model) copyTagFromSelected() tea.Cmd {
 		m.ui.Screen.StatusMsg = "Copied tag: " + desc
 		return nil
 	}
-	label := task.TagLabel
-	return func() tea.Msg {
-		return clipboardResultMsg{err: clipboard.WriteAll(label), label: "tag: " + desc}
-	}
+	return copyToClipboard(task.TagLabel, "tag: "+desc)
 }
 
 // paste routes the normal-mode `p`: a tag copied last wins, then the internal

@@ -8,11 +8,11 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
 
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/modes"
 	"phasionary/internal/app/selection"
+	"phasionary/internal/clipboard"
 	"phasionary/internal/config"
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
@@ -25,6 +25,43 @@ type clipboardResultMsg struct {
 	// label, when set, names what was copied (e.g. "UUID: 550e..."); empty
 	// falls back to a generic "Copied!".
 	label string
+	// viaTerminal marks a copy that went out as OSC 52 rather than through a
+	// clipboard utility. The escape sequence is write-only — the terminal never
+	// answers — so the status says where the text went instead of claiming a
+	// success we cannot confirm.
+	viaTerminal bool
+}
+
+// clipboardVia annotates a copy the terminal carried out, so a status message
+// never implies a clipboard utility confirmed the write when none did.
+func clipboardVia(msg clipboardResultMsg) string {
+	if msg.viaTerminal {
+		return " (via terminal)"
+	}
+	return ""
+}
+
+// copyToClipboard hands text to a clipboard utility, falling back to OSC 52 when
+// there is none. The escape sequence is how a copy still reaches the desktop
+// from a bare TTY or over SSH, and it is the terminal that owns the clipboard
+// there, so the fallback is worth more than the error it replaces.
+//
+// tmux swallows OSC 52 unless `set-clipboard` is on (the default is `external`,
+// which forwards it); a terminal that ignores the sequence drops the copy
+// silently, which is the price of a write-only protocol.
+func copyToClipboard(text, label string) tea.Cmd {
+	return func() tea.Msg {
+		err := clipboard.Write(text)
+		if !errors.Is(err, clipboard.ErrNoBackend) {
+			return clipboardResultMsg{err: err, label: label}
+		}
+		return tea.Batch(
+			tea.SetClipboard(text),
+			func() tea.Msg {
+				return clipboardResultMsg{label: label, viaTerminal: true}
+			},
+		)()
+	}
 }
 
 // saveErrMsg reports a failed background save from the async saver. Successful
@@ -88,12 +125,13 @@ func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 		}
 	case clipboardResultMsg:
-		if msg.err != nil {
+		switch {
+		case msg.err != nil:
 			m.ui.Screen.StatusMsg = fmt.Sprintf("Copy failed: %v", msg.err)
-		} else if msg.label != "" {
-			m.ui.Screen.StatusMsg = "Copied " + msg.label
-		} else {
-			m.ui.Screen.StatusMsg = "Copied!"
+		case msg.label != "":
+			m.ui.Screen.StatusMsg = "Copied " + msg.label + clipboardVia(msg)
+		default:
+			m.ui.Screen.StatusMsg = "Copied!" + clipboardVia(msg)
 		}
 	case clipboardLinesMsg:
 		m.pasteClipboardLines(msg)
@@ -588,10 +626,7 @@ func (m *model) copySelected() tea.Cmd {
 		}
 		m.ui.TagCopiedLast = false
 	}
-	text := m.copyTextForPosition(pos)
-	return func() tea.Msg {
-		return clipboardResultMsg{err: clipboard.WriteAll(text)}
-	}
+	return copyToClipboard(m.copyTextForPosition(pos), "")
 }
 
 func (m *model) copyCategoryContent() tea.Cmd {
@@ -599,10 +634,7 @@ func (m *model) copyCategoryContent() tea.Cmd {
 	if !ok || pos.Kind == selection.FocusProject {
 		return nil
 	}
-	text := export.ExportCategoryMarkdown(m.project.Categories[pos.CategoryIndex])
-	return func() tea.Msg {
-		return clipboardResultMsg{err: clipboard.WriteAll(text)}
-	}
+	return copyToClipboard(export.ExportCategoryMarkdown(m.project.Categories[pos.CategoryIndex]), "")
 }
 
 func (m model) View() tea.View {

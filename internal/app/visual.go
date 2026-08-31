@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
@@ -282,9 +281,7 @@ func (m *model) visualCopyBullets() tea.Cmd {
 	text := m.visualMarkdownText(selPositions, false)
 	m.stashVisualClipboard(selPositions, false)
 	m.exitVisualMode()
-	return func() tea.Msg {
-		return clipboardResultMsg{err: clipboard.WriteAll(text)}
-	}
+	return copyToClipboard(text, "")
 }
 
 func (m *model) visualCopyChecklist() tea.Cmd {
@@ -296,9 +293,7 @@ func (m *model) visualCopyChecklist() tea.Cmd {
 	text := m.visualMarkdownText(selPositions, true)
 	m.stashVisualClipboard(selPositions, false)
 	m.exitVisualMode()
-	return func() tea.Msg {
-		return clipboardResultMsg{err: clipboard.WriteAll(text)}
-	}
+	return copyToClipboard(text, "")
 }
 
 // visualMarkdownText renders the selection as a markdown list — a bullet per

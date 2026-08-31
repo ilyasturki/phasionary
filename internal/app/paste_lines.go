@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
 
 	"phasionary/internal/app/selection"
+	"phasionary/internal/clipboard"
 	"phasionary/internal/domain"
 )
 
@@ -204,7 +204,7 @@ type clipboardLinesMsg struct {
 
 func readClipboardLines() tea.Cmd {
 	return func() tea.Msg {
-		text, err := clipboard.ReadAll()
+		text, err := clipboard.Read()
 		return clipboardLinesMsg{text: text, err: err}
 	}
 }

@@ -70,3 +70,27 @@ func TestCopySelected_CopiesDescriptionBody(t *testing.T) {
 	m.copySelected()
 	assert.Nil(t, m.ui.Clipboard.Task)
 }
+
+// A copy that only reached the terminal via OSC 52 is unverifiable — the escape
+// sequence gets no answer — so the status must say so rather than claim a
+// confirmed write.
+func TestClipboardResultMsg_MarksTheTerminalFallback(t *testing.T) {
+	cases := []struct {
+		name string
+		msg  clipboardResultMsg
+		want string
+	}{
+		{"utility", clipboardResultMsg{}, "Copied!"},
+		{"terminal", clipboardResultMsg{viaTerminal: true}, "Copied! (via terminal)"},
+		{"labelled utility", clipboardResultMsg{label: "URL: x"}, "Copied URL: x"},
+		{"labelled terminal", clipboardResultMsg{label: "URL: x", viaTerminal: true}, "Copied URL: x (via terminal)"},
+		{"failure", clipboardResultMsg{err: assert.AnError}, "Copy failed: " + assert.AnError.Error()},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newTestModel(t, copyProject())
+			updated, _ := m.Update(tc.msg)
+			assert.Equal(t, tc.want, updated.(model).ui.Screen.StatusMsg)
+		})
+	}
+}

@@ -6,8 +6,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/atotto/clipboard"
-
 	"phasionary/internal/app/components"
 	"phasionary/internal/app/selection"
 )
@@ -120,9 +118,7 @@ func (m *model) yankPartForSelected() tea.Cmd {
 }
 
 func copyYankItem(it components.YankItem) tea.Cmd {
-	return func() tea.Msg {
-		return clipboardResultMsg{err: clipboard.WriteAll(it.Value), label: it.Label}
-	}
+	return copyToClipboard(it.Value, it.Label)
 }
 
 func yankPreview(s string) string {
