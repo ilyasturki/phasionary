@@ -1,13 +1,14 @@
 package data
 
 import (
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"phasionary/internal/domain"
+	"phasionary/internal/fsutil"
 )
 
 // globalLockName is the lock file used to serialize operations that span
@@ -24,15 +25,7 @@ func (s *Store) acquireGlobalLock() (*os.File, error) {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(s.globalLockPath(), os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return nil, err
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return nil, err
-	}
-	return f, nil
+	return fsutil.Lock(s.globalLockPath(), 0o644)
 }
 
 // SaveProjectLocked saves a project while holding an exclusive flock on a
@@ -69,6 +62,17 @@ func (s *Store) WriteProjectLocked(id string, data []byte) error {
 	defer f.Close()
 	if _, err := os.Stat(s.projectPath(id)); errors.Is(err, fs.ErrNotExist) {
 		return ErrProjectNotFound
+	}
+	if s.recorder != nil {
+		// Unmarshal what was just marshaled: the recorder must diff exactly
+		// the state this write commits.
+		var updated domain.Project
+		if err := json.Unmarshal(data, &updated); err != nil {
+			return err
+		}
+		if err := s.recordSave(id, updated); err != nil {
+			return err
+		}
 	}
 	return s.writeProjectBytes(id, data)
 }
@@ -133,13 +137,5 @@ func (s *Store) acquireProjectLock(id string) (*os.File, error) {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(s.lockPath(id), os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return nil, err
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return nil, err
-	}
-	return f, nil
+	return fsutil.Lock(s.lockPath(id), 0o644)
 }

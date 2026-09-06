@@ -9,6 +9,7 @@ import (
 const (
 	EnvDataPath   = "PHASIONARY_DATA_PATH"
 	EnvConfigPath = "PHASIONARY_CONFIG_PATH"
+	EnvStatePath  = "PHASIONARY_STATE_PATH"
 
 	StatusDisplayText  = "text"
 	StatusDisplayIcons = "icons"
@@ -53,6 +54,23 @@ func ResolveDataDir(input string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, ".local", "share", "phasionary", "projects"), nil
+}
+
+// ResolveStateDir returns the per-device state directory. Unlike the data and
+// config dirs, this one must never be carried between machines by a file
+// syncer — it holds the device identity.
+func ResolveStateDir() (string, error) {
+	if env := os.Getenv(EnvStatePath); env != "" {
+		return env, nil
+	}
+	if xdg := os.Getenv("XDG_STATE_HOME"); xdg != "" {
+		return filepath.Join(xdg, "phasionary"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "state", "phasionary"), nil
 }
 
 // configDirFromPath accepts either a directory path or a path pointing at a

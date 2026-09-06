@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+
+	"phasionary/internal/fsutil"
 )
 
 // Cursor records which row the TUI was focused on, addressed by stable IDs
@@ -138,7 +140,7 @@ func (m *StateManager) save() error {
 	// every fold toggle and project switch, so a crash mid-write would truncate
 	// it and lose every fold and the project ordering — cheap to prevent, and
 	// the projects beside it already get this treatment.
-	return writeFileAtomic(m.path, m.path+".tmp", data, 0o644)
+	return fsutil.WriteAtomic(m.path, data, 0o644)
 }
 
 // update re-reads state.json, applies fn to the fresh state, and writes it back

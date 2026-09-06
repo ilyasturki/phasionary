@@ -80,38 +80,50 @@ Properties already in place that sync builds on:
 
 ## Sync design (implemented in later slices)
 
-### Device identity
+### Device identity (implemented, slice 2)
 
-Each device that syncs gets a random, immutable device ID, minted on first
-sync setup. It lives in **`$XDG_STATE_HOME/phasionary/device.json`**
-(`~/.local/state/phasionary/`), deliberately **not** in the data or config
+Each device that syncs gets a random, immutable device ID, minted at
+enrollment (`internal/journal.MintDevice`; the `sync login <url>` command
+arrives with the server slice). It lives in
+**`$XDG_STATE_HOME/phasionary/device.json`** (`~/.local/state/phasionary/`,
+override `PHASIONARY_STATE_PATH`), deliberately **not** in the data or config
 directories: both of those are historically carried by file syncers, and a
 device ID that syncs to another machine is two devices claiming one identity.
 Copying a data directory to a new machine is therefore safe by construction —
 the new machine has no state dir, so it enrolls as a new device.
 
 The sync credential (server URL + per-device bearer token, granted at
-enrollment: `phasionary sync login <url>`) lives in the same 0600 file.
+enrollment) lives in the same 0600 file, in a 0700 state dir.
 
-### Change journal
+### Change journal (implemented, slice 2)
 
-A per-device, purely local outbox — bookkeeping, not history. Also in
-`$XDG_STATE_HOME/phasionary/`, never in the synced data dir.
+A per-device, purely local outbox — bookkeeping, not history
+(`internal/journal`). Also in `$XDG_STATE_HOME/phasionary/`
+(`journal.jsonl` + `journal.lock` + `journal.head`), never in the synced
+data dir.
 
-- Every local mutation appends one operation: `(op_id, device_id, seq,
-  timestamp, kind, project_id, entity_id, fields…)`. Kinds mirror the
-  operations layer (task.create, task.update, task.delete, category.*,
-  project.*, separator ops via task kinds).
-- `seq` is a per-device monotonic counter — ordering within a device is exact;
-  cross-device ordering uses the server's arrival order plus per-field
+- **Ops are derived by diffing at the save boundary**, not by instrumenting
+  every mutation: one hook (`data.ChangeRecorder`) covers every writer — the
+  TUI, the CLI, import.
+- Each op is one JSONL line: `journal.Op`, kinds in the `Kind*` constants.
+  Update ops carry only changed fields, with cleared values present as
+  explicit empties.
+- **Order is a field of the container**: whenever a list's ID sequence
+  changes, a single `*.reorder` op carries the full new sequence; the server
+  never infers order from creates.
+- `seq` is a per-device monotonic counter, and never regresses across a
+  prune: `journal.head` records the acked high-water mark.
+  Cross-device ordering uses the server's arrival order plus per-field
   last-writer-wins with the op timestamp as tiebreaker (single user racing
   themself: LWW per field is the right amount of machinery).
 - **Deletes are tombstone ops.** State files just remove the entity; the
   journal entry is what tells the server "deleted", so a delete can never be
-  resurrected by a stale peer pushing an old snapshot.
-- Entries are **pruned after server acknowledgment**. No server configured →
-  journaling is off entirely; enabling sync starts it from a full snapshot
-  upload. The journal never grows unbounded on a local-only install.
+  resurrected by a stale peer pushing an old snapshot. A whole-project delete
+  is one tombstone; the server cascades it to its children.
+- Entries are **pruned after server acknowledgment** (`PruneThrough`). No
+  device enrolled → no recorder is attached and journaling is off entirely;
+  enabling sync starts from a full snapshot upload. The journal never grows
+  on a local-only install.
 
 ### Protocol sketch
 
@@ -146,10 +158,11 @@ aesthetic is the design language.
 
 ## Slice plan from here
 
-1. **(done — this slice)** Android app, `internal/api`, `phasionary serve`,
+1. **(done)** Android app, `internal/api`, `phasionary serve`,
    serve token and NixOS serve module removed; project files schema-versioned;
    this design recorded.
-2. **Journal + device identity** in the Go core, behind a `sync` config no-op
-   until a server exists (journaling stays off by default).
-3. **Server**: sync endpoint, SQLite, enrollment, Nix module.
+2. **(done)** **Journal + device identity** in the Go core
+   (`internal/journal`, `data.ChangeRecorder`, `sync status`).
+3. **Server**: sync endpoint, SQLite, enrollment (`sync login <url>`), Nix
+   module.
 4. **Web app** against the server, then **Capacitor** wrap for Android.

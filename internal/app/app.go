@@ -17,6 +17,7 @@ import (
 	"phasionary/internal/data"
 	"phasionary/internal/domain"
 	"phasionary/internal/export"
+	"phasionary/internal/journal"
 	"phasionary/internal/ui"
 )
 
@@ -785,9 +786,30 @@ func linkDirIfUnset(sm data.StateRepository, projectID string) {
 	}
 }
 
+// Every store construction site must pass through here, or a writer's changes
+// never reach the journal.
+func AttachSyncRecorder(store *data.Store) error {
+	stateDir, err := config.ResolveStateDir()
+	if err != nil {
+		return err
+	}
+	rec, err := journal.OpenIfConfigured(stateDir)
+	if err != nil {
+		return err
+	}
+	// Guard the concrete pointer: a typed nil in the interface is not nil.
+	if rec != nil {
+		store.SetRecorder(rec)
+	}
+	return nil
+}
+
 func Run(dataDir string, projectSelector string, cfgManager config.Reader, workingDir string, forcePicker bool) error {
 	store := data.NewStore(dataDir)
 	if err := store.Ensure(); err != nil {
+		return err
+	}
+	if err := AttachSyncRecorder(store); err != nil {
 		return err
 	}
 

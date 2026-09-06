@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"phasionary/internal/domain"
+	"phasionary/internal/fsutil"
 )
 
 var (
@@ -29,9 +30,20 @@ type ProjectRepository interface {
 	DeleteProject(id string) error
 }
 
+// Implementations are called with the project flock held.
+type ChangeRecorder interface {
+	// Called before the write, so a crash leaves at most an extra op and never
+	// a lost one; old is nil on create, and an error aborts the save.
+	RecordSave(old *domain.Project, updated domain.Project) error
+	// Called after the file is removed, not before: a spurious tombstone would
+	// propagate a deletion that never happened.
+	RecordDelete(projectID string) error
+}
+
 // Store manages JSON persistence in a directory.
 type Store struct {
-	Dir string
+	Dir      string
+	recorder ChangeRecorder
 }
 
 var _ ProjectRepository = (*Store)(nil)
@@ -39,6 +51,9 @@ var _ ProjectRepository = (*Store)(nil)
 func NewStore(dir string) *Store {
 	return &Store{Dir: dir}
 }
+
+// Unsynchronized: call once at wiring time, before the store is shared.
+func (s *Store) SetRecorder(r ChangeRecorder) { s.recorder = r }
 
 func (s *Store) Ensure() error {
 	return os.MkdirAll(s.Dir, 0o755)
@@ -153,27 +168,7 @@ func (s *Store) writeProjectBytes(id string, data []byte) error {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return err
 	}
-	return writeFileAtomic(s.projectPath(id), s.tmpPath(id), data, 0o644)
-}
-
-// writeFileAtomic writes data to path via tmp: an fsync'd temp file, renamed
-// into place, then a directory fsync so the rename survives a crash. A reader
-// therefore sees either the old file or the new one, never a half-written one.
-// It performs no locking or existence check; callers layer those on.
-func writeFileAtomic(path, tmp string, data []byte, perm os.FileMode) error {
-	if err := writeFileSync(tmp, data, perm); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	// Flush the directory entry so the rename survives a crash.
-	if dir, derr := os.Open(filepath.Dir(path)); derr == nil {
-		_ = dir.Sync()
-		_ = dir.Close()
-	}
-	return nil
+	return fsutil.WriteAtomic(s.projectPath(id), data, 0o644)
 }
 
 func (s *Store) saveProjectAtomic(project domain.Project) error {
@@ -181,26 +176,26 @@ func (s *Store) saveProjectAtomic(project domain.Project) error {
 	if err != nil {
 		return err
 	}
+	if err := s.recordSave(project.ID, project); err != nil {
+		return err
+	}
 	return s.writeProjectBytes(project.ID, data)
 }
 
-// writeFileSync writes data to path and fsyncs the file before closing.
-// os.WriteFile only returns once the bytes are in the page cache, which is
-// not crash-safe; the atomic rename pattern needs a flushed tmp file.
-func writeFileSync(path string, data []byte, perm os.FileMode) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+// Caller must hold the project flock, so the old state read here is the one
+// the write overwrites.
+func (s *Store) recordSave(id string, updated domain.Project) error {
+	if s.recorder == nil {
+		return nil
+	}
+	old, err := s.loadProjectFile(s.projectPath(id))
+	if errors.Is(err, fs.ErrNotExist) {
+		return s.recorder.RecordSave(nil, updated)
+	}
 	if err != nil {
 		return err
 	}
-	if _, err := f.Write(data); err != nil {
-		_ = f.Close()
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		_ = f.Close()
-		return err
-	}
-	return f.Close()
+	return s.recorder.RecordSave(&old, updated)
 }
 
 // createNewProjectLocked writes a brand-new project under the global lock,
@@ -433,7 +428,10 @@ func (s *Store) DeleteProject(id string) error {
 		return err
 	}
 	_ = os.Remove(s.tmpPath(id))
-	return nil
+	if s.recorder == nil {
+		return nil
+	}
+	return s.recorder.RecordDelete(id)
 }
 
 type sampleTask struct {
