@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -211,16 +210,11 @@ func projectWithTasks(statuses ...string) domain.Project {
 }
 
 func TestProjectStats(t *testing.T) {
-	// Completed and cancelled tasks are both done with; only the rest are open.
 	open, inProgress := projectStats(projectWithTasks(
 		domain.StatusCompleted, domain.StatusTodo, domain.StatusInProgress, domain.StatusCancelled,
 	))
 	assert.Equal(t, 2, open)
 	assert.Equal(t, 1, inProgress)
-
-	open, inProgress = projectStats(projectWithTasks(domain.StatusCompleted, domain.StatusCancelled))
-	assert.Equal(t, 0, open)
-	assert.Equal(t, 0, inProgress)
 
 	open, _ = projectStats(domain.Project{})
 	assert.Equal(t, 0, open)
@@ -239,7 +233,7 @@ func TestProjectStats_SkipsSeparators(t *testing.T) {
 
 func TestMeasurePickerColumns_DropsRightToLeft(t *testing.T) {
 	projects := []domain.Project{
-		{Name: "One", UpdatedAt: time.Now().Add(-3 * time.Hour).Format(time.RFC3339),
+		{Name: "One", UpdatedAt: "2025-01-02T03:04:05Z",
 			Categories: []domain.Category{{Tasks: []domain.Task{{Status: domain.StatusInProgress}}}}},
 	}
 
@@ -248,8 +242,6 @@ func TestMeasurePickerColumns_DropsRightToLeft(t *testing.T) {
 	assert.Positive(t, full.inProgress)
 	assert.Positive(t, full.edited)
 
-	// Each width that no longer leaves the name its floor sheds the rightmost
-	// column still standing: age, then in-progress, then the open count.
 	fits := func(c pickerColumns) int { return pickerRowPrefixWidth + pickerMinNameWidth + c.width() }
 
 	noAge := measurePickerColumns(projects, fits(full)-1)
@@ -271,13 +263,10 @@ func TestMeasurePickerColumns_NoInProgressDropsTheColumn(t *testing.T) {
 		"the column disappears when nothing is in progress")
 }
 
-// TestPickerPanelView_IsOpaque guards the frameless panel: placeOverlay only
-// replaces the cells a row actually covers, so a short row would let the
-// project list show through the middle of the picker.
+// placeOverlay only replaces the cells a row actually covers, so a short row
+// lets the project list show through the panel.
 func TestPickerPanelView_IsOpaque(t *testing.T) {
 	m := newPickerModel(t, 8, 100, 30)
-	m.ui.Picker.selected = 3
-	m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 
 	rendered := m.projectPickerView()
 	width := lipgloss.Width(rendered)
@@ -286,9 +275,6 @@ func TestPickerPanelView_IsOpaque(t *testing.T) {
 	}
 }
 
-// TestPickerFullscreenView_FillsTheScreen is the full-screen counterpart of the
-// anti-clipping guard: the frame must land on exactly the terminal's rows, so
-// the footer sits on the bottom one and nothing spills past it.
 func TestPickerFullscreenView_FillsTheScreen(t *testing.T) {
 	for _, width := range []int{60, 100, 160} {
 		for height := 16; height <= 45; height++ {

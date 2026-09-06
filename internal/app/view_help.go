@@ -331,8 +331,6 @@ func (m *model) moveHelpFocus(delta int) {
 	m.ensureHelpVisible()
 }
 
-// moveHelpColumn jumps to the entry nearest the current line in the neighboring
-// column — a no-op on the single-column faces, which have nothing to jump to.
 func (m *model) moveHelpColumn(delta int) {
 	body := m.helpBody()
 	if len(body.targets) == 0 {
@@ -342,10 +340,7 @@ func (m *model) moveHelpColumn(delta int) {
 	want := cur.col + delta
 	best := -1
 	for i, t := range body.targets {
-		if t.col != want {
-			continue
-		}
-		if best < 0 || abs(t.line-cur.line) < abs(body.targets[best].line-cur.line) {
+		if t.col == want && (best < 0 || abs(t.line-cur.line) < abs(body.targets[best].line-cur.line)) {
 			best = i
 		}
 	}
@@ -479,10 +474,5 @@ func (m model) renderHelpCell(cell helpCell, width, keyCol int, focused bool, qu
 	if !focused {
 		return ui.PadTo(text, width)
 	}
-	// Extend the band to the cell edge so the cursor is a full bar, not a
-	// ragged one that stops at the end of the description.
-	if gap := width - lipgloss.Width(text); gap > 0 {
-		text += base.Render(strings.Repeat(" ", gap))
-	}
-	return text
+	return ui.PadToStyle(text, width, base)
 }

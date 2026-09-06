@@ -17,7 +17,6 @@ Ctrl+P
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/11_picker_open.png"
 
-# Step up onto the pinned "+ New Project" affordance, which sits above the list
 Type "k"
 Sleep 300ms
 Screenshot "/tmp/phas-vt/vhs-out/11_picker_on_add.png"

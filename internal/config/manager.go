@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,6 +48,9 @@ func (m *Manager) Load() error {
 	if err := json.Unmarshal(data, &m.cfg); err != nil {
 		return fmt.Errorf("parsing config %s: %w", m.path, err)
 	}
+	d := DefaultConfig()
+	m.cfg.StatusDisplay = cmp.Or(m.cfg.StatusDisplay, d.StatusDisplay)
+	m.cfg.PriorityColor = cmp.Or(m.cfg.PriorityColor, d.PriorityColor)
 	m.tightenPermissions()
 	return nil
 }

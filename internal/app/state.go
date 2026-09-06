@@ -239,34 +239,11 @@ type ProjectPickerState struct {
 	filter      textinput.Model
 	query       string
 	allProjects []domain.Project
-	// fullscreen makes the picker own the terminal instead of floating over the
-	// project. Set only when the picker is the startup mode, where there is no
-	// project worth showing behind it.
-	fullscreen bool
-}
-
-// columnSource is the list the metadata columns are measured over: the full
-// ordered set while filtering, so the columns hold still as the query narrows
-// the rows under them.
-func (p *ProjectPickerState) columnSource() []domain.Project {
-	if p.filtering {
-		return p.allProjects
-	}
-	return p.projects
+	fullscreen  bool
 }
 
 func (p *ProjectPickerState) reset() {
-	p.projects = nil
-	p.selected = 0
-	p.onNew = false
-	p.scrollOffset = 0
-	p.isAdding = false
-	p.input = textinput.Model{}
-	p.filtering = false
-	p.filter = textinput.Model{}
-	p.query = ""
-	p.allProjects = nil
-	p.fullscreen = false
+	*p = ProjectPickerState{}
 }
 
 type ConfirmDeleteKind int

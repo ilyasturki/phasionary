@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -14,6 +15,11 @@ var (
 
 	PanelChromeWidth  = PanelStyle.GetHorizontalPadding()
 	PanelChromeHeight = PanelStyle.GetVerticalPadding()
+
+	// Both gutters, though only the left is painted: a row reaching the last
+	// column phantom-wraps in some terminals.
+	FullPanelChromeWidth  = 2 * FullPanelStyle.GetPaddingLeft()
+	FullPanelChromeHeight = FullPanelStyle.GetVerticalPadding()
 )
 
 const (
@@ -41,12 +47,6 @@ func DialogBodyHeight(screenHeight, ownRows, minBody int) int {
 	return max(screenHeight-DialogChromeHeight-ownRows, minBody)
 }
 
-// PanelBodyHeight is DialogBodyHeight for a borderless panel, which spends no
-// rows on a frame.
-func PanelBodyHeight(screenHeight, ownRows, minBody int) int {
-	return max(screenHeight-PanelChromeHeight-ownRows, minBody)
-}
-
 // PadTo right-pads line to width cells, measuring the rendered width so styling
 // sequences don't count toward it.
 func PadTo(line string, width int) string {
@@ -55,6 +55,14 @@ func PadTo(line string, width int) string {
 		return line
 	}
 	return line + strings.Repeat(" ", gap)
+}
+
+func PadToStyle(line string, width int, style lipgloss.Style) string {
+	gap := width - ansi.StringWidth(line)
+	if gap <= 0 {
+		return line
+	}
+	return line + style.Render(strings.Repeat(" ", gap))
 }
 
 // SplitRow lays left and right out on one row width cells wide, right flush to

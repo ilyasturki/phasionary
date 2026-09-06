@@ -162,25 +162,11 @@ func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string
 		}
 	}
 	if selected && visualMode {
-		padBandToWidth(result, style, width)
+		for i, l := range result {
+			result[i] = ui.PadToStyle(l, width, style)
+		}
 	}
 	return strings.Join(result, "\n")
-}
-
-// padBandToWidth extends each line to the full row width with style-rendered
-// spaces, so the visual selection band reads as a solid block instead of
-// stopping at the end of the content.
-func padBandToWidth(lines []string, style lipgloss.Style, width int) {
-	if width <= 0 {
-		return
-	}
-	for i, l := range lines {
-		gap := width - ansi.StringWidth(l)
-		if gap <= 0 {
-			continue
-		}
-		lines[i] = l + style.Render(strings.Repeat(" ", gap))
-	}
 }
 
 func (m model) renderTaskLine(task domain.Task, selected bool, width int, focused bool, visualMode bool, isCursor bool, cut bool) string {

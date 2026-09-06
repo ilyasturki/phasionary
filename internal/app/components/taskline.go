@@ -113,11 +113,7 @@ func (r *TaskLineRenderer) padToWidth(rendered string) string {
 	style := r.selectedStyle()
 	lines := strings.Split(rendered, "\n")
 	for i, l := range lines {
-		gap := r.width - ansi.StringWidth(l)
-		if gap <= 0 {
-			continue
-		}
-		lines[i] = l + style.Render(strings.Repeat(" ", gap))
+		lines[i] = ui.PadToStyle(l, r.width, style)
 	}
 	return strings.Join(lines, "\n")
 }
@@ -227,9 +223,7 @@ func (r *TaskLineRenderer) styleDescriptionLine(indentStr, text string, textStyl
 		// styling inside the selection band; pad with the band style to width.
 		rendered := sel.Render(prefix) + r.highlightLine(text, sel)
 		if shouldPad {
-			if gap := r.width - ansi.StringWidth(prefix) - ansi.StringWidth(text); gap > 0 {
-				rendered += sel.Render(strings.Repeat(" ", gap))
-			}
+			rendered = ui.PadToStyle(rendered, r.width, sel)
 		}
 		return rendered
 	}

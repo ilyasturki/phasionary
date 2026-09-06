@@ -14,48 +14,30 @@ func currentOptionValue(t *testing.T, m *model, i int) string {
 	return optionSpecs[i].current(m.deps.CfgManager.Get())
 }
 
-func TestCycleOption_ForwardWrapsRound(t *testing.T) {
+func TestCycleOption_WrapsBothWays(t *testing.T) {
 	m := newTestModel(t, sampleProject())
 	m.ui.Options.selectedOption = 1 // Priority Color
 
 	require.Equal(t, config.PriorityColorFull, currentOptionValue(t, m, 1))
-	m.cycleSelectedOption(1)
-	assert.Equal(t, config.PriorityColorIcon, currentOptionValue(t, m, 1))
-	m.cycleSelectedOption(1)
-	assert.Equal(t, config.PriorityColorNone, currentOptionValue(t, m, 1))
-	m.cycleSelectedOption(1)
-	assert.Equal(t, config.PriorityColorFull, currentOptionValue(t, m, 1))
-}
-
-func TestCycleOption_BackwardIsTheInverse(t *testing.T) {
-	m := newTestModel(t, sampleProject())
-	m.ui.Options.selectedOption = 1
-
+	for _, want := range []string{config.PriorityColorIcon, config.PriorityColorNone, config.PriorityColorFull} {
+		m.cycleSelectedOption(1)
+		assert.Equal(t, want, currentOptionValue(t, m, 1))
+	}
 	m.cycleSelectedOption(-1)
-	assert.Equal(t, config.PriorityColorNone, currentOptionValue(t, m, 1))
-	m.cycleSelectedOption(1)
-	assert.Equal(t, config.PriorityColorFull, currentOptionValue(t, m, 1))
+	assert.Equal(t, config.PriorityColorNone, currentOptionValue(t, m, 1), "h is l's inverse, and wraps too")
 }
 
-// Every spec must be able to find its own current value among its values, or
-// the dialog would highlight nothing and h/l would always land on the first.
-func TestOptionSpecs_CurrentValueIsListed(t *testing.T) {
+func TestOptionSpecs_EveryValueRoundTrips(t *testing.T) {
 	m := newTestModel(t, sampleProject())
-	for i, spec := range optionSpecs {
-		cur := spec.current(m.deps.CfgManager.Get())
+	for _, spec := range optionSpecs {
 		keys := make([]string, len(spec.values))
 		for j, v := range spec.values {
 			keys[j] = v.key
 		}
-		assert.Containsf(t, keys, cur, "option %d (%s)", i, spec.name)
-	}
-}
+		// Or the dialog would highlight nothing and h/l would land on the first.
+		assert.Containsf(t, keys, spec.current(m.deps.CfgManager.Get()), "option %s", spec.name)
 
-func TestOptionSpecs_EveryValueRoundTrips(t *testing.T) {
-	for i, spec := range optionSpecs {
 		for _, v := range spec.values {
-			m := newTestModel(t, sampleProject())
-			m.ui.Options.selectedOption = i
 			spec.apply(m, v.key)
 			assert.Equalf(t, v.key, spec.current(m.deps.CfgManager.Get()), "option %s value %s", spec.name, v.key)
 		}

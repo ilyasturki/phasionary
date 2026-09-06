@@ -197,9 +197,6 @@ func (m *model) confirmDeleteProject() {
 	if err != nil {
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Error reloading projects: %v", err)
 	} else {
-		// Reload through the saved order: ListProjects sorts by name, so without
-		// this the rows would reshuffle under the cursor the moment a delete
-		// lands.
 		projects = orderProjects(projects, m.deps.StateManager.GetProjectOrder())
 		m.ui.Picker.projects = projects
 		if m.ui.Picker.selected >= len(projects) {

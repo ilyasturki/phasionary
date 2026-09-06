@@ -16,17 +16,10 @@ var (
 	CategoryStyle = lipgloss.NewStyle().Bold(true)
 	// SeparatorStyle draws in-category divider rules at full foreground
 	// contrast (an empty style = the terminal's default foreground).
-	SeparatorStyle  = lipgloss.NewStyle()
-	SelectedStyle   = lipgloss.NewStyle().Bold(true).Reverse(true)
-	StatusLineStyle = lipgloss.NewStyle().Faint(true)
-	HelpDialogStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
-	// PanelStyle is HelpDialogStyle without the frame, for an overlay that reads
-	// as part of the screen rather than as a box floating on it. The padding
-	// spends the border's rows and columns on blank space instead, so a panel
-	// occupies the same rectangle as a bordered dialog and the moat — not a
-	// line — is what separates it from the list underneath. Width must be set on
-	// it: padding alone leaves short rows transparent to whatever is below.
-	PanelStyle       = lipgloss.NewStyle().Padding(2, 3)
+	SeparatorStyle   = lipgloss.NewStyle()
+	SelectedStyle    = lipgloss.NewStyle().Bold(true).Reverse(true)
+	StatusLineStyle  = lipgloss.NewStyle().Faint(true)
+	HelpDialogStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
 	DialogTitleStyle = lipgloss.NewStyle().Bold(true)
 	DialogHintStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 	SuccessStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
@@ -70,18 +63,19 @@ var (
 	ShortcutLabelStyle = lipgloss.NewStyle().Faint(true)
 	ShortcutSepStyle   = lipgloss.NewStyle().Faint(true)
 
-	// Muted second line under a dialog row: what the row actually does.
-	DialogDetailStyle = lipgloss.NewStyle().Faint(true)
+	// A frameless dialog: Padding(2,3) equals HelpDialogStyle's border plus
+	// padding, so a panel fills the same rectangle.
+	PanelStyle = lipgloss.NewStyle().Padding(2, 3)
+	// The same panel owning the whole terminal: no bottom padding, so the footer
+	// rests on the last row.
+	FullPanelStyle = lipgloss.NewStyle().Padding(1, 0, 0, 2)
 )
 
-// Inside a dialog body the key column carries the color and the description
-// stays plain, so the eye scans keys first. An ANSI 0–6 slot, so it tracks the
-// terminal theme like the rest of the palette.
+// ANSI 0–6 so it tracks the terminal theme; 16–255 and hex do not.
 var dialogKeyColor = lipgloss.Color("6")
 
-// DialogKey colors a row's key column. The cursor row keeps its own background:
-// base is Reverse there, so a second color inside it would render as a block
-// pasted onto the bar rather than as part of the line.
+// Focused rows are Reverse; a foreground color inside that band renders as a
+// pasted block.
 func DialogKey(base lipgloss.Style, focused bool) lipgloss.Style {
 	if focused {
 		return base
@@ -206,12 +200,8 @@ func TagSegmentText(name, label string) string {
 }
 
 // PriorityStyle returns the text style for a task title with the given
-// priority. Color is applied only when colorMode is "full" (or empty, which
-// is treated as the default "full").
+// priority. Color is applied only when colorMode is "full".
 func PriorityStyle(priority, colorMode string) lipgloss.Style {
-	if colorMode == "" {
-		colorMode = "full"
-	}
 	if colorMode != "full" {
 		return lipgloss.NewStyle()
 	}
@@ -222,11 +212,8 @@ func PriorityStyle(priority, colorMode string) lipgloss.Style {
 }
 
 // PriorityIconStyle returns the style for the priority icon. Color is applied
-// when colorMode is "full" or "icon" (empty defaults to "full").
+// when colorMode is "full" or "icon".
 func PriorityIconStyle(priority, colorMode string) lipgloss.Style {
-	if colorMode == "" {
-		colorMode = "full"
-	}
 	if colorMode != "full" && colorMode != "icon" {
 		return lipgloss.NewStyle()
 	}
@@ -240,12 +227,9 @@ func PriorityIconStyle(priority, colorMode string) lipgloss.Style {
 // filled color block on a highlighted row, mirroring TagBlockStyle: Reverse
 // turns the priority color into the cell background so the icon keeps its color
 // as part of the reversed selection bar instead of vanishing into it. Color is
-// applied when colorMode is "full" or "icon" (empty defaults to "full"); the
-// bool reports whether a colored block renders at all.
+// applied when colorMode is "full" or "icon"; the bool reports whether a
+// colored block renders at all.
 func PriorityIconBlockStyle(priority, colorMode string) (lipgloss.Style, bool) {
-	if colorMode == "" {
-		colorMode = "full"
-	}
 	if colorMode != "full" && colorMode != "icon" {
 		return lipgloss.NewStyle(), false
 	}

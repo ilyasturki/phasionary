@@ -70,6 +70,16 @@ func TestManager(t *testing.T) {
 		assert.JSONEq(t, `{"status_display":"icons","priority_color":"full","show_shortcut_bar":true,"expand_descriptions_by_default":false,"help_expanded":false}`, string(data))
 	})
 
+	t.Run("a hand-edited empty field loads as the default", func(t *testing.T) {
+		configPath := filepath.Join(t.TempDir(), "config.json")
+		require.NoError(t, os.WriteFile(configPath, []byte(`{"status_display":"","priority_color":""}`), 0o600))
+
+		m := NewManager(configPath)
+		require.NoError(t, m.Load())
+		assert.Equal(t, StatusDisplayIcons, m.Get().StatusDisplay)
+		assert.Equal(t, PriorityColorFull, m.Get().PriorityColor)
+	})
+
 	t.Run("loads existing config", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		configPath := filepath.Join(tmpDir, "config.json")

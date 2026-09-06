@@ -6,26 +6,20 @@ Set FontSize 16
 Env PHASIONARY_DATA_PATH "/tmp/phas-vt/data"
 Env PHASIONARY_CONFIG_PATH "/tmp/phas-vt/cfg"
 
-# Seed a few projects so the full-screen frame has a list worth showing.
 Hide
 Type "clear && for n in Alpha Bravo Charlie Delta; do ./phasionary project add $n -q >/dev/null 2>&1; done && ./phasionary pick"
 Enter
 Sleep 2500ms
 Show
 Sleep 500ms
-# `pick` opens the picker as the whole terminal: no project behind it, the
-# hints resting on the bottom row.
 Screenshot "/tmp/phas-vt/vhs-out/15_pick_opens_picker.png"
 
-# Deleting confirms over the picker rather than replacing it.
 Type "g"
 Sleep 300ms
 Type "d"
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/15_pick_delete_confirm.png"
 
-# Confirm: the picker stays, and its status line — which normally lives on the
-# main view's project row — reports the delete above the hints.
 Type "y"
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/15_pick_deleted.png"

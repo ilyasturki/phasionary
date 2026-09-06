@@ -392,7 +392,6 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) model {
 }
 
 func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
-	optionCount := len(optionSpecs)
 	switch msg.String() {
 	case "q", "esc", "enter":
 		m.ui.Modes.ToNormal()
@@ -401,7 +400,7 @@ func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
 		// changes available content height.
 		m.ensureVisible()
 	case "j", "down":
-		if m.ui.Options.selectedOption < optionCount-1 {
+		if m.ui.Options.selectedOption < len(optionSpecs)-1 {
 			m.ui.Options.selectedOption++
 		}
 	case "k", "up":
@@ -612,14 +611,12 @@ func (m model) renderView() string {
 		return ""
 	}
 
-	// A full-screen picker owns the terminal, so there is no project view to
-	// build under it — at startup there may not even be a project loaded.
 	if m.ui.Picker.fullscreen && (m.ui.Modes.IsProjectPicker() || m.isConfirmingProjectDelete()) {
-		picker := m.pickerFullscreenView()
 		if m.isConfirmingProjectDelete() {
-			return components.NewModal(m.ui.Screen.Width, m.ui.Screen.Height).Render(picker, m.confirmDeleteView())
+			return components.NewModal(m.ui.Screen.Width, m.ui.Screen.Height).
+				Render(m.projectPickerView(), m.confirmDeleteView())
 		}
-		return picker
+		return m.projectPickerView()
 	}
 
 	layout := m.buildLayout()
@@ -670,8 +667,6 @@ func (m model) renderView() string {
 		return modal.Render(content, m.helpView())
 	case modes.ModeConfirmDelete:
 		if m.isConfirmingProjectDelete() {
-			// Deleting a project is a step inside picking one, so the picker stays
-			// under the confirmation rather than being replaced by it.
 			return modal.Render(modal.Render(content, m.projectPickerView()), m.confirmDeleteView())
 		}
 		return modal.Render(content, m.confirmDeleteView())
@@ -697,8 +692,6 @@ func (m model) renderView() string {
 	return content
 }
 
-// isConfirmingProjectDelete reports whether the confirmation on screen belongs
-// to the picker, which keeps the picker rendered behind it.
 func (m model) isConfirmingProjectDelete() bool {
 	return m.ui.Modes.IsConfirmDelete() && m.ui.ConfirmDelete.Kind == ConfirmDeleteProject
 }
@@ -890,10 +883,9 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 			}
 		}
 		m.ui.Picker = ProjectPickerState{
-			projects:     ordered,
-			selected:     selected,
-			scrollOffset: 0,
-			fullscreen:   true,
+			projects:   ordered,
+			selected:   selected,
+			fullscreen: true,
 		}
 		m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 	}
