@@ -11,6 +11,9 @@ import (
 var (
 	DialogChromeWidth  = HelpDialogStyle.GetHorizontalPadding() + HelpDialogStyle.GetHorizontalBorderSize()
 	DialogChromeHeight = HelpDialogStyle.GetVerticalPadding() + HelpDialogStyle.GetVerticalBorderSize()
+
+	PanelChromeWidth  = PanelStyle.GetHorizontalPadding()
+	PanelChromeHeight = PanelStyle.GetVerticalPadding()
 )
 
 const (
@@ -36,6 +39,12 @@ func DialogContentWidth(screenWidth int) int {
 // rather than collapsing to nothing.
 func DialogBodyHeight(screenHeight, ownRows, minBody int) int {
 	return max(screenHeight-DialogChromeHeight-ownRows, minBody)
+}
+
+// PanelBodyHeight is DialogBodyHeight for a borderless panel, which spends no
+// rows on a frame.
+func PanelBodyHeight(screenHeight, ownRows, minBody int) int {
+	return max(screenHeight-PanelChromeHeight-ownRows, minBody)
 }
 
 // PadTo right-pads line to width cells, measuring the rendered width so styling

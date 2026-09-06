@@ -2,7 +2,9 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -115,10 +117,10 @@ func TestPickerVisibleCount_AdaptsToTerminalHeight(t *testing.T) {
 	m := newPickerModel(t, 50, 160, 30)
 	require.Equal(t, 1, m.pickerHintRows(), "test assumes single-line hints")
 
-	assert.Equal(t, 30-ui.DialogChromeHeight-pickerOwnRows-1-pickerScrollReserve, m.pickerVisibleCount()) // 18
+	assert.Equal(t, 30-ui.PanelChromeHeight-pickerOwnRows-1-pickerScrollReserve, m.pickerVisibleCount()) // 18
 
 	m.ui.Screen.Height = 50
-	assert.Equal(t, 50-ui.DialogChromeHeight-pickerOwnRows-1-pickerScrollReserve, m.pickerVisibleCount()) // 38
+	assert.Equal(t, 50-ui.PanelChromeHeight-pickerOwnRows-1-pickerScrollReserve, m.pickerVisibleCount()) // 38
 }
 
 func TestPickerVisibleCount_FitsAllWhenTall(t *testing.T) {
@@ -208,26 +210,108 @@ func projectWithTasks(statuses ...string) domain.Project {
 	return domain.Project{Categories: []domain.Category{{Tasks: tasks}}}
 }
 
-func TestProjectProgressBadge(t *testing.T) {
-	// Cancelled tasks drop out of both the numerator and denominator.
-	badge, complete := projectProgressBadge(projectWithTasks(
+func TestProjectStats(t *testing.T) {
+	// Completed and cancelled tasks are both done with; only the rest are open.
+	open, inProgress := projectStats(projectWithTasks(
 		domain.StatusCompleted, domain.StatusTodo, domain.StatusInProgress, domain.StatusCancelled,
 	))
-	assert.Equal(t, "1/3", badge)
-	assert.False(t, complete)
+	assert.Equal(t, 2, open)
+	assert.Equal(t, 1, inProgress)
 
-	// All active tasks done reads as complete with a check.
-	badge, complete = projectProgressBadge(projectWithTasks(
-		domain.StatusCompleted, domain.StatusCompleted, domain.StatusCancelled,
-	))
-	assert.Equal(t, "2/2 ✓", badge)
-	assert.True(t, complete)
+	open, inProgress = projectStats(projectWithTasks(domain.StatusCompleted, domain.StatusCancelled))
+	assert.Equal(t, 0, open)
+	assert.Equal(t, 0, inProgress)
 
-	// No countable tasks → no badge.
-	badge, complete = projectProgressBadge(projectWithTasks(domain.StatusCancelled))
-	assert.Equal(t, "", badge)
-	assert.False(t, complete)
+	open, _ = projectStats(domain.Project{})
+	assert.Equal(t, 0, open)
+}
 
-	badge, _ = projectProgressBadge(domain.Project{})
-	assert.Equal(t, "", badge)
+func TestProjectStats_SkipsSeparators(t *testing.T) {
+	p := domain.Project{Categories: []domain.Category{{Tasks: []domain.Task{
+		{ID: "t0", Status: domain.StatusTodo},
+		{ID: "s0", Kind: domain.KindSeparator},
+		{ID: "t1", Status: domain.StatusInProgress},
+	}}}}
+	open, inProgress := projectStats(p)
+	assert.Equal(t, 2, open, "a separator is a divider, not work")
+	assert.Equal(t, 1, inProgress)
+}
+
+func TestMeasurePickerColumns_DropsRightToLeft(t *testing.T) {
+	projects := []domain.Project{
+		{Name: "One", UpdatedAt: time.Now().Add(-3 * time.Hour).Format(time.RFC3339),
+			Categories: []domain.Category{{Tasks: []domain.Task{{Status: domain.StatusInProgress}}}}},
+	}
+
+	full := measurePickerColumns(projects, 200)
+	assert.Positive(t, full.open)
+	assert.Positive(t, full.inProgress)
+	assert.Positive(t, full.edited)
+
+	// Each width that no longer leaves the name its floor sheds the rightmost
+	// column still standing: age, then in-progress, then the open count.
+	fits := func(c pickerColumns) int { return pickerRowPrefixWidth + pickerMinNameWidth + c.width() }
+
+	noAge := measurePickerColumns(projects, fits(full)-1)
+	assert.Zero(t, noAge.edited)
+	assert.Positive(t, noAge.inProgress)
+
+	noProgress := measurePickerColumns(projects, fits(noAge)-1)
+	assert.Zero(t, noProgress.inProgress)
+	assert.Positive(t, noProgress.open)
+
+	assert.Zero(t, measurePickerColumns(projects, fits(noProgress)-1).open)
+}
+
+func TestMeasurePickerColumns_NoInProgressDropsTheColumn(t *testing.T) {
+	projects := []domain.Project{{Name: "Quiet", Categories: []domain.Category{
+		{Tasks: []domain.Task{{Status: domain.StatusTodo}}},
+	}}}
+	assert.Zero(t, measurePickerColumns(projects, 70).inProgress,
+		"the column disappears when nothing is in progress")
+}
+
+// TestPickerPanelView_IsOpaque guards the frameless panel: placeOverlay only
+// replaces the cells a row actually covers, so a short row would let the
+// project list show through the middle of the picker.
+func TestPickerPanelView_IsOpaque(t *testing.T) {
+	m := newPickerModel(t, 8, 100, 30)
+	m.ui.Picker.selected = 3
+	m.ui.Picker.ensureVisible(m.pickerVisibleCount())
+
+	rendered := m.projectPickerView()
+	width := lipgloss.Width(rendered)
+	for i, line := range strings.Split(rendered, "\n") {
+		assert.Equalf(t, width, lipgloss.Width(line), "row %d is short, the background bleeds through", i)
+	}
+}
+
+// TestPickerFullscreenView_FillsTheScreen is the full-screen counterpart of the
+// anti-clipping guard: the frame must land on exactly the terminal's rows, so
+// the footer sits on the bottom one and nothing spills past it.
+func TestPickerFullscreenView_FillsTheScreen(t *testing.T) {
+	for _, width := range []int{60, 100, 160} {
+		for height := 16; height <= 45; height++ {
+			for _, n := range []int{1, 8, 40} {
+				m := newPickerModel(t, n, width, height)
+				m.ui.Picker.fullscreen = true
+				m.ui.Picker.jumpToLast(m.pickerVisibleCount())
+				assert.Equalf(t, height, lipgloss.Height(m.projectPickerView()),
+					"full-screen picker must be exactly %d rows (width=%d, projects=%d)", height, width, n)
+			}
+		}
+	}
+}
+
+func TestHandlePickerKey_AddsFromAnyRow(t *testing.T) {
+	m := newPickerModel(t, 10, 160, 24)
+	m.ui.Picker.selected = 4
+
+	after, _ := m.handleProjectPickerKey(tea.KeyPressMsg{Text: "a"})
+	assert.True(t, after.ui.Picker.isAdding)
+	assert.False(t, after.ui.Picker.onNew, "a opens the input without moving the cursor")
+
+	after, _ = after.handleProjectPickerKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+	assert.False(t, after.ui.Picker.isAdding)
+	assert.Equal(t, 4, after.ui.Picker.selected, "cancelling returns to the row a was pressed on")
 }

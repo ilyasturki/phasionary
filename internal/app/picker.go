@@ -88,6 +88,8 @@ func (m model) handleProjectPickerKey(msg tea.KeyPressMsg) (model, tea.Cmd) {
 		if len(m.ui.Picker.projects) > 0 {
 			m.ui.Picker.startFiltering()
 		}
+	case "a":
+		m.ui.Picker.startAdding()
 	case "j", "down":
 		m.ui.Picker.moveSelection(1, visible)
 	case "k", "up":
@@ -195,6 +197,10 @@ func (m *model) confirmDeleteProject() {
 	if err != nil {
 		m.ui.Screen.StatusMsg = fmt.Sprintf("Error reloading projects: %v", err)
 	} else {
+		// Reload through the saved order: ListProjects sorts by name, so without
+		// this the rows would reshuffle under the cursor the moment a delete
+		// lands.
+		projects = orderProjects(projects, m.deps.StateManager.GetProjectOrder())
 		m.ui.Picker.projects = projects
 		if m.ui.Picker.selected >= len(projects) {
 			m.ui.Picker.selected = len(projects) - 1

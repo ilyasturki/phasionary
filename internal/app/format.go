@@ -153,3 +153,34 @@ func FormatEstimateLabel(minutes int) string {
 	}
 	return fmt.Sprintf("%d days", days)
 }
+
+// FormatRelativeShort compresses FormatRelativeTime into a table cell: "now",
+// "5m", "3h", "2d", "4w", "6mo", "2y". Future stamps (a clock skew, a
+// hand-edited file) read as "now" rather than growing an "in " prefix that
+// would break the column width.
+func FormatRelativeShort(timestamp string) string {
+	if timestamp == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		return ""
+	}
+	diff := time.Since(t)
+	switch {
+	case diff < time.Minute:
+		return "now"
+	case diff < time.Hour:
+		return fmt.Sprintf("%dm", int(diff.Minutes()))
+	case diff < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(diff.Hours()))
+	case diff < 7*24*time.Hour:
+		return fmt.Sprintf("%dd", int(diff.Hours()/24))
+	case diff < 30*24*time.Hour:
+		return fmt.Sprintf("%dw", int(diff.Hours()/(24*7)))
+	case diff < 365*24*time.Hour:
+		return fmt.Sprintf("%dmo", int(diff.Hours()/(24*30)))
+	default:
+		return fmt.Sprintf("%dy", int(diff.Hours()/(24*365)))
+	}
+}

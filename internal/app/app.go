@@ -612,6 +612,16 @@ func (m model) renderView() string {
 		return ""
 	}
 
+	// A full-screen picker owns the terminal, so there is no project view to
+	// build under it — at startup there may not even be a project loaded.
+	if m.ui.Picker.fullscreen && (m.ui.Modes.IsProjectPicker() || m.isConfirmingProjectDelete()) {
+		picker := m.pickerFullscreenView()
+		if m.isConfirmingProjectDelete() {
+			return components.NewModal(m.ui.Screen.Width, m.ui.Screen.Height).Render(picker, m.confirmDeleteView())
+		}
+		return picker
+	}
+
 	layout := m.buildLayout()
 	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
 	viewport.ComputeVisibility(m.ui.Screen.ScrollOffset)
@@ -659,6 +669,11 @@ func (m model) renderView() string {
 	case modes.ModeHelp:
 		return modal.Render(content, m.helpView())
 	case modes.ModeConfirmDelete:
+		if m.isConfirmingProjectDelete() {
+			// Deleting a project is a step inside picking one, so the picker stays
+			// under the confirmation rather than being replaced by it.
+			return modal.Render(modal.Render(content, m.projectPickerView()), m.confirmDeleteView())
+		}
 		return modal.Render(content, m.confirmDeleteView())
 	case modes.ModeOptions:
 		return modal.Render(content, m.optionsView())
@@ -680,6 +695,12 @@ func (m model) renderView() string {
 		return modal.Render(content, m.tagEditView())
 	}
 	return content
+}
+
+// isConfirmingProjectDelete reports whether the confirmation on screen belongs
+// to the picker, which keeps the picker rendered behind it.
+func (m model) isConfirmingProjectDelete() bool {
+	return m.ui.Modes.IsConfirmDelete() && m.ui.ConfirmDelete.Kind == ConfirmDeleteProject
 }
 
 func (m model) renderLayoutItem(item LayoutItem) string {
@@ -872,6 +893,7 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 			projects:     ordered,
 			selected:     selected,
 			scrollOffset: 0,
+			fullscreen:   true,
 		}
 		m.ui.Picker.ensureVisible(m.pickerVisibleCount())
 	}

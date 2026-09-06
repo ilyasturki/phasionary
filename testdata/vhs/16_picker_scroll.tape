@@ -16,7 +16,7 @@ Sleep 2500ms
 Show
 
 # Open the picker: "+ New Project" is pinned at the top, the window sizes
-# itself to the terminal, and each project shows its task progress.
+# itself to the terminal, and each project shows its open count and age.
 Ctrl+P
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/16_picker_open.png"

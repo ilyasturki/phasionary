@@ -16,10 +16,17 @@ var (
 	CategoryStyle = lipgloss.NewStyle().Bold(true)
 	// SeparatorStyle draws in-category divider rules at full foreground
 	// contrast (an empty style = the terminal's default foreground).
-	SeparatorStyle   = lipgloss.NewStyle()
-	SelectedStyle    = lipgloss.NewStyle().Bold(true).Reverse(true)
-	StatusLineStyle  = lipgloss.NewStyle().Faint(true)
-	HelpDialogStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
+	SeparatorStyle  = lipgloss.NewStyle()
+	SelectedStyle   = lipgloss.NewStyle().Bold(true).Reverse(true)
+	StatusLineStyle = lipgloss.NewStyle().Faint(true)
+	HelpDialogStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
+	// PanelStyle is HelpDialogStyle without the frame, for an overlay that reads
+	// as part of the screen rather than as a box floating on it. The padding
+	// spends the border's rows and columns on blank space instead, so a panel
+	// occupies the same rectangle as a bordered dialog and the moat — not a
+	// line — is what separates it from the list underneath. Width must be set on
+	// it: padding alone leaves short rows transparent to whatever is below.
+	PanelStyle       = lipgloss.NewStyle().Padding(2, 3)
 	DialogTitleStyle = lipgloss.NewStyle().Bold(true)
 	DialogHintStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 	SuccessStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
