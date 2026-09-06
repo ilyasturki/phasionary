@@ -331,6 +331,31 @@ func (m *model) moveHelpFocus(delta int) {
 	m.ensureHelpVisible()
 }
 
+// moveHelpColumn jumps to the entry nearest the current line in the neighboring
+// column — a no-op on the single-column faces, which have nothing to jump to.
+func (m *model) moveHelpColumn(delta int) {
+	body := m.helpBody()
+	if len(body.targets) == 0 {
+		return
+	}
+	cur := body.targets[min(max(m.ui.Help.Focused, 0), len(body.targets)-1)]
+	want := cur.col + delta
+	best := -1
+	for i, t := range body.targets {
+		if t.col != want {
+			continue
+		}
+		if best < 0 || abs(t.line-cur.line) < abs(body.targets[best].line-cur.line) {
+			best = i
+		}
+	}
+	if best < 0 {
+		return
+	}
+	m.ui.Help.Focused = best
+	m.ensureHelpVisible()
+}
+
 // The cursor resets to the top: the two faces share no ordering, so carrying a
 // position across would land anywhere.
 func (m *model) toggleHelpExpanded() {
@@ -449,7 +474,7 @@ func (m model) renderHelpCell(cell helpCell, width, keyCol int, focused bool, qu
 	}
 
 	text := base.Render("  ") +
-		ui.HighlightMatches(ui.PadTo(e.keys, keyCol), query, base, match) +
+		ui.HighlightMatches(ui.PadTo(e.keys, keyCol), query, ui.DialogKey(base, focused), match) +
 		ui.HighlightMatches(e.desc, query, base, match)
 	if !focused {
 		return ui.PadTo(text, width)

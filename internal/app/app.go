@@ -281,6 +281,10 @@ func (m model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveHelpFocus(1)
 	case "k", "up":
 		m.moveHelpFocus(-1)
+	case "h", "left":
+		m.moveHelpColumn(-1)
+	case "l", "right":
+		m.moveHelpColumn(1)
 	case "ctrl+d":
 		m.moveHelpFocus(m.helpBodyHeight() / 2)
 	case "ctrl+u":
@@ -388,7 +392,7 @@ func (m model) handleConfirmDeleteKey(msg tea.KeyPressMsg) model {
 }
 
 func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
-	const optionCount = 4
+	optionCount := len(optionSpecs)
 	switch msg.String() {
 	case "q", "esc", "enter":
 		m.ui.Modes.ToNormal()
@@ -404,8 +408,10 @@ func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
 		if m.ui.Options.selectedOption > 0 {
 			m.ui.Options.selectedOption--
 		}
-	case "space", "tab", "h", "l":
-		m.toggleSelectedOption()
+	case "space", "tab", "l", "right":
+		m.cycleSelectedOption(1)
+	case "h", "left":
+		m.cycleSelectedOption(-1)
 	}
 	return m
 }
@@ -534,53 +540,6 @@ func (m model) handleYankPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, copyYankItem(it)
 	}
 	return m, nil
-}
-
-func (m *model) toggleSelectedOption() {
-	switch m.ui.Options.selectedOption {
-	case 0: // StatusDisplay
-		newValue := config.StatusDisplayIcons
-		if m.deps.CfgManager.Get().StatusDisplay == config.StatusDisplayIcons {
-			newValue = config.StatusDisplayText
-		}
-		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
-			cfg.StatusDisplay = newValue
-		})
-		// Icons vs. text change the status column width, so cached row heights
-		// are stale. (PriorityColor below only recolors — layout is unaffected.)
-		m.invalidateLayout()
-	case 1: // PriorityColor
-		newValue := nextPriorityColor(m.deps.CfgManager.Get().PriorityColor)
-		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
-			cfg.PriorityColor = newValue
-		})
-	case 2: // ShowShortcutBar
-		newValue := !m.deps.CfgManager.Get().ShowShortcutBar
-		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
-			cfg.ShowShortcutBar = newValue
-		})
-		// The bar is hidden while Options is open, so the layout under us
-		// hasn't actually changed yet. handleOptionsKey's exit branch calls
-		// ensureVisible against the post-toggle layout once Options closes.
-	case 3: // ExpandDescriptionsByDefault
-		newValue := !m.deps.CfgManager.Get().ExpandDescriptionsByDefault
-		_ = m.deps.CfgManager.Update(func(cfg *config.Config) {
-			cfg.ExpandDescriptionsByDefault = newValue
-		})
-		m.ui.Screen.ExpandDescriptions = newValue
-		m.rebuildPositions()
-	}
-}
-
-func nextPriorityColor(current string) string {
-	switch current {
-	case config.PriorityColorFull:
-		return config.PriorityColorIcon
-	case config.PriorityColorIcon:
-		return config.PriorityColorNone
-	default:
-		return config.PriorityColorFull
-	}
 }
 
 func (m model) handleNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {

@@ -15,6 +15,8 @@ Show
 Type ","
 Sleep 500ms
 Screenshot "/tmp/phas-vt/vhs-out/05_options_open.png"
+# Idle renders no frame, so without this the capture lands after the `j` below.
+Sleep 500ms
 
 Type "j"
 Sleep 300ms
@@ -23,6 +25,17 @@ Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_full.png"
 Type " "
 Sleep 300ms
 Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_icon.png"
+
+# `h` is `l`'s inverse: back to Full, then wrapping round to None.
+Type "h"
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_back.png"
+Type "h"
+Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_wrapped.png"
+# Back round to Icon, which is what the capture below is checking.
+Type "ll"
+Sleep 300ms
 
 Escape
 Sleep 300ms

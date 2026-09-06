@@ -62,7 +62,25 @@ var (
 	ShortcutKeyStyle   = lipgloss.NewStyle().Bold(true)
 	ShortcutLabelStyle = lipgloss.NewStyle().Faint(true)
 	ShortcutSepStyle   = lipgloss.NewStyle().Faint(true)
+
+	// Muted second line under a dialog row: what the row actually does.
+	DialogDetailStyle = lipgloss.NewStyle().Faint(true)
 )
+
+// Inside a dialog body the key column carries the color and the description
+// stays plain, so the eye scans keys first. An ANSI 0–6 slot, so it tracks the
+// terminal theme like the rest of the palette.
+var dialogKeyColor = lipgloss.Color("6")
+
+// DialogKey colors a row's key column. The cursor row keeps its own background:
+// base is Reverse there, so a second color inside it would render as a block
+// pasted onto the bar rather than as part of the line.
+func DialogKey(base lipgloss.Style, focused bool) lipgloss.Style {
+	if focused {
+		return base
+	}
+	return base.Foreground(dialogKeyColor)
+}
 
 // CutMark is the badge appended to rows whose item is pending a cut/paste.
 const CutMark = " ✂"
