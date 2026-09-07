@@ -21,6 +21,9 @@ type Device struct {
 	DeviceID  string `json:"device_id"`
 	ServerURL string `json:"server_url,omitempty"`
 	Token     string `json:"token,omitempty"`
+	// Advanced only after a pull is fully applied, so an interrupted one is
+	// redone.
+	Cursor uint64 `json:"cursor,omitempty"`
 }
 
 func devicePath(stateDir string) string {
@@ -54,6 +57,16 @@ func SaveDevice(stateDir string, d Device) error {
 		return err
 	}
 	return fsutil.WriteAtomic(devicePath(stateDir), data, 0o600)
+}
+
+// Discards pending journal entries too; callers check for those first.
+func Unenroll(stateDir string) error {
+	for _, name := range []string{deviceFileName, journalFileName, headFileName, lockFileName} {
+		if err := os.Remove(filepath.Join(stateDir, name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 // Refuses to overwrite: an identity swap orphans the server's cursor for the

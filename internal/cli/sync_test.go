@@ -1,13 +1,18 @@
 package cli
 
 import (
+	"context"
+	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"phasionary/internal/config"
+	"phasionary/internal/data"
 	"phasionary/internal/journal"
+	"phasionary/internal/server"
 )
 
 func TestSyncStatusUnconfigured(t *testing.T) {
@@ -60,6 +65,57 @@ func TestCLIWritesJournalWhenEnrolled(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "the task add must appear in the journal")
+}
+
+func TestSyncLoginAndNowViaCLI(t *testing.T) {
+	db, err := server.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	srv := httptest.NewServer(server.New(db, "").Handler())
+	t.Cleanup(srv.Close)
+	code := func() string {
+		c, err := db.NewEnrollCode(context.Background())
+		require.NoError(t, err)
+		return c
+	}
+
+	stateA, dataA := t.TempDir(), t.TempDir()
+	t.Setenv(config.EnvStatePath, stateA)
+	_, err = runCLI(t, dataA, "init", "Synced")
+	require.NoError(t, err)
+	out, err := runCLI(t, dataA, "sync", "login", srv.URL, "--code", code(), "--name", "a")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "Enrolled as device")
+	out, err = runCLI(t, dataA, "sync", "status")
+	require.NoError(t, err)
+	assert.Contains(t, out, "Sync: configured")
+	assert.Contains(t, out, srv.URL)
+
+	_, err = runCLI(t, dataA, "task", "add", "From A", "-p", "Synced", "--category", "Feature")
+	require.NoError(t, err)
+	out, err = runCLI(t, dataA, "sync", "now")
+	require.NoError(t, err)
+	assert.Contains(t, out, "Pushed 2 change(s)", out)
+
+	stateB, dataB := t.TempDir(), t.TempDir()
+	t.Setenv(config.EnvStatePath, stateB)
+	out, err = runCLI(t, dataB, "sync", "login", srv.URL, "--code", code(), "--name", "b")
+	require.NoError(t, err, out)
+	onB, err := data.NewStore(filepath.Join(dataB, "projects")).LoadProject("Synced")
+	require.NoError(t, err)
+	_, ok := findTask(firstCategoryTasks(t, onB, "Feature"), "From A")
+	assert.True(t, ok, "B must receive A's task through the server")
+
+	_, err = runCLI(t, dataB, "task", "add", "Local only", "-p", "Synced", "--category", "Feature")
+	require.NoError(t, err)
+	_, err = runCLI(t, dataB, "sync", "logout")
+	require.Error(t, err, "logout must not silently discard unsynced changes")
+	assert.Contains(t, err.Error(), "not yet synced")
+	_, err = runCLI(t, dataB, "sync", "logout", "--force")
+	require.NoError(t, err)
+	out, err = runCLI(t, dataB, "sync", "status")
+	require.NoError(t, err)
+	assert.Contains(t, out, "not configured")
 }
 
 func TestCLIJournalsNothingWhenLocalOnly(t *testing.T) {

@@ -63,7 +63,10 @@ func (s *Store) WriteProjectLocked(id string, data []byte) error {
 	if _, err := os.Stat(s.projectPath(id)); errors.Is(err, fs.ErrNotExist) {
 		return ErrProjectNotFound
 	}
-	if s.recorder != nil {
+	if err := s.checkFresh(id); err != nil {
+		return err
+	}
+	if s.recording() {
 		// Unmarshal what was just marshaled: the recorder must diff exactly
 		// the state this write commits.
 		var updated domain.Project

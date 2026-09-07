@@ -1,15 +1,13 @@
 package app
 
 import (
+	"errors"
+
 	"phasionary/internal/app/selection"
+	"phasionary/internal/data"
 	"phasionary/internal/domain"
 )
 
-// storeTaskUpdate persists the in-memory project to disk under the project
-// flock. The lock makes the WRITE atomic vs. concurrent writers (the CLI, a
-// second TUI), but the TUI's load-mutate-save cycle still wins blindly over
-// any edits made in the meantime — use reloadProject (R) to pick up
-// out-of-band changes before continuing to edit.
 func (m *model) storeTaskUpdate() {
 	// Content changed: the memoized layout no longer matches the project.
 	m.invalidateLayout()
@@ -26,8 +24,15 @@ func (m *model) storeTaskUpdate() {
 		return
 	}
 	if err := m.deps.Store.SaveProjectLocked(m.project); err != nil {
-		m.ui.Screen.StatusMsg = "Save failed: " + err.Error()
+		m.ui.Screen.StatusMsg = saveFailedMessage(err)
 	}
+}
+
+func saveFailedMessage(err error) string {
+	if errors.Is(err, data.ErrStaleProject) {
+		return "Project changed on disk; press R to reload (unsaved edits are dropped)"
+	}
+	return "Save failed: " + err.Error()
 }
 
 // invalidateLayout drops the memoized layout so the next render/scroll rebuilds

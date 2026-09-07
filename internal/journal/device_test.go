@@ -28,20 +28,38 @@ func TestMintAndLoadDevice(t *testing.T) {
 	assert.Error(t, err, "re-minting would orphan the server's cursor for the old identity")
 }
 
-func TestOpenIfConfigured(t *testing.T) {
+func TestRecorderFollowsEnrollment(t *testing.T) {
 	dir := t.TempDir()
-
-	rec, err := OpenIfConfigured(dir)
+	rec := NewRecorder(dir)
+	assert.False(t, rec.Active(), "no device file → sync off")
+	require.NoError(t, rec.RecordDelete("p1"))
+	ops, err := Open(dir).Entries()
 	require.NoError(t, err)
-	assert.Nil(t, rec, "no device file → sync off")
+	assert.Empty(t, ops, "nothing journaled while unenrolled")
 
 	_, err = MintDevice(dir, "https://example.test", "tok")
 	require.NoError(t, err)
-	rec, err = OpenIfConfigured(dir)
+	assert.True(t, rec.Active())
+	require.NoError(t, rec.RecordDelete("p1"))
+	ops, err = Open(dir).Entries()
 	require.NoError(t, err)
-	require.NotNil(t, rec)
+	require.Len(t, ops, 1)
 
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "device.json"), []byte("{"), 0o600))
-	_, err = OpenIfConfigured(dir)
-	assert.Error(t, err, "corrupt device file must not fall back to local-only")
+	assert.Error(t, rec.RecordDelete("p1"), "corrupt device file must not fall back to local-only")
+}
+
+func TestUnenrollRemovesIdentityAndJournal(t *testing.T) {
+	dir := t.TempDir()
+	_, err := MintDevice(dir, "https://example.test", "tok")
+	require.NoError(t, err)
+	require.NoError(t, NewRecorder(dir).RecordDelete("p1"))
+	require.NoError(t, Unenroll(dir))
+	_, ok, err := LoadDevice(dir)
+	require.NoError(t, err)
+	assert.False(t, ok)
+	ops, err := Open(dir).Entries()
+	require.NoError(t, err)
+	assert.Empty(t, ops)
+	require.NoError(t, Unenroll(dir), "idempotent")
 }

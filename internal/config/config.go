@@ -11,6 +11,8 @@ const (
 	EnvConfigPath = "PHASIONARY_CONFIG_PATH"
 	EnvStatePath  = "PHASIONARY_STATE_PATH"
 
+	EnvServerDataPath = "PHASIONARY_SERVER_DATA_PATH"
+
 	StatusDisplayText  = "text"
 	StatusDisplayIcons = "icons"
 
@@ -42,39 +44,45 @@ func DefaultConfig() Config {
 	}
 }
 
-func ResolveDataDir(input string) (string, error) {
+// input > $env > $xdg/sub > ~/home...; an empty xdg skips that branch.
+func resolveDir(input, env, xdg, sub string, home ...string) (string, error) {
 	if input != "" {
-		return filepath.Join(input, "projects"), nil
+		return input, nil
 	}
-	if env := os.Getenv(EnvDataPath); env != "" {
-		return filepath.Join(env, "projects"), nil
+	if v := os.Getenv(env); v != "" {
+		return v, nil
 	}
-	home, err := os.UserHomeDir()
+	if xdg != "" {
+		if v := os.Getenv(xdg); v != "" {
+			return filepath.Join(v, sub), nil
+		}
+	}
+	h, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".local", "share", "phasionary", "projects"), nil
+	return filepath.Join(append([]string{h}, home...)...), nil
 }
 
-// ResolveStateDir returns the per-device state directory. Unlike the data and
-// config dirs, this one must never be carried between machines by a file
-// syncer — it holds the device identity.
+func ResolveDataDir(input string) (string, error) {
+	dir, err := resolveDir(input, EnvDataPath, "", "", ".local", "share", "phasionary")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "projects"), nil
+}
+
+// The per-device state directory must never be carried between machines by a
+// file syncer: it holds the device identity.
 func ResolveStateDir() (string, error) {
-	if env := os.Getenv(EnvStatePath); env != "" {
-		return env, nil
-	}
-	if xdg := os.Getenv("XDG_STATE_HOME"); xdg != "" {
-		return filepath.Join(xdg, "phasionary"), nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".local", "state", "phasionary"), nil
+	return resolveDir("", EnvStatePath, "XDG_STATE_HOME", "phasionary", ".local", "state", "phasionary")
 }
 
-// configDirFromPath accepts either a directory path or a path pointing at a
-// `*.json` file (in which case the parent directory is used).
+func ResolveServerDataDir(input string) (string, error) {
+	return resolveDir(input, EnvServerDataPath, "XDG_DATA_HOME", "phasionary-server", ".local", "share", "phasionary-server")
+}
+
+// Accepts either a directory path or a path pointing at a `*.json` file.
 func configDirFromPath(p string) string {
 	if strings.HasSuffix(p, ".json") {
 		return filepath.Dir(p)
@@ -82,23 +90,12 @@ func configDirFromPath(p string) string {
 	return p
 }
 
-// ResolveConfigDir returns the config directory path.
-// Priority: input > PHASIONARY_CONFIG_PATH > XDG_CONFIG_HOME > ~/.config/phasionary
 func ResolveConfigDir(input string) (string, error) {
-	if input != "" {
-		return configDirFromPath(input), nil
-	}
-	if env := os.Getenv(EnvConfigPath); env != "" {
-		return configDirFromPath(env), nil
-	}
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "phasionary"), nil
-	}
-	home, err := os.UserHomeDir()
+	dir, err := resolveDir(input, EnvConfigPath, "XDG_CONFIG_HOME", "phasionary", ".config", "phasionary")
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".config", "phasionary"), nil
+	return configDirFromPath(dir), nil
 }
 
 // ResolveConfigPath returns the full path to config.json.

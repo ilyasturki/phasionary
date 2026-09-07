@@ -150,7 +150,7 @@ func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case saveErrMsg:
 		if msg.err != nil {
-			m.ui.Screen.StatusMsg = "Save failed: " + msg.err.Error()
+			m.ui.Screen.StatusMsg = saveFailedMessage(msg.err)
 		}
 		return m, m.listenSaveErrors()
 	case tea.KeyPressMsg:
@@ -793,14 +793,12 @@ func AttachSyncRecorder(store *data.Store) error {
 	if err != nil {
 		return err
 	}
-	rec, err := journal.OpenIfConfigured(stateDir)
-	if err != nil {
+	// Discarded load: an unreadable identity file fails at startup, not on the
+	// first save.
+	if _, _, err := journal.LoadDevice(stateDir); err != nil {
 		return err
 	}
-	// Guard the concrete pointer: a typed nil in the interface is not nil.
-	if rec != nil {
-		store.SetRecorder(rec)
-	}
+	store.SetRecorder(journal.NewRecorder(stateDir))
 	return nil
 }
 

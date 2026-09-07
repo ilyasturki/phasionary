@@ -30,12 +30,13 @@ inputs.phasionary.url = "github:ilyasturki/phasionary";
 
 ### Prebuilt binary
 
-Grab the latest `phasionary-linux-x64` or `phasionary-linux-arm64` from the [releases page](https://github.com/ilyasturki/phasionary/releases), `chmod +x`, drop in `$PATH`.
+Grab the latest `phasionary-linux-x64` or `phasionary-linux-arm64` from the [releases page](https://github.com/ilyasturki/phasionary/releases), `chmod +x`, drop in `$PATH`. The sync server ships alongside as `phasionary-server-linux-*`.
 
 ### From source
 
 ```bash
 go build -o phasionary ./cmd/phasionary
+go build -o phasionary-server ./cmd/phasionary-server   # optional, see Sync
 ```
 
 ## Quick start
@@ -61,9 +62,44 @@ phasionary import project.md                          # Restore from markdown
 
 Run `phasionary --help` for the full surface (projects, categories, config, completions).
 
-## Mobile & web
+## Sync (optional)
 
-The previous native Android client and its `phasionary serve` API were removed; a new mobile + web client with proper sync is in the works. The architecture is laid out in [`docs/sync-design.md`](docs/sync-design.md).
+Phasionary stays local-only until you enroll it with your own `phasionary-server`. Devices exchange changes with it only when you ask; nothing runs in the background and the TUI never touches the network.
+
+On the machine hosting the server:
+
+```bash
+phasionary-server            # listens on 127.0.0.1:7777
+phasionary-server enroll     # prints a single-use code, valid ten minutes
+```
+
+On each device:
+
+```bash
+phasionary sync login http://server:7777   # asks for the code, uploads local projects
+phasionary sync now                        # push local changes, pull everyone else's
+phasionary sync status
+phasionary sync logout                     # back to local-only
+```
+
+Stop any file syncer (Syncthing, Dropbox, …) carrying `~/.local/share/phasionary` before enrolling: two pipes moving the same files fight each other. The device identity and token live in `~/.local/state/phasionary/`, which must never be copied between machines. If a sync changes a project the TUI has open, the TUI's next save is refused until you press `R` to reload.
+
+The server speaks plain HTTP and every request carries the device's bearer token, so keep it on a private network (Tailscale, WireGuard, an SSH tunnel) or behind a TLS reverse proxy.
+
+### NixOS
+
+```nix
+imports = [ inputs.phasionary.nixosModules.phasionary-server ];
+services.phasionary-server = {
+  enable = true;
+  host = "100.64.0.1";   # e.g. a Tailscale address; default 127.0.0.1
+  openFirewall = true;
+};
+```
+
+Then mint codes with `sudo -u phasionary phasionary-server --data /var/lib/phasionary-server enroll`.
+
+A mobile and web client against this server are next; the architecture is laid out in [`docs/sync-design.md`](docs/sync-design.md).
 
 ## Configuration
 

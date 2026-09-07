@@ -46,6 +46,8 @@ jobs:
 
                   GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o phasionary-linux-x64 ./cmd/phasionary
                   GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o phasionary-linux-arm64 ./cmd/phasionary
+                  GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o phasionary-server-linux-x64 ./cmd/phasionary-server
+                  GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o phasionary-server-linux-arm64 ./cmd/phasionary-server
 
             - name: Smoke test (linux-x64)
               run: |
@@ -54,14 +56,13 @@ jobs:
                   ./phasionary-linux-x64 completion bash | grep -q 'phasionary'
                   ./phasionary-linux-x64 completion zsh | grep -q 'phasionary'
                   ./phasionary-linux-x64 completion fish | grep -q 'phasionary'
+                  ./phasionary-server-linux-x64 --version
 
             - name: Upload binaries
               uses: actions/upload-artifact@v7
               with:
                   name: binaries
-                  path: |
-                      phasionary-linux-x64
-                      phasionary-linux-arm64
+                  path: phasionary*-linux-*
 
     github-release:
         needs: build
@@ -79,9 +80,7 @@ jobs:
               uses: softprops/action-gh-release@v3
               with:
                   generate_release_notes: true
-                  files: |
-                      phasionary-linux-x64
-                      phasionary-linux-arm64
+                  files: phasionary*-linux-*
 
     aur:
         needs: github-release

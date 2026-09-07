@@ -12,6 +12,14 @@ ldflags := "-X phasionary/internal/version.Version=v" + version + \
 build:
     go build -ldflags "{{ldflags}}" -o phasionary ./cmd/phasionary
 
+# Build the sync server binary.
+build-server:
+    go build -ldflags "{{ldflags}}" -o phasionary-server ./cmd/phasionary-server
+
+# Run the sync server from source, passing args through (e.g. `just run-server enroll`).
+run-server *ARGS:
+    go run -ldflags "{{ldflags}}" ./cmd/phasionary-server {{ARGS}}
+
 # Run from source, passing args through (e.g. `just run version`).
 run *ARGS:
     go run -ldflags "{{ldflags}}" ./cmd/phasionary {{ARGS}}
@@ -39,7 +47,7 @@ test:
 
 # Format Go files.
 fmt:
-    gofmt -w cmd/phasionary internal
+    gofmt -w cmd internal
 
 # Clean up go.mod/go.sum.
 tidy:

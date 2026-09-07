@@ -17,6 +17,8 @@ type fakeRecorder struct {
 	fail    error
 }
 
+func (f *fakeRecorder) Active() bool { return true }
+
 func (f *fakeRecorder) RecordSave(old *domain.Project, updated domain.Project) error {
 	if f.fail != nil {
 		return f.fail
@@ -78,13 +80,9 @@ func TestStoreWritesReachJournal(t *testing.T) {
 	stateDir := t.TempDir()
 	device, err := journal.MintDevice(stateDir, "", "")
 	require.NoError(t, err)
-	rec, err := journal.OpenIfConfigured(stateDir)
-	require.NoError(t, err)
-	require.NotNil(t, rec)
-
 	store := NewStore(t.TempDir())
 	require.NoError(t, store.Ensure())
-	store.SetRecorder(rec)
+	store.SetRecorder(journal.NewRecorder(stateDir))
 
 	project, err := store.CreateProject("Synced")
 	require.NoError(t, err)

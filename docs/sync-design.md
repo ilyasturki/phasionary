@@ -83,8 +83,7 @@ Properties already in place that sync builds on:
 ### Device identity (implemented, slice 2)
 
 Each device that syncs gets a random, immutable device ID, minted at
-enrollment (`internal/journal.MintDevice`; the `sync login <url>` command
-arrives with the server slice). It lives in
+enrollment (`phasionary sync login <url>`). It lives in
 **`$XDG_STATE_HOME/phasionary/device.json`** (`~/.local/state/phasionary/`,
 override `PHASIONARY_STATE_PATH`), deliberately **not** in the data or config
 directories: both of those are historically carried by file syncers, and a
@@ -120,32 +119,73 @@ data dir.
   journal entry is what tells the server "deleted", so a delete can never be
   resurrected by a stale peer pushing an old snapshot. A whole-project delete
   is one tombstone; the server cascades it to its children.
-- Entries are **pruned after server acknowledgment** (`PruneThrough`). No
-  device enrolled → no recorder is attached and journaling is off entirely;
-  enabling sync starts from a full snapshot upload. The journal never grows
-  on a local-only install.
+- Entries are **pruned after server acknowledgment** (`PruneThrough`). The
+  recorder checks for `device.json` on every write rather than once at
+  startup, so a TUI that was open when `sync login` ran journals from its
+  next save on; while unenrolled it journals nothing and the journal never
+  grows. Enrolling starts from a full snapshot upload (exactly the
+  diff-from-nothing cascade).
 
-### Protocol sketch
+### Protocol (implemented, slice 3)
 
-`POST /sync` with `{device_id, last_seen_server_cursor, ops: […]}` →
-`{acked_through_seq, new_ops: […], server_cursor}`. Push and pull in one
-round-trip; the client applies `new_ops` to its JSON store under the existing
-flocks. Conflicts are resolved server-side, per field, LWW; the server's
-SQLite holds the merged truth *for syncing devices* — each device's files
-remain its own working copy.
+Wire types live in `internal/syncproto`; the client side in
+`internal/syncclient`.
 
-### Server
+- `POST /v1/enroll`: the device mints its own ID, the server mints the bearer
+  token and stores only its hash.
+- `POST /v1/sync`: the journal up, snapshots down.
 
-One Go binary (`phasionary-server` or a revived `serve` subcommand — decide in
-the server slice), self-hosted:
+Push and pull happen in one round-trip, and **the server is the only place
+merges happen**. A device never applies ops: the response carries a full
+snapshot of every project whose server version moved past the device's
+cursor — its own push included, so a device sees its edits merged with
+everyone else's in the same round — and the device overwrites its files with
+those snapshots. Applying ops client-side would not converge on a same-field
+conflict without per-field timestamps in the JSON files; snapshots converge
+by construction.
 
-- SQLite for state (this is where SQLite belongs: one writer process, real
-  transactions, no human ever greps it).
-- Serves the sync endpoint, a JSON API for thin online reads if the web app
-  wants them, and the **web app's static files** themselves.
-- Auth: per-device bearer tokens, enrollment via a one-time code printed on
-  the server console. TLS/exposure guidance stays what the old serve docs
-  said: private network (Tailscale/WireGuard/SSH tunnel) over public exposure.
+Two rules make a round safe to interrupt (`syncclient.Run`): a snapshot is
+skipped while the journal still holds entries for that project, and the
+device cursor advances only after every snapshot has been applied.
+
+### Stale saves (implemented, slice 3)
+
+The TUI edits in memory and saves whole snapshots, so a project changed on
+disk by a pull (or by the CLI) would be silently overwritten by its next
+save — and with sync on, the overwrite would journal the reversal. The store
+therefore refuses a snapshot save over a file version this process did not
+load. Read-modify-write under the flock (`WithProjectLocked`) is never stale;
+listing projects deliberately does not move the baseline.
+
+### Server (implemented, slice 3)
+
+`phasionary-server`, a separate binary (`cmd/phasionary-server`,
+`internal/server`) so the local-only TUI never links a server or a SQLite
+driver. Pure-Go SQLite (`modernc.org/sqlite`) keeps the arm64 release build
+toolchain-free.
+
+- **State model:** one `entities` table; every project, category and task is
+  a row of merged fields keyed by the domain JSON tags plus a timestamp per
+  field. Order lists and a task's `category_id` are fields like any other,
+  so every op kind is the same operation: set fields, or tombstone.
+- **Merge:** per field, last-writer-wins on the op timestamp, later arrival
+  winning a tie. A tombstone, once set, wins over anything after it. Creates
+  are upserts, so enrolling with a copy of an already-synced data directory
+  converges. An order list that lost the race drops the other side's
+  additions from the sequence, not from existence: the snapshot appends
+  every live entity the winning list misses, by `created_at`. A task whose
+  category was deleted goes with it.
+- **Pull:** each project row carries the server cursor at the last request
+  that touched it; a pull returns projects with version > the device cursor.
+- **Auth:** per-device bearer token minted at enrollment, stored hashed.
+  Enrollment codes are minted by `phasionary-server enroll` into the same
+  database (WAL, so it runs beside the service), single use, ten-minute
+  life; a failed attempt costs a second. Retries after a lost response are
+  idempotent through the per-device acked seq.
+- Plain HTTP; deployment guidance is private network or TLS reverse proxy.
+  The NixOS module (`nix/module.nix`, `services.phasionary-server`) runs it
+  hardened under its own user. The web app's static files and any read API
+  arrive with the web slice.
 
 ### Mobile & web app (next slice)
 
@@ -163,6 +203,9 @@ aesthetic is the design language.
    this design recorded.
 2. **(done)** **Journal + device identity** in the Go core
    (`internal/journal`, `data.ChangeRecorder`, `sync status`).
-3. **Server**: sync endpoint, SQLite, enrollment (`sync login <url>`), Nix
+3. **(done)** **Server**, client sync commands, the stale-save guard, NixOS
    module.
 4. **Web app** against the server, then **Capacitor** wrap for Android.
+   Candidates for the same slice: automatic sync from the TUI (on start and
+   after saves, best effort) and a Host-header allowlist on the server once
+   a browser is a client.

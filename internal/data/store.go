@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"phasionary/internal/domain"
 	"phasionary/internal/fsutil"
@@ -32,6 +34,8 @@ type ProjectRepository interface {
 
 // Implementations are called with the project flock held.
 type ChangeRecorder interface {
+	// Consulted per write, so enrolling mid-session needs no restart.
+	Active() bool
 	// Called before the write, so a crash leaves at most an extra op and never
 	// a lost one; old is nil on create, and an error aborts the save.
 	RecordSave(old *domain.Project, updated domain.Project) error
@@ -44,6 +48,9 @@ type ChangeRecorder interface {
 type Store struct {
 	Dir      string
 	recorder ChangeRecorder
+
+	mu     sync.Mutex
+	stamps map[string]os.FileInfo
 }
 
 var _ ProjectRepository = (*Store)(nil)
@@ -54,6 +61,8 @@ func NewStore(dir string) *Store {
 
 // Unsynchronized: call once at wiring time, before the store is shared.
 func (s *Store) SetRecorder(r ChangeRecorder) { s.recorder = r }
+
+func (s *Store) recording() bool { return s.recorder != nil && s.recorder.Active() }
 
 func (s *Store) Ensure() error {
 	return os.MkdirAll(s.Dir, 0o755)
@@ -76,7 +85,9 @@ func (s *Store) ListProjects() ([]domain.Project, error) {
 			continue
 		}
 		path := filepath.Join(s.Dir, entry.Name())
-		project, err := s.loadProjectFile(path)
+		// Stamp deliberately dropped: listing must not refresh the open
+		// project's baseline.
+		project, _, err := s.loadProjectFile(path)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +115,7 @@ func (s *Store) LoadProjectByID(id string) (domain.Project, error) {
 	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		return domain.Project{}, ErrProjectNotFound
 	}
-	project, err := s.loadProjectFile(path)
+	project, info, err := s.loadProjectFile(path)
 	if err != nil {
 		return domain.Project{}, err
 	}
@@ -114,6 +125,7 @@ func (s *Store) LoadProjectByID(id string) (domain.Project, error) {
 	if project.ID == "" {
 		return domain.Project{}, ErrProjectNotFound
 	}
+	s.adopt(id, info)
 	return project, nil
 }
 
@@ -137,12 +149,12 @@ func (s *Store) LoadProject(selector string) (domain.Project, error) {
 		return domain.Project{}, ErrProjectNotFound
 	}
 	if strings.TrimSpace(selector) == "" {
-		return projects[0], nil
+		return s.LoadProjectByID(projects[0].ID)
 	}
 	needle := domain.NormalizeName(selector)
 	for _, project := range projects {
 		if strings.EqualFold(project.ID, selector) || domain.NormalizeName(project.Name) == needle {
-			return project, nil
+			return s.LoadProjectByID(project.ID)
 		}
 	}
 	return domain.Project{}, ErrProjectNotFound
@@ -168,7 +180,13 @@ func (s *Store) writeProjectBytes(id string, data []byte) error {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return err
 	}
-	return fsutil.WriteAtomic(s.projectPath(id), data, 0o644)
+	if err := fsutil.WriteAtomic(s.projectPath(id), data, 0o644); err != nil {
+		return err
+	}
+	if info, err := os.Stat(s.projectPath(id)); err == nil {
+		s.adopt(id, info)
+	}
+	return nil
 }
 
 func (s *Store) saveProjectAtomic(project domain.Project) error {
@@ -185,10 +203,10 @@ func (s *Store) saveProjectAtomic(project domain.Project) error {
 // Caller must hold the project flock, so the old state read here is the one
 // the write overwrites.
 func (s *Store) recordSave(id string, updated domain.Project) error {
-	if s.recorder == nil {
+	if !s.recording() {
 		return nil
 	}
-	old, err := s.loadProjectFile(s.projectPath(id))
+	old, _, err := s.loadProjectFile(s.projectPath(id))
 	if errors.Is(err, fs.ErrNotExist) {
 		return s.recorder.RecordSave(nil, updated)
 	}
@@ -353,7 +371,7 @@ func (s *Store) InitDefault() (domain.Project, error) {
 		return domain.Project{}, err
 	}
 	if len(projects) > 0 {
-		return projects[0], nil
+		return s.LoadProjectByID(projects[0].ID)
 	}
 	return s.CreateProject("Default")
 }
@@ -370,21 +388,32 @@ func (s *Store) defaultCategories() ([]domain.Category, error) {
 	return categories, nil
 }
 
-func (s *Store) loadProjectFile(path string) (domain.Project, error) {
-	data, err := os.ReadFile(path)
+// Stat from the same fd as the bytes: os.Stat would pair new metadata with
+// old content across a rename.
+func (s *Store) loadProjectFile(path string) (domain.Project, os.FileInfo, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		return domain.Project{}, err
+		return domain.Project{}, nil, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return domain.Project{}, nil, err
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return domain.Project{}, nil, err
 	}
 	var project domain.Project
 	if err := json.Unmarshal(data, &project); err != nil {
-		return domain.Project{}, err
+		return domain.Project{}, nil, err
 	}
 	// A file from a newer binary is refused, not repaired: in a fleet of
 	// machines sharing a data directory, a half-upgraded member must fail
 	// loudly rather than rewrite the file through an older format and drop
 	// whatever the newer version added.
 	if err := domain.CheckSchema(project); err != nil {
-		return domain.Project{}, fmt.Errorf("%s: %w", filepath.Base(path), err)
+		return domain.Project{}, nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
 	}
 	// Repair rather than reject: a project containing control characters —
 	// written before these checks existed, or hand-edited — still opens, minus
@@ -392,7 +421,7 @@ func (s *Store) loadProjectFile(path string) (domain.Project, error) {
 	// injected byte enough to lock the user out of their own project with no
 	// in-app way to fix it. The stripped form becomes canonical on the next save.
 	domain.StripProjectText(&project)
-	return project, nil
+	return project, info, nil
 }
 
 func (s *Store) projectPath(id string) string {
@@ -410,28 +439,64 @@ func (s *Store) lockPath(id string) string { return s.projectPath(id) + ".lock" 
 func (s *Store) tmpPath(id string) string  { return s.projectPath(id) + ".tmp" }
 
 func (s *Store) DeleteProject(id string) error {
-	// Hold the project flock while deleting so a concurrent writer can't
-	// race in mid-delete. We keep the .lock file on disk afterwards — unlinking
-	// it would break mutual exclusion for any other process that's already
-	// flocked the old inode (a fresh OpenFile would get a new inode and lock
-	// it independently).
-	f, err := s.acquireProjectLock(id)
+	removed, err := s.RemoveProject(id)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	path := s.projectPath(id)
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+	if !removed {
 		return ErrProjectNotFound
 	}
-	if err := os.Remove(path); err != nil {
-		return err
-	}
-	_ = os.Remove(s.tmpPath(id))
-	if s.recorder == nil {
+	if !s.recording() {
 		return nil
 	}
 	return s.recorder.RecordDelete(id)
+}
+
+// Sync's write path: no journaling, no staleness check; fn returning nil
+// leaves the file untouched.
+func (s *Store) ReplaceProject(id string, fn func(current *domain.Project) (*domain.Project, error)) (bool, error) {
+	f, err := s.acquireProjectLock(id)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	var current *domain.Project
+	loaded, _, err := s.loadProjectFile(s.projectPath(id))
+	if err == nil {
+		current = &loaded
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return false, err
+	}
+	next, err := fn(current)
+	if err != nil || next == nil {
+		return false, err
+	}
+	next.ID = id
+	data, err := s.marshalProject(*next)
+	if err != nil {
+		return false, err
+	}
+	return true, s.writeProjectBytes(id, data)
+}
+
+// Delete without a tombstone. The .lock file stays on disk: unlinking it would
+// break mutual exclusion for a process already flocked to the old inode.
+func (s *Store) RemoveProject(id string) (bool, error) {
+	f, err := s.acquireProjectLock(id)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	err = os.Remove(s.projectPath(id))
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	_ = os.Remove(s.tmpPath(id))
+	s.forget(id)
+	return true, nil
 }
 
 type sampleTask struct {

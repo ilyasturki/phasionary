@@ -1,33 +1,40 @@
 package journal
 
-import "phasionary/internal/domain"
+import (
+	"os"
+
+	"phasionary/internal/domain"
+)
 
 type Recorder struct {
-	device  Device
-	journal *Journal
+	stateDir string
 }
 
-// (nil, nil) means not enrolled; an unreadable device file is an error, never
-// a silent fallback to local-only.
-func OpenIfConfigured(stateDir string) (*Recorder, error) {
-	d, ok, err := LoadDevice(stateDir)
+func NewRecorder(stateDir string) *Recorder { return &Recorder{stateDir: stateDir} }
+
+func (r *Recorder) Active() bool {
+	_, err := os.Stat(devicePath(r.stateDir))
+	return err == nil
+}
+
+// Missing device file → no-op; unreadable → error, never a silent fallback
+// to local-only.
+func (r *Recorder) append(drafts []Draft) error {
+	d, ok, err := LoadDevice(r.stateDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !ok {
-		return nil, nil
+		return nil
 	}
-	return &Recorder{device: d, journal: Open(stateDir)}, nil
+	return Open(r.stateDir).Append(d.DeviceID, drafts)
 }
 
 func (r *Recorder) RecordSave(old *domain.Project, updated domain.Project) error {
-	return r.journal.Append(r.device.DeviceID, DiffProjects(old, updated))
+	return r.append(DiffProjects(old, updated))
 }
 
 // No child tombstones: the server cascades a project delete.
 func (r *Recorder) RecordDelete(projectID string) error {
-	return r.journal.Append(r.device.DeviceID, []Draft{{
-		Kind:      KindProjectDelete,
-		ProjectID: projectID,
-	}})
+	return r.append([]Draft{{Kind: KindProjectDelete, ProjectID: projectID}})
 }
