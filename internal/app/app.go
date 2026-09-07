@@ -621,7 +621,7 @@ func (m model) renderView() string {
 
 	layout := m.buildLayout()
 	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
-	viewport.ComputeVisibility(m.ui.Screen.ScrollOffset)
+	viewport.ComputeVisibility(m.ui.Screen.TopRow)
 
 	var lines []string
 
@@ -629,13 +629,19 @@ func (m model) renderView() string {
 		lines = append(lines, ui.MutedStyle.Render(scrollMoreAbove))
 	}
 
+	// Only the first item drawn can be entered partway through; if none fit at
+	// all, the partial below is that item and inherits the offset.
+	top := viewport.RowOffset
 	for i := viewport.VisibleStart; i < viewport.VisibleEnd; i++ {
-		lines = append(lines, m.renderLayoutItem(layout.Items[i]))
+		lines = append(lines, m.renderLayoutItemWindow(layout.Items[i], top, 0))
+		top = 0
 	}
 
 	if viewport.HasMoreBelow && viewport.VisibleEnd < len(layout.Items) {
-		if partial := m.renderLayoutItemTruncated(layout.Items[viewport.VisibleEnd], viewport.RemainingContentHeight()); partial != "" {
-			lines = append(lines, partial)
+		if remaining := viewport.RemainingContentHeight(); remaining > 0 {
+			if partial := m.renderLayoutItemWindow(layout.Items[viewport.VisibleEnd], top, remaining); partial != "" {
+				lines = append(lines, partial)
+			}
 		}
 	}
 
@@ -755,19 +761,18 @@ func (m model) renderLayoutItem(item LayoutItem) string {
 	return ""
 }
 
-func (m model) renderLayoutItemTruncated(item LayoutItem, maxRows int) string {
-	if maxRows <= 0 {
+// renderLayoutItemWindow draws the item's rows from top on; maxRows <= 0 means
+// every row it has.
+func (m model) renderLayoutItemWindow(item LayoutItem, top, maxRows int) string {
+	rendered := strings.Split(m.renderLayoutItem(item), "\n")
+	if top >= len(rendered) {
 		return ""
 	}
-	full := m.renderLayoutItem(item)
-	if full == "" {
-		return ""
+	rendered = rendered[top:]
+	if maxRows > 0 {
+		rendered = rendered[:min(maxRows, len(rendered))]
 	}
-	rendered := strings.Split(full, "\n")
-	if len(rendered) <= maxRows {
-		return full
-	}
-	return strings.Join(rendered[:maxRows], "\n")
+	return strings.Join(rendered, "\n")
 }
 
 // linkDirIfUnset establishes the directory→project link only when the directory

@@ -188,7 +188,7 @@ func (m *model) confirmDeleteProject() {
 			m.applyStoredCursor()
 			// Reset first: centering is a no-op on an empty project, which would
 			// otherwise inherit the deleted project's scroll offset.
-			m.ui.Screen.ScrollOffset = 0
+			m.ui.Screen.TopRow = 0
 			m.centerOnSelected()
 		}
 	}
@@ -286,7 +286,7 @@ func (m *model) createProjectFromPicker() {
 	m.ui.History.Reset()
 	m.rebuildPositions()
 	m.ui.Selection.SetSelected(findFirstTaskIndex(m.ui.Selection.Positions()))
-	m.ui.Screen.ScrollOffset = 0
+	m.ui.Screen.TopRow = 0
 
 	m.ensureVisible()
 	m.ui.Screen.StatusMsg = fmt.Sprintf("Created project: %s", project.Name)
@@ -333,7 +333,7 @@ func (m *model) selectProject() {
 	m.applyStoredCursor()
 	// Reset first: centering is a no-op on an empty project, which would
 	// otherwise inherit the previous project's scroll offset.
-	m.ui.Screen.ScrollOffset = 0
+	m.ui.Screen.TopRow = 0
 	// Center rather than ensureVisible — reopening a project carries no
 	// information about where the view sat, so a restored row deep in the list
 	// would otherwise arrive pinned to the bottom edge.

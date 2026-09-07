@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -49,6 +50,7 @@ func (m *model) startEditing() {
 	if !ok {
 		return
 	}
+	defer m.ensureVisible()
 	switch position.Kind {
 	case selection.FocusProject:
 		m.ui.Modes.ToEdit()
@@ -185,6 +187,7 @@ func (m *model) removeNewCategory() {
 }
 
 func (m *model) handleEditKey(msg tea.KeyPressMsg) tea.Cmd {
+	defer m.ensureVisible()
 	switch msg.String() {
 	case "enter":
 		m.finishEditing()
@@ -192,11 +195,41 @@ func (m *model) handleEditKey(msg tea.KeyPressMsg) tea.Cmd {
 	case "esc":
 		m.cancelEditing()
 		return nil
+	case "up", "down":
+		// Not forwarded: bubbles' textinput binds up/down to suggestion history.
+		m.moveEditCursorRow(msg.String() == "down")
+		return nil
 	}
 	var cmd tea.Cmd
 	m.ui.Edit.input, cmd = m.ui.Edit.input.Update(msg)
 	sanitizeInput(&m.ui.Edit.input)
 	return cmd
+}
+
+// moveEditCursorRow walks the caret one wrapped row, landing on the start or
+// end of the buffer past either end.
+func (m *model) moveEditCursorRow(down bool) {
+	edit, ok := m.openEditRows()
+	if !ok {
+		return
+	}
+	target := edit.cursorRow - 1
+	if down {
+		target = edit.cursorRow + 1
+	}
+	if target < 0 {
+		m.ui.Edit.input.SetCursor(0)
+		return
+	}
+	value := m.ui.Edit.input.Value()
+	if target >= len(edit.rows) {
+		m.ui.Edit.input.SetCursor(utf8.RuneCountInString(value))
+		return
+	}
+	row := edit.rows[target]
+	runes := []rune(row.Text)
+	offset := row.Start + len(string(runes[:min(edit.cursorCol, len(runes))]))
+	m.ui.Edit.input.SetCursor(utf8.RuneCountInString(value[:min(offset, len(value))]))
 }
 
 func (m *model) finishEditing() {
@@ -312,6 +345,7 @@ func (m model) forwardToInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.ui.Edit.input, cmd = m.ui.Edit.input.Update(msg)
 		sanitizeInput(&m.ui.Edit.input)
+		m.ensureVisible()
 		return m, cmd
 	}
 	if m.ui.Modes.IsSearch() {

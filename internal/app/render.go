@@ -58,18 +58,9 @@ func renderProjectLine(name string, selected, focused, filtered, visualMode bool
 }
 
 func (m model) renderEditProjectLine() string {
-	prefix := "> "
-	icon := "■ "
+	prefix := "> " + ui.HeaderStyle.Render("■ ")
 	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
-	return renderCursorLine(
-		m.ui.Edit.input.Value(),
-		m.ui.Edit.input.Position(),
-		m.ui.Screen.Width,
-		ansi.StringWidth(prefix+icon),
-		prefix+ui.HeaderStyle.Render(icon),
-		ui.HeaderStyle,
-		cursorStyle,
-	)
+	return renderEditRows(m.editRows(projectPrefixWidth), projectPrefixWidth, prefix, ui.HeaderStyle, cursorStyle)
 }
 
 func renderCategoryLine(name string, estimateMinutes int, aggregateStatus string, selected bool, folded bool, width int, focused bool, visualMode bool, isCursor bool, cut bool, searchQuery string, searchMatch lipgloss.Style) string {
@@ -250,7 +241,7 @@ func (m model) renderEditCategoryLine() string {
 		styledText := cursorStyle.Render(" ") + placeholder
 		return prefixLine(styledText, m.ui.Screen.Width, prefixWidth, prefix)
 	}
-	return renderCursorLine(m.ui.Edit.input.Value(), m.ui.Edit.input.Position(), m.ui.Screen.Width, prefixWidth, prefix, ui.CategoryStyle, cursorStyle)
+	return renderEditRows(m.editRows(prefixWidth), prefixWidth, prefix, ui.CategoryStyle, cursorStyle)
 }
 
 func (m model) renderEditTaskLine(task domain.Task) string {
@@ -261,10 +252,8 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 	iconStyle := ui.PriorityIconStyle(task.Priority, cfg.PriorityColor)
 	icon := ui.PriorityIcon(task.Priority)
 	iconPrefix := ""
-	iconPlain := ""
 	if icon != "" {
 		iconPrefix = iconStyle.Render(icon) + " "
-		iconPlain = icon + " "
 	}
 	dotPrefix := ""
 	dotPlain := ui.TagSegmentText(task.TagColor, task.TagLabel)
@@ -273,18 +262,14 @@ func (m model) renderEditTaskLine(task domain.Task) string {
 		dotPrefix = dotStyle.Render(dotPlain)
 	}
 	prefixPart := fmt.Sprintf("%s[%s] %s%s", prefix, statusText, dotPrefix, iconPrefix)
-	overhead := ansi.StringWidth(prefix + "[" + statusLabel(task.Status, cfg.StatusDisplay) + "] " + dotPlain + iconPlain)
+	overhead := taskTitleColumn(task, cfg.StatusDisplay)
 	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
 	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
 		placeholder := ui.MutedStyle.Render("Enter task title...")
 		styledText := cursorStyle.Render(" ") + placeholder
 		return prefixLine(styledText, m.ui.Screen.Width, overhead, prefixPart)
 	}
-	edited := m.ui.Edit.input.Value()
-	if edited == "" {
-		edited = " "
-	}
-	return renderCursorLine(edited, m.ui.Edit.input.Position(), m.ui.Screen.Width, overhead, prefixPart, titleStyle, cursorStyle)
+	return renderEditRows(m.editRows(overhead), overhead, prefixPart, titleStyle, cursorStyle)
 }
 
 // separatorRule is the heavy box-drawing glyph the divider is built from.
@@ -292,6 +277,12 @@ const separatorRule = "━"
 
 // separatorLead is the short rule that precedes a labeled separator's text.
 const separatorLead = separatorRule + separatorRule
+
+// Columns left of the edited text: "> ■ " and "> ━━ ".
+const (
+	projectPrefixWidth   = 4
+	separatorPrefixWidth = 5
+)
 
 // sepContentCap caps the divider to the content column so it stops short of the
 // empty right side of the screen instead of spanning the whole terminal.
@@ -381,17 +372,15 @@ func (m model) renderSeparatorLine(label string, selected, focused, visualMode, 
 // renderEditSeparatorLine draws the inline editor for a separator's label,
 // entered with Enter. An empty value shows a placeholder rather than a rule.
 func (m model) renderEditSeparatorLine() string {
-	prefix := "> " + separatorLead + " "
-	styledPrefix := ui.SeparatorStyle.Render(prefix)
-	overhead := ansi.StringWidth(prefix)
+	styledPrefix := ui.SeparatorStyle.Render("> " + separatorLead + " ")
 	cursorStyle := ui.GetCursorStyle(m.ui.Screen.WindowFocused)
 
 	if m.ui.Edit.input.Value() == "" {
 		placeholder := ui.MutedStyle.Render("Enter separator label...")
 		styledText := cursorStyle.Render(" ") + placeholder
-		return prefixLine(styledText, m.ui.Screen.Width, overhead, styledPrefix)
+		return prefixLine(styledText, m.ui.Screen.Width, separatorPrefixWidth, styledPrefix)
 	}
-	return renderCursorLine(m.ui.Edit.input.Value(), m.ui.Edit.input.Position(), m.ui.Screen.Width, overhead, styledPrefix, ui.HeaderStyle, cursorStyle)
+	return renderEditRows(m.editRows(separatorPrefixWidth), separatorPrefixWidth, styledPrefix, ui.HeaderStyle, cursorStyle)
 }
 
 func (m model) statusText() string {

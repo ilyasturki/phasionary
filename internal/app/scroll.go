@@ -8,26 +8,17 @@ const wheelScrollStep = 1
 const wheelScrollDivisor = 4
 
 func (m *model) scrollUp(amount int) {
-	if m.ui.Screen.ScrollOffset <= 0 {
-		m.ui.Screen.ScrollOffset = 0
-		return
-	}
-	m.ui.Screen.ScrollOffset -= amount
-	if m.ui.Screen.ScrollOffset < 0 {
-		m.ui.Screen.ScrollOffset = 0
-	}
+	m.ui.Screen.TopRow = max(m.ui.Screen.TopRow-amount, 0)
 }
 
 func (m *model) scrollDown(amount int) {
 	layout := m.buildLayout()
 	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
-	for i := 0; i < amount; i++ {
-		viewport.ComputeVisibility(m.ui.Screen.ScrollOffset)
-		if !viewport.HasMoreBelow {
-			return
-		}
-		m.ui.Screen.ScrollOffset++
+	viewport.ComputeVisibility(m.ui.Screen.TopRow)
+	if !viewport.HasMoreBelow {
+		return
 	}
+	m.ui.Screen.TopRow = min(m.ui.Screen.TopRow+amount, max(layout.TotalHeight-viewport.windowAt(m.ui.Screen.TopRow), 0))
 }
 
 func (m model) availableHeight() int {
@@ -40,39 +31,50 @@ func (m model) availableHeight() int {
 
 func (m *model) ensureVisible() {
 	if m.ui.Selection.IsEmpty() || m.selected() < 0 {
-		m.ui.Screen.ScrollOffset = 0
+		m.ui.Screen.TopRow = 0
 		return
 	}
-
 	layout := m.buildLayout()
 	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
-	viewport.ScrollOffset = m.ui.Screen.ScrollOffset
-	m.ui.Screen.ScrollOffset = viewport.EnsureVisible(m.selected())
+	viewport.ComputeVisibility(m.ui.Screen.TopRow)
+
+	start, end, ok := layout.rowRange(m.selected())
+	if !ok {
+		return
+	}
+	// An open editor follows its caret instead: a buffer taller than the screen
+	// is never whole on it, so pinning the whole row would drag the block around
+	// under a caret that only moved a row.
+	if el, editing := m.openEditRows(); editing {
+		start += min(el.cursorRow, end-start-1)
+		end = start + 1
+	}
+	m.ui.Screen.TopRow = viewport.ShowRows(start, end)
 }
 
 func (m *model) centerOnSelected() {
 	if m.ui.Selection.IsEmpty() || m.selected() < 0 {
 		return
 	}
-
 	layout := m.buildLayout()
 	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
-	m.ui.Screen.ScrollOffset = viewport.CenterOnPosition(m.selected())
+	m.ui.Screen.TopRow = viewport.CenterOnPosition(m.selected())
 }
 
 func (m *model) topOnSelected() {
 	if m.ui.Selection.IsEmpty() || m.selected() < 0 {
 		return
 	}
-	m.ui.Screen.ScrollOffset = m.selected()
+	if start, _, ok := m.buildLayout().rowRange(m.selected()); ok {
+		m.ui.Screen.TopRow = start
+	}
 }
 
 func (m *model) bottomOnSelected() {
 	if m.ui.Selection.IsEmpty() || m.selected() < 0 {
 		return
 	}
-
 	layout := m.buildLayout()
 	viewport := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
-	m.ui.Screen.ScrollOffset = viewport.BottomOnPosition(m.selected())
+	m.ui.Screen.TopRow = viewport.BottomOnPosition(m.selected())
 }

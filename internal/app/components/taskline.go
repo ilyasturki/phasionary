@@ -259,7 +259,8 @@ func (r *TaskLineRenderer) renderUnselected(task domain.Task, prefix, priorityIc
 		return prefixPart + leading + r.highlightLine(task.Title, titleStyle) + suffix
 	}
 
-	return r.wrapTaskContentWithSuffix(task.Title, prefixPart, leading, leadingWidth, titleStyle, suffix, suffixText)
+	overhead := ansi.StringWidth(prefixPart)
+	return r.wrapContentWithSuffix(task.Title, prefixPart, leading, strings.Repeat(" ", overhead), overhead, leadingWidth, titleStyle, suffix, suffixText)
 }
 
 // tagSegment renders the leading tag (a colored dot plus its optional label and
@@ -335,56 +336,27 @@ func (r *TaskLineRenderer) renderSelected(task domain.Task, prefix, priorityIcon
 	}
 
 	overhead := ansi.StringWidth(prefix + "[" + statusText + "] ")
-	return r.wrapSelectedContentWithSuffix(task.Title, prefixPart, leading, leadingWidth, overhead, priorityStyle, suffix, suffixText)
+	indent := r.selectedStyle().Render(strings.Repeat(" ", overhead))
+	return r.wrapContentWithSuffix(task.Title, prefixPart, leading, indent, overhead, leadingWidth, priorityStyle, suffix, suffixText)
 }
 
-func (r *TaskLineRenderer) wrapTaskContentWithSuffix(title, prefixPart, leading string, leadingWidth int, titleStyle lipgloss.Style, suffix, suffixText string) string {
-	overhead := ansi.StringWidth(prefixPart)
-	suffixWidth := ansi.StringWidth(suffixText)
-	available := safeWidth(r.width, overhead+leadingWidth+suffixWidth)
+// wrapContentWithSuffix lays title out behind prefixPart, continuation rows
+// behind indent, with suffix on the last row.
+func (r *TaskLineRenderer) wrapContentWithSuffix(title, prefixPart, leading, indent string, overhead, leadingWidth int, titleStyle lipgloss.Style, suffix, suffixText string) string {
+	available := safeWidth(r.width, overhead+leadingWidth+ansi.StringWidth(suffixText))
 	wrapLines := r.clampTitle(title, available)
-	indent := strings.Repeat(" ", overhead)
 	last := len(wrapLines) - 1
 
-	var result []string
+	result := make([]string, len(wrapLines))
 	for i, line := range wrapLines {
-		styledLine := r.highlightLine(line, titleStyle)
-		var rendered string
+		rendered := indent + r.highlightLine(line, titleStyle)
 		if i == 0 {
-			rendered = prefixPart + leading + styledLine
-		} else {
-			rendered = indent + styledLine
+			rendered = prefixPart + leading + r.highlightLine(line, titleStyle)
 		}
 		if i == last {
 			rendered += suffix
 		}
-		result = append(result, rendered)
-	}
-	return strings.Join(result, "\n")
-}
-
-func (r *TaskLineRenderer) wrapSelectedContentWithSuffix(title, prefixPart, leading string, leadingWidth, overhead int, titleStyle lipgloss.Style, suffix, suffixText string) string {
-	suffixWidth := ansi.StringWidth(suffixText)
-	available := safeWidth(r.width, overhead+leadingWidth+suffixWidth)
-	wrapLines := r.clampTitle(title, available)
-	indent := strings.Repeat(" ", overhead)
-	selectedStyle := r.selectedStyle()
-	last := len(wrapLines) - 1
-
-	var result []string
-	for i, line := range wrapLines {
-		styledTitle := r.highlightLine(line, titleStyle)
-		var rendered string
-		if i == 0 {
-			rendered = prefixPart + leading + styledTitle
-		} else {
-			styledIndent := selectedStyle.Render(indent)
-			rendered = styledIndent + styledTitle
-		}
-		if i == last {
-			rendered += suffix
-		}
-		result = append(result, rendered)
+		result[i] = rendered
 	}
 	return strings.Join(result, "\n")
 }

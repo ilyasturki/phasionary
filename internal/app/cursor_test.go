@@ -254,7 +254,7 @@ func rowsAboveSelected(t *testing.T, m *model) int {
 	t.Helper()
 	layout := m.buildLayout()
 	vp := NewViewport(layout, m.ui.Screen.Height, m.layoutConfig())
-	vp.ComputeVisibility(m.ui.Screen.ScrollOffset)
+	vp.ComputeVisibility(m.ui.Screen.TopRow)
 	rows := 0
 	for i := vp.VisibleStart; i < vp.VisibleEnd; i++ {
 		if layout.Items[i].PositionIndex == m.selected() {
@@ -262,7 +262,7 @@ func rowsAboveSelected(t *testing.T, m *model) int {
 		}
 		rows += layout.Items[i].Height
 	}
-	t.Fatalf("cursor is not visible at scroll offset %d", m.ui.Screen.ScrollOffset)
+	t.Fatalf("cursor is not visible at scroll offset %d", m.ui.Screen.TopRow)
 	return -1
 }
 
@@ -304,13 +304,13 @@ func TestLaterWindowSize_DoesNotRecenter(t *testing.T) {
 	// off-center — a position centering would move and ensureVisible would not.
 	selectTask(t, m, "t30")
 	m.centerOnSelected()
-	offCenter := m.ui.Screen.ScrollOffset + 3
-	m.ui.Screen.ScrollOffset = offCenter
+	offCenter := m.ui.Screen.TopRow + 3
+	m.ui.Screen.TopRow = offCenter
 	require.NotEqual(t, -1, rowsAboveSelected(t, m), "cursor must still be visible for this test to mean anything")
 
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	assert.Equal(t, offCenter, m.ui.Screen.ScrollOffset,
+	assert.Equal(t, offCenter, m.ui.Screen.TopRow,
 		"a resize must not re-center a view the user is already looking at")
 }
 

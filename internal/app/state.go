@@ -5,6 +5,7 @@ import (
 
 	"phasionary/internal/app/selection"
 	"phasionary/internal/domain"
+	"phasionary/internal/ui"
 )
 
 var filterStatuses = []string{
@@ -403,6 +404,23 @@ type EditState struct {
 	isAdding  bool
 	newItemID string
 	itemType  selection.FocusKind
+	wrap      editWrapCache
+}
+
+type editWrapCache struct {
+	value     string
+	available int
+	rows      []ui.LineSpan
+}
+
+// wrapFor reuses the last wrap: a keystroke lays the buffer out several times
+// over, and an editor's wrap is linear in the buffer.
+func (e *EditState) wrapFor(value string, available int) []ui.LineSpan {
+	if c := e.wrap; c.rows != nil && c.available == available && c.value == value {
+		return c.rows
+	}
+	e.wrap = editWrapCache{value: value, available: available, rows: ui.WrapSpans(value, available)}
+	return e.wrap.rows
 }
 
 func (e *EditState) reset() {
@@ -410,12 +428,13 @@ func (e *EditState) reset() {
 	e.isAdding = false
 	e.newItemID = ""
 	e.itemType = selection.FocusProject
+	e.wrap = editWrapCache{}
 }
 
 func newEditState(value string, isAdding bool, newID string, kind selection.FocusKind) EditState {
 	ti := textinput.New()
-	// No CharLimit: a title may be any length. The row it renders into is what
-	// stays bounded (see renderCursorLine and ui.WrapClamped), not the buffer.
+	// No CharLimit: a title may be any length; the row it renders into is what
+	// stays bounded.
 	ti.SetValue(value)
 	ti.SetCursor(len([]rune(value)))
 	ti.Focus()

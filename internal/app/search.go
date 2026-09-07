@@ -49,7 +49,7 @@ func (m *model) startSearch() tea.Cmd {
 	m.ui.Search = SearchState{
 		input:          ti,
 		originSelected: m.selected(),
-		originScroll:   m.ui.Screen.ScrollOffset,
+		originScroll:   m.ui.Screen.TopRow,
 		originFolded:   m.ui.Fold.FoldedIDs(),
 	}
 	m.ui.Modes.ToSearch()
@@ -81,7 +81,7 @@ func (m model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m *model) restoreSearchOrigin() {
 	m.restoreFolds(m.ui.Search.originFolded)
 	m.ui.Selection.SetSelected(m.ui.Search.originSelected)
-	m.ui.Screen.ScrollOffset = m.ui.Search.originScroll
+	m.ui.Screen.TopRow = m.ui.Search.originScroll
 }
 
 // previewSearch is the incremental step: reset to the pre-search view, then jump

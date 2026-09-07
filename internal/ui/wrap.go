@@ -131,3 +131,44 @@ func snapToWord(s string, i, span int) int {
 	}
 	return i
 }
+
+type LineSpan struct {
+	Text  string
+	Start int // byte offset into the source
+}
+
+// WrapSpans wraps text to width columns and returns every row it takes, with no
+// row cap. ansi.Wrap eats the whitespace it breaks on, so the rows do not
+// concatenate back to text and each carries where it starts instead.
+func WrapSpans(text string, width int) []LineSpan {
+	width = max(width, 1)
+	lines := strings.Split(ansi.Wrap(text, width, ""), "\n")
+	spans := make([]LineSpan, 0, len(lines))
+	pos := 0
+	for _, line := range lines {
+		spans = appendSplit(spans, LineSpan{Text: line, Start: pos}, width)
+		pos += len(line)
+		for pos < len(text) && strings.ContainsRune(" \t\r\n", rune(text[pos])) {
+			pos++
+		}
+	}
+	return spans
+}
+
+// appendSplit adds span, cut into rows that fit width: ansi.Wrap can leave an
+// over-wide run of spaces on one row.
+func appendSplit(spans []LineSpan, span LineSpan, width int) []LineSpan {
+	if ansi.StringWidth(span.Text) <= width {
+		return append(spans, span)
+	}
+	start, w := 0, 0
+	for i, r := range span.Text {
+		rw := ansi.StringWidth(string(r))
+		if w+rw > width {
+			spans = append(spans, LineSpan{Text: span.Text[start:i], Start: span.Start + start})
+			start, w = i, 0
+		}
+		w += rw
+	}
+	return append(spans, LineSpan{Text: span.Text[start:], Start: span.Start + start})
+}

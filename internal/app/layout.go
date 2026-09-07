@@ -63,6 +63,9 @@ type LayoutBuilder struct {
 	// other description row is capped to its preview height.
 	cursorCat  int
 	cursorTask int
+	// editHeight of 0 means no editor is open on editPos.
+	editPos    int
+	editHeight int
 }
 
 func NewLayoutBuilder(config LayoutConfig, width int, statusDisplay string, filter *FilterState, fold *FoldState) *LayoutBuilder {
@@ -88,13 +91,26 @@ func (b *LayoutBuilder) WithCursorDescription(catIdx, taskIdx int) *LayoutBuilde
 	return b
 }
 
+func (b *LayoutBuilder) WithEditOverlay(posIndex, height int) *LayoutBuilder {
+	b.editPos, b.editHeight = posIndex, height
+	return b
+}
+
+// rowHeight is fallback unless an editor is open on posIndex, whose live buffer
+// sizes the row instead.
+func (b *LayoutBuilder) rowHeight(posIndex, fallback int) int {
+	if b.editHeight == 0 || b.editPos != posIndex {
+		return fallback
+	}
+	return b.editHeight
+}
+
 func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Position) Layout {
 	var items []LayoutItem
 	totalHeight := 0
 	posIndex := 0
 
-	// Project line (first focusable item)
-	projectHeight := 1 // Project line doesn't wrap
+	projectHeight := b.rowHeight(posIndex, 1)
 	items = append(items, LayoutItem{
 		Kind:          LayoutProject,
 		Height:        projectHeight,
@@ -135,7 +151,7 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Posi
 		if category.AggregateStatus() != "" {
 			catSuffixWidth += 4 // " [x]"
 		}
-		catHeight := countWrappedLines(category.Name, b.width, prefixWidth+2+catSuffixWidth)
+		catHeight := b.rowHeight(posIndex, countWrappedLines(category.Name, b.width, prefixWidth+2+catSuffixWidth))
 		items = append(items, LayoutItem{
 			Kind:          LayoutCategory,
 			Height:        catHeight,
@@ -197,18 +213,19 @@ func (b *LayoutBuilder) Build(project domain.Project, positions []selection.Posi
 				continue
 			}
 			if task.IsSeparator() {
+				sepHeight := b.rowHeight(posIndex, 1)
 				items = append(items, LayoutItem{
 					Kind:          LayoutSeparator,
-					Height:        1,
+					Height:        sepHeight,
 					PositionIndex: posIndex,
 					CategoryIndex: catIdx,
 					TaskIndex:     taskIdx,
 				})
-				totalHeight++
+				totalHeight += sepHeight
 				posIndex++
 				continue
 			}
-			taskHeight := b.countTaskLines(task)
+			taskHeight := b.rowHeight(posIndex, b.countTaskLines(task))
 			items = append(items, LayoutItem{
 				Kind:          LayoutTask,
 				Height:        taskHeight,
@@ -262,14 +279,44 @@ func (m *model) buildLayout() *Layout {
 	if pos, ok := m.selectedPosition(); ok && pos.Kind == selection.FocusDescription {
 		cursorCat, cursorTask = pos.CategoryIndex, pos.TaskIndex
 	}
+	editPos, editHeight := m.editOverlay()
 	c := m.ui.layout
-	if c.layout != nil && c.width == w && c.cursorCat == cursorCat && c.cursorTask == cursorTask {
+	if c.layout != nil && c.width == w && c.cursorCat == cursorCat && c.cursorTask == cursorTask &&
+		c.editPos == editPos && c.editHeight == editHeight {
 		return c.layout
 	}
 	builder := NewLayoutBuilder(m.layoutConfig(), w, m.deps.CfgManager.Get().StatusDisplay, &m.ui.Filter, &m.ui.Fold).
 		WithExpandedDescriptions(m.ui.Screen.ExpandDescriptions).
-		WithCursorDescription(cursorCat, cursorTask)
+		WithCursorDescription(cursorCat, cursorTask).
+		WithEditOverlay(editPos, editHeight)
 	layout := builder.Build(m.project, m.positions())
-	m.ui.layout = layoutCache{width: w, cursorCat: cursorCat, cursorTask: cursorTask, layout: &layout}
+	m.ui.layout = layoutCache{width: w, cursorCat: cursorCat, cursorTask: cursorTask, editPos: editPos, editHeight: editHeight, layout: &layout}
 	return &layout
+}
+
+// editOverlay is the row an editor is open on and the rows its live buffer
+// needs, or -1, 0 when no editor is open.
+func (m *model) editOverlay() (int, int) {
+	if m.ui.Edit.isAdding && m.ui.Edit.input.Value() == "" {
+		return -1, 0 // the placeholder is one row, whatever the field
+	}
+	el, ok := m.openEditRows()
+	if !ok {
+		return -1, 0
+	}
+	return m.selected(), len(el.rows)
+}
+
+// editOverhead is the width left of the edited text for the field at pos.
+func (m *model) editOverhead(pos selection.Position) int {
+	switch pos.Kind {
+	case selection.FocusTask:
+		task := m.project.Categories[pos.CategoryIndex].Tasks[pos.TaskIndex]
+		return taskTitleColumn(task, m.deps.CfgManager.Get().StatusDisplay)
+	case selection.FocusProject:
+		return projectPrefixWidth
+	case selection.FocusSeparator:
+		return separatorPrefixWidth
+	}
+	return prefixWidth
 }

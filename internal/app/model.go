@@ -56,9 +56,11 @@ type TagClipboard struct {
 }
 
 type Screen struct {
-	Width              int
-	Height             int
-	ScrollOffset       int
+	Width  int
+	Height int
+	// TopRow counts the layout's rows, not its items: an edited title wraps to
+	// as many rows as it takes, so an item can outgrow the screen.
+	TopRow             int
 	StatusMsg          string
 	PendingKey         rune
 	WindowFocused      bool
@@ -158,6 +160,8 @@ type layoutCache struct {
 	width      int
 	cursorCat  int
 	cursorTask int
+	editPos    int
+	editHeight int
 	layout     *Layout
 }
 

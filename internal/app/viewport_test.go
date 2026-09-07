@@ -325,3 +325,67 @@ func TestLayoutBuilder_ExpandedDescriptions_AddsSeparateRow(t *testing.T) {
 	}
 	assert.Equal(t, baseA, expA, "task row height should not change when expanding descriptions")
 }
+
+// tallItemLayout is a 1-row project, an item of tallHeight rows, then two 1-row
+// items — hand-built so these tests are about the viewport's row arithmetic
+// rather than about what wraps to what.
+func tallItemLayout(tallHeight int) *Layout {
+	items := []LayoutItem{
+		{Kind: LayoutProject, Height: 1, PositionIndex: 0, CategoryIndex: -1, TaskIndex: -1},
+		{Kind: LayoutTask, Height: tallHeight, PositionIndex: 1, CategoryIndex: 0, TaskIndex: 0},
+		{Kind: LayoutTask, Height: 1, PositionIndex: 2, CategoryIndex: 0, TaskIndex: 1},
+		{Kind: LayoutTask, Height: 1, PositionIndex: 3, CategoryIndex: 0, TaskIndex: 2},
+	}
+	total := 0
+	for _, item := range items {
+		total += item.Height
+	}
+	return &Layout{Items: items, TotalHeight: total}
+}
+
+func TestComputeVisibility_EntersATallItem(t *testing.T) {
+	layout := tallItemLayout(50)
+
+	// 24 rows less the footer is 23, less a row for each scroll indicator is 21.
+	// 40 of the item's rows remain, so its tail alone fills them.
+	deep := NewViewport(layout, 24, LayoutConfig{FooterHeight: 1})
+	deep.ComputeVisibility(11)
+	require.Equal(t, 1, deep.VisibleStart, "the tall item is what the view starts on")
+	assert.Equal(t, 10, deep.RowOffset, "the offset within the item is what is left of the top row")
+	assert.True(t, deep.HasMoreAbove, "rows scrolled off the top are elided above")
+	assert.True(t, deep.HasMoreBelow, "40 rows remain and only 21 fit")
+	assert.Equal(t, 1, deep.VisibleEnd, "the item doesn't fit whole, so it is drawn as a partial")
+	assert.Equal(t, 21, deep.RemainingContentHeight(), "every content row goes to it")
+
+	// Far enough into the item and its tail leaves room for what follows.
+	tail := NewViewport(layout, 24, LayoutConfig{FooterHeight: 1})
+	tail.ComputeVisibility(31)
+	assert.False(t, tail.HasMoreBelow, "20 remaining rows plus the two items below fit in 22")
+	assert.Equal(t, len(layout.Items), tail.VisibleEnd, "the items below the tall one are drawn too")
+}
+
+func TestComputeVisibility_ClampsPastTheLastRow(t *testing.T) {
+	layout := tallItemLayout(3)
+	viewport := NewViewport(layout, 24, LayoutConfig{FooterHeight: 1})
+	viewport.ComputeVisibility(99)
+
+	assert.Equal(t, layout.TotalHeight-1, viewport.TopRow, "a top row past the end leaves the last row on screen")
+	assert.Equal(t, len(layout.Items), viewport.VisibleEnd)
+	assert.False(t, viewport.HasMoreBelow)
+}
+
+func TestScroll_StepsByRowThroughATallItem(t *testing.T) {
+	m := editingModel(t, 80, 24, longWords(4000))
+
+	// Park the view on the item's first row, then walk down into it.
+	start, _, ok := m.buildLayout().rowRange(m.selected())
+	require.True(t, ok)
+	m.ui.Screen.TopRow = start
+	m.scrollDown(5)
+	assert.Equal(t, start+5, m.ui.Screen.TopRow, "each step reveals one more row of it")
+
+	m.scrollUp(2)
+	assert.Equal(t, start+3, m.ui.Screen.TopRow, "scrolling back walks the same rows")
+	m.scrollUp(10)
+	assert.Less(t, m.ui.Screen.TopRow, start, "past the item's first row the view moves on")
+}

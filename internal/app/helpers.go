@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
@@ -120,8 +121,7 @@ func safeWidth(totalWidth, overhead int) int {
 }
 
 // prefixLine renders already-styled text on a single row behind prefix,
-// truncating rather than wrapping. Edit rows are sized by the layout as one row
-// (see renderCursorLine), so their placeholders have to stay on one too.
+// truncating rather than wrapping: an editor's placeholder is always one row.
 func prefixLine(text string, width, overhead int, prefix string) string {
 	if width <= 0 {
 		return prefix + text
@@ -160,61 +160,92 @@ func splitAtCursor(text string, cursor int) cursorSplit {
 	return cursorSplit{left: left, cursorCh: cursorCh, right: right}
 }
 
-// renderCursorLine draws an inline editor as exactly one row: a horizontal
-// window onto the buffer, positioned to keep the cursor visible, with an
-// ellipsis at either end marking text scrolled out of view.
-//
-// It stays one row on purpose. The layout sizes an edited row from the *stored*
-// value, so a growing buffer that wrapped would push the rest of the screen —
-// and the bottom bar — off the terminal as the user typed. A window can't: it is
-// always exactly as tall as the row the layout reserved, whatever gets typed.
-func renderCursorLine(text string, cursor int, width, overhead int, prefix string, textStyle, cursorStyle lipgloss.Style) string {
-	if width <= 0 {
-		split := splitAtCursor(text, cursor)
-		return prefix + textStyle.Render(split.left) + cursorStyle.Render(split.cursorCh) + textStyle.Render(split.right)
-	}
-	runes := []rune(text)
-	pos := min(max(cursor, 0), len(runes))
-
-	// The cursor needs a cell of its own past the last rune when it sits at the
-	// end of the buffer, so the window is measured over that virtual cell too.
-	span := len(runes)
-	if pos == span {
-		span++
-	}
-	available := safeWidth(width, overhead)
-	// An ellipsis costs a cell at whichever end it appears. Reserving both ends
-	// whenever the buffer overflows leaves at most one column unused, which a
-	// left-aligned row doesn't show, and spares the render a fixpoint.
-	content := available
-	if span > available {
-		content = max(available-2, 1)
-	}
-	start, end := cursorWindow(span, pos, content)
-	end = min(end, len(runes))
-
-	line := prefix
-	if start > 0 {
-		line += textStyle.Render(ui.Ellipsis)
-	}
-	cursorCh, right := " ", ""
-	if pos < end {
-		cursorCh = string(runes[pos])
-		right = string(runes[pos+1 : end])
-	}
-	line += textStyle.Render(string(runes[start:pos])) + cursorStyle.Render(cursorCh) + textStyle.Render(right)
-	if end < len(runes) {
-		line += textStyle.Render(ui.Ellipsis)
-	}
-	return line
+// rows can hold one row more than the wrap: a caret past the end of a full row
+// would make it one column too wide, which the terminal soft-wraps.
+type editLayout struct {
+	rows      []ui.LineSpan
+	cursorRow int
+	cursorCol int // rune index into rows[cursorRow].Text
 }
 
-// cursorWindow returns the [start, end) rune window of the given width that
-// contains pos, sliding only as far as it must to keep the cursor in view.
-func cursorWindow(span, pos, width int) (int, int) {
-	if span <= width {
-		return 0, span
+func layoutEdit(text string, cursor, available int) editLayout {
+	available = max(available, 1)
+	return locateEditCursor(text, ui.WrapSpans(text, available), cursor, available)
+}
+
+// locateEditCursor places cursor, a rune index into text, on rows.
+func locateEditCursor(text string, rows []ui.LineSpan, cursor, available int) editLayout {
+	offset := len(text)
+	for i, n := 0, 0; i < len(text); n++ {
+		if n == cursor {
+			offset = i
+			break
+		}
+		_, size := utf8.DecodeRuneInString(text[i:])
+		i += size
 	}
-	start := min(max(pos-width+1, 0), span-width)
-	return start, start + width
+	if cursor <= 0 {
+		offset = 0
+	}
+
+	row := 0
+	for i, span := range rows {
+		if span.Start > offset {
+			break
+		}
+		row = i
+	}
+	col := min(offset-rows[row].Start, len(rows[row].Text))
+	if col == len(rows[row].Text) && ansi.StringWidth(rows[row].Text) >= available {
+		row++
+		col = 0
+		if row == len(rows) {
+			// Capped so the phantom row can't land in a cached row slice's
+			// spare capacity.
+			rows = append(rows[:len(rows):len(rows)], ui.LineSpan{Start: len(text)})
+		}
+	}
+	return editLayout{
+		rows:      rows,
+		cursorRow: row,
+		cursorCol: utf8.RuneCountInString(rows[row].Text[:col]),
+	}
+}
+
+func (m *model) editRows(overhead int) editLayout {
+	available := safeWidth(m.ui.Screen.Width, overhead)
+	value := m.ui.Edit.input.Value()
+	return locateEditCursor(value, m.ui.Edit.wrapFor(value, available), m.ui.Edit.input.Position(), available)
+}
+
+func (m *model) openEditRows() (editLayout, bool) {
+	if !m.ui.Modes.IsEdit() {
+		return editLayout{}, false
+	}
+	pos, ok := m.selectedPosition()
+	if !ok {
+		return editLayout{}, false
+	}
+	return m.editRows(m.editOverhead(pos)), true
+}
+
+func renderEditRows(el editLayout, overhead int, prefix string, textStyle, cursorStyle lipgloss.Style) string {
+	indent := strings.Repeat(" ", overhead)
+
+	lines := make([]string, len(el.rows))
+	for i, span := range el.rows {
+		var body string
+		if i == el.cursorRow {
+			split := splitAtCursor(span.Text, el.cursorCol)
+			body = textStyle.Render(split.left) + cursorStyle.Render(split.cursorCh) + textStyle.Render(split.right)
+		} else {
+			body = textStyle.Render(span.Text)
+		}
+		if i == 0 {
+			lines[i] = prefix + body
+			continue
+		}
+		lines[i] = indent + body
+	}
+	return strings.Join(lines, "\n")
 }

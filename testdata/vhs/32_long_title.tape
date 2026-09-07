@@ -8,8 +8,8 @@ Env PHASIONARY_CONFIG_PATH "/tmp/phas-vt/cfg"
 
 # Titles have no length limit. This tape covers what bounds one instead: the
 # list clamps the row to ui.MaxLineRows, a search moves that window onto the
-# match, the inline editor windows onto the cursor, and the info dialog scrolls
-# so the whole title stays readable somewhere.
+# match, and the info dialog scrolls so the whole title stays readable
+# somewhere. The inline editor is 38_multiline_title_edit.
 Hide
 Type `clear && ./phasionary task add "$(for i in $(seq 1 150); do printf 'w%03d ' $i; done)END" -C Ergonomy -q`
 Enter
@@ -49,26 +49,6 @@ Screenshot "/tmp/phas-vt/vhs-out/32_long_title_info_bottom.png"
 
 Type "q"
 Sleep 600ms
-
-# The inline editor stays one row, windowed onto the cursor at the end.
-Enter
-Sleep 1500ms
-Screenshot "/tmp/phas-vt/vhs-out/32_long_title_edit_end.png"
-
-# A no-op keystroke: the cursor is already at the end, so the row redraws
-# unchanged. VHS writes a queued screenshot on the next rendered frame, and a
-# still screen produces none — without this the capture above would land on the
-# frame Ctrl+A draws instead.
-Right
-Sleep 400ms
-
-Ctrl+A
-Sleep 900ms
-Screenshot "/tmp/phas-vt/vhs-out/32_long_title_edit_start.png"
-
-Sleep 500ms
-Escape
-Sleep 400ms
 
 Hide
 Type "q"

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,4 +109,42 @@ func TestFirstMatchIndex(t *testing.T) {
 		assert.Equal(t, -1, FirstMatchIndex("abc", ""))
 		assert.Equal(t, -1, FirstMatchIndex("ab", "abc"))
 	})
+}
+
+func TestWrapSpans(t *testing.T) {
+	texts := []string{
+		"one two three four",
+		"aa  bb  cc",
+		"abcdefghij",
+		"ab ",
+		"a  b",
+		"héllo wörld",
+		"  leading",
+		"trailing   ",
+		"a\nb",
+		"one\n\ntwo three",
+		"",
+		words(400),
+	}
+	for _, text := range texts {
+		for _, width := range []int{1, 2, 4, 10, 31} {
+			spans := WrapSpans(text, width)
+			require.NotEmpty(t, spans, "%q w=%d", text, width)
+			assert.Equal(t, 0, spans[0].Start, "%q w=%d: the first row starts the text", text, width)
+			for i, span := range spans {
+				require.LessOrEqual(t, span.Start+len(span.Text), len(text), "%q w=%d row=%d", text, width, i)
+				assert.Equal(t, span.Text, text[span.Start:span.Start+len(span.Text)],
+					"%q w=%d row=%d: rows must be substrings at their offset", text, width, i)
+				assert.LessOrEqual(t, ansi.StringWidth(span.Text), width, "%q w=%d row=%d: a row must fit", text, width, i)
+				if i+1 < len(spans) {
+					gap := text[span.Start+len(span.Text) : spans[i+1].Start]
+					assert.Empty(t, strings.Trim(gap, " \t\r\n"),
+						"%q w=%d row=%d: only swallowed whitespace may sit between rows", text, width, i)
+				}
+			}
+		}
+	}
+	// The clamped wrap caps rows on purpose; this one must not, or an editor
+	// would silently lose the tail of its buffer.
+	assert.Greater(t, len(WrapSpans(words(400), 20)), MaxLineRows)
 }
