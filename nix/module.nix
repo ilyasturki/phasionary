@@ -62,6 +62,17 @@ in
       description = "Group under which the server runs.";
     };
 
+    allowedHosts = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      example = [ "phas.example.net" ];
+      description = ''
+        Hostnames a browser may reach the web app by; IP literals and
+        `localhost` always pass. A named host has to be listed (a DNS-rebinding
+        guard): set it to the name your reverse proxy serves.
+      '';
+    };
+
     openFirewall = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -107,6 +118,7 @@ in
         PHASIONARY_SERVER_DATA_PATH = cfg.dataDir;
         PHASIONARY_SERVER_HOST = cfg.host;
         PHASIONARY_SERVER_PORT = toString cfg.port;
+        PHASIONARY_SERVER_ALLOWED_HOSTS = lib.concatStringsSep "," cfg.allowedHosts;
       };
 
       serviceConfig = {

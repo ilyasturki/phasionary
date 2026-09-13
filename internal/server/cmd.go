@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -15,8 +16,9 @@ import (
 )
 
 const (
-	EnvHost = "PHASIONARY_SERVER_HOST"
-	EnvPort = "PHASIONARY_SERVER_PORT"
+	EnvHost         = "PHASIONARY_SERVER_HOST"
+	EnvPort         = "PHASIONARY_SERVER_PORT"
+	EnvAllowedHosts = "PHASIONARY_SERVER_ALLOWED_HOSTS"
 
 	defaultHost = "127.0.0.1"
 	defaultPort = "7777"
@@ -29,11 +31,16 @@ func envOr(name, fallback string) string {
 	return fallback
 }
 
+func envHosts(name string) []string {
+	return strings.Fields(strings.ReplaceAll(os.Getenv(name), ",", " "))
+}
+
 func NewRootCmd() *cobra.Command {
 	var (
-		dataDir string
-		host    string
-		port    string
+		dataDir      string
+		host         string
+		port         string
+		allowedHosts []string
 	)
 	cmd := &cobra.Command{
 		Use:   "phasionary-server",
@@ -61,7 +68,7 @@ every request.`,
 			defer db.Close()
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			return New(db, net.JoinHostPort(host, port)).Run(ctx)
+			return New(db, net.JoinHostPort(host, port), allowedHosts...).Run(ctx)
 		},
 	}
 	cmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", version.Version, version.Commit, version.BuildDate)
@@ -69,6 +76,8 @@ every request.`,
 	cmd.PersistentFlags().StringVar(&dataDir, "data", "", "database directory (default: $"+config.EnvServerDataPath+" or ~/.local/share/phasionary-server)")
 	cmd.Flags().StringVar(&host, "host", envOr(EnvHost, defaultHost), "listen host/IP ($"+EnvHost+")")
 	cmd.Flags().StringVar(&port, "port", envOr(EnvPort, defaultPort), "listen port ($"+EnvPort+")")
+	cmd.Flags().StringArrayVar(&allowedHosts, "allowed-host", envHosts(EnvAllowedHosts),
+		"hostname browsers may reach the app by; repeatable, IPs and localhost always pass ($"+EnvAllowedHosts+", comma-separated)")
 
 	cmd.AddCommand(newEnrollCmd(&dataDir, &host, &port))
 	return cmd

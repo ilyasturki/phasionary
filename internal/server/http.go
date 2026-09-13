@@ -14,6 +14,7 @@ import (
 
 	"phasionary/internal/domain"
 	"phasionary/internal/syncproto"
+	"phasionary/internal/webui"
 )
 
 // A first upload carries every project; 64 MiB is generous for that.
@@ -24,19 +25,24 @@ const maxBodyBytes = 64 << 20
 var enrollFailureDelay = time.Second
 
 type Server struct {
-	db   *DB
-	addr string
+	db           *DB
+	addr         string
+	allowedHosts []string
 }
 
-func New(db *DB, addr string) *Server {
-	return &Server{db: db, addr: addr}
+func New(db *DB, addr string, allowedHosts ...string) *Server {
+	return &Server{db: db, addr: addr, allowedHosts: allowedHosts}
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST "+syncproto.EnrollPath, s.handleEnroll)
 	mux.HandleFunc("POST "+syncproto.SyncPath, s.handleSync)
-	return panicMiddleware(mux)
+	mux.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "no such endpoint")
+	})
+	mux.Handle("/", webHandler(webui.FS))
+	return panicMiddleware(hostMiddleware(s.allowedHosts, mux))
 }
 
 func (s *Server) Run(ctx context.Context) error {

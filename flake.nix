@@ -14,13 +14,26 @@
       commit = self.shortRev or self.dirtyShortRev or "none";
       buildDate = self.lastModifiedDate or "unknown";
 
+      phasionary-web = pkgs.buildNpmPackage {
+        pname = "phasionary-web";
+        inherit version;
+        src = ./web;
+        npmDepsHash = "sha256-BJcouDI6j+HxpYOwaOSqQbsxrD2j+uIGXtEyeIrW1S8=";
+        doCheck = true;
+        installPhase = ''
+          runHook preInstall
+          cp -r dist $out
+          runHook postInstall
+        '';
+      };
+
       mkBinary =
         args:
         pkgs.buildGoModule (
           {
             inherit version;
             src = ./.;
-            vendorHash = "sha256-yQrdS4X4Twa62keX7kHUmaL0EOs09zoCZnUvWQvxWxY=";
+            vendorHash = "sha256-XvjiBnzMxM/+ty9ZHT84FP7HO1h9cIxMbdorBJSIHCE=";
             ldflags = [
               "-s"
               "-w"
@@ -46,9 +59,15 @@
               --fish <($out/bin/phasionary completion fish)
           '';
         };
+        inherit phasionary-web;
         phasionary-server = mkBinary {
           pname = "phasionary-server";
           subPackages = [ "cmd/phasionary-server" ];
+          preBuild = ''
+            rm -rf internal/webui/dist
+            cp -r ${phasionary-web} internal/webui/dist
+            chmod -R u+w internal/webui/dist
+          '';
         };
         default = self.packages.${system}.phasionary;
       };

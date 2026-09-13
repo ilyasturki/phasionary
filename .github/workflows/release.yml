@@ -34,6 +34,19 @@ jobs:
                   go-version: stable
                   cache: true
 
+            - name: Setup Node
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: npm
+                  cache-dependency-path: web/package-lock.json
+
+            - name: Build the web app into the server
+              run: |
+                  npm ci --prefix web
+                  npm run build --prefix web
+                  cp -r web/dist/. internal/webui/dist/
+
             - name: Build linux binaries
               run: |
                   version="${GITHUB_REF_NAME#v}"
@@ -57,6 +70,7 @@ jobs:
                   ./phasionary-linux-x64 completion zsh | grep -q 'phasionary'
                   ./phasionary-linux-x64 completion fish | grep -q 'phasionary'
                   ./phasionary-server-linux-x64 --version
+                  ./phasionary-server-linux-x64 --help | grep -q 'allowed-host'
 
             - name: Upload binaries
               uses: actions/upload-artifact@v7
