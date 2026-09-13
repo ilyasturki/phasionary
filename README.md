@@ -106,7 +106,7 @@ Then mint codes with `sudo -u phasionary phasionary-server --data /var/lib/phasi
 
 The server also serves a web app at its own address — the same projects, the same glyphs and colors as the TUI, on a phone. Scan the QR from `phasionary-server pair` and it opens enrolled, downloads your projects and keeps working offline; changes queue locally and go up when the server is reachable again. Typing the code into the app by hand does the same thing.
 
-It can create, edit, delete and reorder projects, categories and tasks, including separators. Filtering, search, visual mode, undo and copy/paste stay in the TUI.
+It can create, edit, delete and reorder projects, categories and tasks, including separators, and search both lists. On a keyboard the basics carry over — `j`/`k`, `space` to cycle a status, `⏎` to edit, `a`/`A` to add, `/` to search; `?` lists them. Filtering, visual mode, undo and copy/paste stay in the TUI. When a sync fails, a banner stays up until one succeeds; otherwise sync is silent.
 
 Installing the app to a home screen, and having it open with no network, needs HTTPS — browsers only register a service worker on a secure origin, so put the server behind a TLS reverse proxy if you want that. Over plain HTTP it still works, it just has to be loaded from the server each time.
 

@@ -1,6 +1,6 @@
 <script lang="ts">
     import Menu from "../lib/Menu.svelte";
-    import { app } from "../lib/app.svelte";
+    import { app, href } from "../lib/app.svelte";
 
     let confirming = $state(false);
 
@@ -23,47 +23,69 @@
         if (r.skipped) parts.push(`${r.skipped} deferred`);
         return parts.join(" · ");
     });
+
+    const health = $derived.by(() => {
+        if (app.syncing) return { text: "syncing…", cls: "" };
+        if (app.error !== null) return { text: app.offline ? "offline" : "failed", cls: app.offline ? "warn" : "error" };
+        return { text: "ok", cls: "ok" };
+    });
+
+    const back = $derived(app.projectID ? href("tasks", app.projectID) : href("projects"));
 </script>
 
-<div class="header">
-    <button class="hit back" aria-label="Back" onclick={() => (app.route = app.projectID ? "tasks" : "projects")}>
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 4l-6 6 6 6" />
-        </svg>
-    </button>
-    <span class="bold">Sync</span>
-</div>
+<svelte:window onkeydown={(e) => e.key === "Escape" && !confirming && (location.hash = back)} />
 
-<div class="body">
-    <div class="kv">
-        <span class="muted">Device</span><span>{app.device?.name}</span>
-        <span class="muted">Server</span><span>{location.host}</span>
-        <span class="muted">Pending</span>
-        <span class:pending={app.pending > 0}>
-            {app.pending === 0 ? "nothing" : `${app.pending} change${app.pending === 1 ? "" : "s"}`}
-        </span>
-        <span class="muted">Last sync</span><span>{relative}</span>
-        {#if result}
-            <span class="muted">Result</span><span class="muted">{result}</span>
-        {/if}
-        {#if app.error}
-            <span class="muted">Error</span><span class="error">{app.error}</span>
-        {/if}
+<div class="screen">
+    <div class="top">
+        <div class="header">
+            <a class="hit back" href={back} aria-label="Back">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 4l-6 6 6 6" />
+                </svg>
+            </a>
+            <h1 class="bold">Sync</h1>
+        </div>
     </div>
 
-    <button class="primary" disabled={app.syncState === "syncing"} onclick={() => app.sync()}>
-        {app.syncState === "syncing" ? "Syncing…" : "Sync now"}
-    </button>
+    <div class="body">
+        <dl class="kv">
+            <dt class="muted">State</dt>
+            <dd class={health.cls}>{health.text}</dd>
+            <dt class="muted">Device</dt>
+            <dd>{app.device?.name}</dd>
+            <dt class="muted">Server</dt>
+            <dd>{location.host}</dd>
+            <dt class="muted">Pending</dt>
+            <dd class:pending={app.pending > 0}>
+                {app.pending === 0 ? "nothing" : `${app.pending} change${app.pending === 1 ? "" : "s"}`}
+            </dd>
+            <dt class="muted">Last sync</dt>
+            <dd>{relative}</dd>
+            {#if result}
+                <dt class="muted">Result</dt>
+                <dd class="muted">{result}</dd>
+            {/if}
+            {#if app.error}
+                <dt class="muted">Error</dt>
+                <dd class="error">{app.error}</dd>
+            {/if}
+        </dl>
 
-    <p class="muted note">
-        Syncs on its own when the app opens, after each edit, and when it comes back to the foreground.
-    </p>
-</div>
+        <button class="primary" disabled={app.syncing} onclick={() => app.sync()}>
+            {app.syncing ? "Syncing…" : "Sync now"}
+        </button>
 
-<div class="spacer"></div>
+        <p class="muted note">
+            Syncs on its own when the app opens, after each edit, and when it comes back to the foreground. A
+            banner stays up while a sync is failing.
+        </p>
+    </div>
 
-<div class="bar">
-    <button class="chip logout" onclick={() => (confirming = true)}>Log out of this device</button>
+    <div class="spacer"></div>
+
+    <div class="foot">
+        <button class="chip danger logout" onclick={() => (confirming = true)}>Log out of this device</button>
+    </div>
 </div>
 
 {#if confirming}
@@ -77,21 +99,26 @@
 {/if}
 
 <style>
-    .back {
-        margin-left: -12px;
-    }
-
     .body {
         display: flex;
         flex-direction: column;
         gap: 20px;
         padding: 8px 16px 0;
+        max-width: 480px;
     }
 
     .kv {
         display: grid;
         grid-template-columns: 110px minmax(0, 1fr);
         gap: 4px 12px;
+    }
+
+    .ok {
+        color: var(--green);
+    }
+
+    .warn {
+        color: var(--yellow);
     }
 
     .pending {
@@ -104,8 +131,12 @@
         overflow-wrap: anywhere;
     }
 
+    .foot {
+        display: flex;
+        padding: 16px;
+    }
+
     .logout {
-        border: none;
         font-weight: 400;
     }
 </style>

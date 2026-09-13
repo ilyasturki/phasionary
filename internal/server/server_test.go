@@ -329,6 +329,22 @@ func TestProjectDeletePullsAsDeleted(t *testing.T) {
 	assert.True(t, findSnapshot(t, resp, p.ID).Deleted)
 }
 
+func TestSnapshotUpdatedAtTracksLastOp(t *testing.T) {
+	e := newEnv(t)
+	a := e.enroll("a")
+	p := baseProject(t)
+	resp := e.sync(a, a.ops(t1, journal.DiffProjects(nil, p)))
+	assert.Equal(t, t1, findSnapshot(t, resp, p.ID).Project.UpdatedAt)
+
+	renamed := clone(t, p)
+	renamed.Name = "Renamed"
+	resp = e.sync(a, a.ops(t2, journal.DiffProjects(&p, renamed)))
+	assert.Equal(t, t2, findSnapshot(t, resp, p.ID).Project.UpdatedAt, "a rename alone dates the project")
+
+	resp = e.sync(a, a.ops(t3, []journal.Draft{{Kind: journal.KindTaskDelete, ProjectID: p.ID, EntityID: p.Categories[0].Tasks[0].ID}}))
+	assert.Equal(t, t3, findSnapshot(t, resp, p.ID).Project.UpdatedAt, "a delete dates the project")
+}
+
 func TestInvalidOpsRejected(t *testing.T) {
 	e := newEnv(t)
 	a := e.enroll("a")

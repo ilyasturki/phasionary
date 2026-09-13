@@ -42,13 +42,23 @@ export interface Project {
 export const STATUSES: Status[] = ["todo", "in_progress", "completed", "cancelled"];
 export const PRIORITY_ORDER: Priority[] = ["critical", "high", "medium", "low", "trivial"];
 export const TAG_COLORS: TagColor[] = ["green", "blue", "magenta", "cyan"];
-export const ESTIMATE_PRESETS = [0, 15, 30, 60, 120, 240, 480, 960, 1440, 2400];
+export const ESTIMATE_CHOICES = [0, 15, 30, 60, 120, 240, 480, 960, 1440, 2400].map((m) => ({
+    value: m,
+    label: formatEstimate(m) || "None",
+}));
 
 export const STATUS_GLYPH: Record<Status, string> = {
     todo: "[ ]",
     in_progress: "[/]",
     completed: "[x]",
     cancelled: "[-]",
+};
+
+export const STATUS_NAME: Record<Status, string> = {
+    todo: "to do",
+    in_progress: "in progress",
+    completed: "completed",
+    cancelled: "cancelled",
 };
 
 export const PRIORITY_GLYPH: Record<string, string> = {
@@ -76,8 +86,38 @@ export function isSeparator(t: Task): boolean {
     return t.kind === SEPARATOR;
 }
 
-export function nextStatus(status: Status): Status {
-    return STATUSES[(STATUSES.indexOf(status) + 1) % STATUSES.length];
+export function nextStatus(status: Status, delta = 1): Status {
+    const n = STATUSES.length;
+    return STATUSES[(STATUSES.indexOf(status) + delta + n) % n];
+}
+
+export function formatRelativeShort(timestamp: string, now = Date.now()): string {
+    const t = Date.parse(timestamp);
+    if (Number.isNaN(t)) return "";
+    const s = Math.max(0, Math.floor((now - t) / 1000));
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const d = Math.floor(h / 24);
+    if (m < 1) return "now";
+    if (h < 1) return `${m}m`;
+    if (d < 1) return `${h}h`;
+    if (d < 7) return `${d}d`;
+    if (d < 30) return `${Math.floor(d / 7)}w`;
+    if (d < 365) return `${Math.floor(d / 30)}mo`;
+    return `${Math.floor(d / 365)}y`;
+}
+
+export function projectStats(p: Project): { open: number; inProgress: number } {
+    let open = 0;
+    let inProgress = 0;
+    for (const c of p.categories) {
+        for (const t of c.tasks) {
+            if (isSeparator(t)) continue;
+            if (t.status === "in_progress") inProgress++;
+            if (t.status === "todo" || t.status === "in_progress") open++;
+        }
+    }
+    return { open, inProgress };
 }
 
 export function formatEstimate(minutes: number | undefined): string {
@@ -86,21 +126,6 @@ export function formatEstimate(minutes: number | undefined): string {
     const hours = Math.floor(minutes / 60);
     if (hours < 8) return `${hours}h`;
     return `${Math.floor(hours / 8)}d`;
-}
-
-export function estimateLabel(minutes: number): string {
-    return formatEstimate(minutes) || "None";
-}
-
-export function statusCounts(p: Project): Record<Status, number> {
-    const counts = { todo: 0, in_progress: 0, completed: 0, cancelled: 0 };
-    for (const c of p.categories) {
-        for (const t of c.tasks) {
-            if (isSeparator(t) || t.status === "") continue;
-            counts[t.status]++;
-        }
-    }
-    return counts;
 }
 
 export function categoryStatus(c: Category): Status | "" {

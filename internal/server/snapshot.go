@@ -13,7 +13,7 @@ import (
 
 // A tombstoned or absent project is reported as Deleted.
 func snapshot(tx *sql.Tx, projectID string) (syncproto.ProjectSnapshot, error) {
-	rows, err := tx.Query(`SELECT id, kind, fields, deleted_at FROM entities WHERE project_id = ?`, projectID)
+	rows, err := tx.Query(`SELECT id, kind, fields, field_ts, deleted_at FROM entities WHERE project_id = ?`, projectID)
 	if err != nil {
 		return syncproto.ProjectSnapshot{}, err
 	}
@@ -22,15 +22,23 @@ func snapshot(tx *sql.Tx, projectID string) (syncproto.ProjectSnapshot, error) {
 	var project *entity
 	categories := map[string]*entity{}
 	tasks := map[string]*entity{}
+	updatedAt := ""
 	for rows.Next() {
-		var id, kind, fields, deletedAt string
-		if err := rows.Scan(&id, &kind, &fields, &deletedAt); err != nil {
+		var id, kind, fields, fieldTS, deletedAt string
+		if err := rows.Scan(&id, &kind, &fields, &fieldTS, &deletedAt); err != nil {
 			return syncproto.ProjectSnapshot{}, err
 		}
 		e := newEntity(kind)
 		e.deletedAt = deletedAt
 		if err := json.Unmarshal([]byte(fields), &e.fields); err != nil {
 			return syncproto.ProjectSnapshot{}, fmt.Errorf("entity %s/%s fields: %w", projectID, id, err)
+		}
+		if err := json.Unmarshal([]byte(fieldTS), &e.fieldTS); err != nil {
+			return syncproto.ProjectSnapshot{}, fmt.Errorf("entity %s/%s field_ts: %w", projectID, id, err)
+		}
+		updatedAt = max(updatedAt, deletedAt)
+		for _, ts := range e.fieldTS {
+			updatedAt = max(updatedAt, ts)
 		}
 		switch kind {
 		case kindProject:
@@ -66,7 +74,7 @@ func snapshot(tx *sql.Tx, projectID string) (syncproto.ProjectSnapshot, error) {
 		return syncproto.ProjectSnapshot{}, err
 	}
 	p.ID = projectID
-	p.UpdatedAt = p.CreatedAt
+	p.UpdatedAt = cmp.Or(updatedAt, p.CreatedAt)
 	for _, cid := range orderedIDs(project.fields["category_ids"], categories) {
 		c := domain.Category{Tasks: []domain.Task{}}
 		if err := decodeFields(categories[cid].fields, &c); err != nil {

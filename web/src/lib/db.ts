@@ -71,9 +71,11 @@ export function saveDevice(device: Device): Promise<void> {
     return write("meta", (s) => s.put(device, "device"));
 }
 
+const byName = new Intl.Collator(undefined, { sensitivity: "base" });
+
 export async function listProjects(): Promise<Project[]> {
     const projects = await read<Project[]>("projects", (s) => s.getAll());
-    return projects.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return projects.sort((a, b) => byName.compare(a.name, b.name) || a.created_at.localeCompare(b.created_at));
 }
 
 // Queued ops postdate the push, so this snapshot is stale for the project.

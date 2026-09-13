@@ -35,6 +35,8 @@ func TestWebClientOpsRebuildTheSameProject(t *testing.T) {
 	for _, want := range fixture.Projects {
 		snap := findSnapshot(t, resp, want.ID)
 		require.NotNil(t, snap.Project, "project %s came back deleted", want.ID)
+		// Ops never carry updated_at; the server derives it.
+		want.UpdatedAt = snap.Project.UpdatedAt
 		require.Equal(t, want, *snap.Project)
 	}
 	for _, id := range fixture.Deleted {

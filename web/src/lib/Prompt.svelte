@@ -1,5 +1,6 @@
 <script lang="ts">
     import { untrack } from "svelte";
+    import LineField from "./LineField.svelte";
     import Sheet from "./Sheet.svelte";
 
     let {
@@ -20,24 +21,18 @@
 
     let text = $state(untrack(() => value));
 
-    function submit(event: SubmitEvent) {
-        event.preventDefault();
+    function submit() {
         if (text.trim()) onsubmit(text.trim());
-    }
-
-    function focus(node: HTMLInputElement) {
-        node.focus();
-        node.select();
     }
 </script>
 
 <Sheet {title} {onclose}>
-    <form class="group" onsubmit={submit}>
-        <span class="muted">{label}</span>
-        <input class="field" bind:value={text} use:focus autocomplete="off" />
+    <div class="group">
+        <label for="prompt-field">{label}</label>
+        <LineField id="prompt-field" class="field" bind:value={text} onenter={submit} select />
         <div class="actions">
-            <button type="button" class="chip" onclick={onclose}>Cancel</button>
-            <button type="submit" class="chip on" disabled={!text.trim()}>{confirm}</button>
+            <button class="chip" onclick={onclose}>Cancel</button>
+            <button class="chip on" disabled={!text.trim()} onclick={submit}>{confirm}</button>
         </div>
-    </form>
+    </div>
 </Sheet>

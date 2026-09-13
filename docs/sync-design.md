@@ -206,7 +206,9 @@ and `go test ./...` need no Node; a bare binary answers 503 on the app's paths.
 - **Sync:** the same round as the Go client — push, prune what was acked,
   then apply snapshots, skipping any project the outbox has touched since the
   push. Automatic on load, after each edit (debounced), on foreground, and on
-  `online`; plus a manual button.
+  `online`; plus a manual button on the sync screen. Snapshots date a project
+  by the newest field timestamp or tombstone among its entities, so the list's
+  age column tracks renames and deletes.
 - **Serving:** hashed assets are immutable, everything else revalidates
   (`sw.js` above all, or a worker would never hand over). Unknown paths fall
   back to the app, except under `/assets/` and `/v1/`, which answer 404 as
