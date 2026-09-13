@@ -184,17 +184,62 @@ toolchain-free.
   idempotent through the per-device acked seq.
 - Plain HTTP; deployment guidance is private network or TLS reverse proxy.
   The NixOS module (`nix/module.nix`, `services.phasionary-server`) runs it
-  hardened under its own user. The web app's static files and any read API
-  arrive with the web slice.
+  hardened under its own user. It also serves the web app below.
 
-### Mobile & web app (next slice)
+### Web app (implemented, slice 4)
 
-One TypeScript codebase, built twice: a static web app served by the server,
-and the same app wrapped with **Capacitor** for Android (iOS later for free).
-Framework: pick in that slice; the constraints that matter are a local store
-(IndexedDB/SQLite via Capacitor plugin) implementing the same journal +
-snapshot model, and an offline-first capture path. The TUI's dense monospace
-aesthetic is the design language.
+Svelte 5 + Vite + TypeScript in `web/`, built by `buildNpmPackage` and
+embedded into `phasionary-server` through `internal/webui` — one binary to
+deploy. The committed embed directory holds only a placeholder, so `go build`
+and `go test ./...` need no Node; a bare binary answers 503 on the app's paths.
+
+- **Local model:** IndexedDB holds whole project snapshots, an append-only
+  outbox keyed by the seq the protocol acks, and the device record (id, token,
+  cursor, last sync). Every edit writes the project and its ops in one
+  transaction, so a reload never shows an edit whose op was lost.
+- **Ops:** emitted at the action, not diffed from a before/after tree — each
+  action knows what it changed. `web/src/lib/ops.ts` is the whole vocabulary,
+  and `web/src/lib/fixtures.test.ts` writes a scripted session's ops to
+  `internal/server/testdata/web-ops.json`, which a Go test replays through the
+  real merge and compares against the model the client ended up with. A
+  renamed field or a dropped reorder fails that test.
+- **Sync:** the same round as the Go client — push, prune what was acked,
+  then apply snapshots, skipping any project the outbox has touched since the
+  push. Automatic on load, after each edit (debounced), on foreground, and on
+  `online`; plus a manual button.
+- **Serving:** hashed assets are immutable, everything else revalidates
+  (`sw.js` above all, or a worker would never hand over). Unknown paths fall
+  back to the app, except under `/assets/` and `/v1/`, which answer 404 as
+  themselves. CSP pins every fetch directive to `'self'` and denies the rest.
+- **Host allowlist:** `--allowed-host` / `PHASIONARY_SERVER_ALLOWED_HOSTS`,
+  the same DNS-rebinding defence the removed `phasionary serve` carried: IP
+  literals and `localhost` always pass, a name must be listed.
+- **Offline:** the service worker precaches the shell, so the app opens with
+  no network and edits queue. It needs a secure context, so a plain-HTTP
+  deployment loses the offline shell and the install prompt but nothing else.
+
+### Setup without ceremony (implemented, slice 5)
+
+The server exists for the web app and for other devices, so joining one had to
+stop being a six-step copy of codes between terminals.
+
+- **The host enrolls itself.** On startup the server spends a code on its own
+  TUI over loopback — the machine holding the database has nothing to prove to
+  the network. It skips a device that is already enrolled (which may name
+  another server) and a machine with no data directory. `--no-local-enroll`
+  turns it off, and the NixOS unit sets it.
+- **The phone scans.** The server prints a pairing block on startup when
+  stdout is a terminal (never into a journal, where a code would outlive its
+  ten minutes), and `phasionary-server pair` prints another. Both show the code as a QR of
+  `http://<lan-ip>:<port>/#code=…`, painted with half blocks and explicit
+  colours so it reads on any terminal theme. The code rides in the fragment,
+  which no proxy or log ever sees; the app lifts it out of `location.hash`,
+  clears the URL, and enrolls itself.
+- **The address is printed, not guessed.** The default bind is `0.0.0.0`,
+  since a phone cannot reach loopback, and `pair` names the interfaces the
+  server answers on, LAN before CGNAT (Tailscale).
+- **The TUI syncs at its edges.** Pull at launch, push after the saver's final
+  flush (`internal/app/autosync.go`); three seconds each, never fatal.
 
 ## Slice plan from here
 
@@ -205,7 +250,12 @@ aesthetic is the design language.
    (`internal/journal`, `data.ChangeRecorder`, `sync status`).
 3. **(done)** **Server**, client sync commands, the stale-save guard, NixOS
    module.
-4. **Web app** against the server, then **Capacitor** wrap for Android.
-   Candidates for the same slice: automatic sync from the TUI (on start and
-   after saves, best effort) and a Host-header allowlist on the server once
-   a browser is a client.
+4. **(done)** **Web app** served by the server: offline-first Svelte client,
+   static serving behind a CSP, Host-header allowlist, op-conformance fixture.
+5. **(done)** **Setup without ceremony**: the host enrolls itself, `pair`
+   prints a QR on the LAN address, the TUI syncs at launch and at quit.
+6. **Capacitor** wrap for Android (iOS later for free): CORS and a preflight
+   on `/v1/*` for the `https://localhost` origin the WebView serves from, a
+   server-URL field at login (the page origin no longer identifies the
+   server), the Android SDK derivation deleted in `1c9717d`, a signed-APK
+   release job.
