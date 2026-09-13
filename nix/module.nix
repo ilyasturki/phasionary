@@ -122,7 +122,7 @@ in
       };
 
       serviceConfig = {
-        ExecStart = "${cfg.package}/bin/phasionary-server";
+        ExecStart = "${cfg.package}/bin/phasionary-server --no-local-enroll";
         User = cfg.user;
         Group = cfg.group;
         Restart = "on-failure";

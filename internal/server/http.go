@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strconv"
@@ -45,18 +46,25 @@ func (s *Server) Handler() http.Handler {
 	return panicMiddleware(hostMiddleware(s.allowedHosts, mux))
 }
 
-func (s *Server) Run(ctx context.Context) error {
+// Bound before onReady runs, so its caller cannot race the listener.
+func (s *Server) Run(ctx context.Context, onReady func(addr string)) error {
 	srv := &http.Server{
-		Addr:              s.addr,
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
+	ln, err := net.Listen("tcp", s.addr)
+	if err != nil {
+		return err
+	}
 	errCh := make(chan error, 1)
-	go func() { errCh <- srv.ListenAndServe() }()
+	go func() { errCh <- srv.Serve(ln) }()
 	log.Printf("phasionary-server listening on http://%s", s.addr)
+	if onReady != nil {
+		onReady(ln.Addr().String())
+	}
 	select {
 	case <-ctx.Done():
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
