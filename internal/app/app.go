@@ -811,6 +811,10 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 		return err
 	}
 
+	// Deferred before saver.Close so it runs after the final flush.
+	defer syncAtExit(store)
+	syncStatus := syncAtLaunch(store)
+
 	// Persist off the event loop so no keystroke blocks on fsync. Deferring
 	// Close here means the final edit is flushed on exit regardless of which
 	// quit path the program took — program.Run only returns once the event loop
@@ -891,6 +895,7 @@ func Run(dataDir string, projectSelector string, cfgManager config.Reader, worki
 	}
 	m.ui.Fold = foldState
 	m.ui.Screen.ExpandDescriptions = expandDescriptions
+	m.ui.Screen.StatusMsg = syncStatus
 	// Reopen on the row this project was last left on. Runs after the fold state
 	// is in place so a cursor inside a folded category resolves to that
 	// category's header rather than to a row that isn't rendered. The viewport

@@ -21,8 +21,10 @@ cd "$root"
 DATA="/tmp/phas-vt/data"
 CFG="/tmp/phas-vt/cfg"
 OUT="/tmp/phas-vt/vhs-out"
+# Reaches seed.sh's import and every tape's shell, so no real enrolment is journaled or synced.
+export PHASIONARY_STATE_PATH="/tmp/phas-vt/state"
 
-rm -rf "$OUT" && mkdir -p "$OUT"
+rm -rf "$OUT" "$PHASIONARY_STATE_PATH" && mkdir -p "$OUT"
 go build -o phasionary ./cmd/phasionary
 
 mapfile -t TAPES < <(

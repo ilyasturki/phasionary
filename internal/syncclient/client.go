@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -22,8 +23,15 @@ var (
 	ErrNotEnrolled     = errors.New("this device is not enrolled with a sync server")
 	ErrAlreadyEnrolled = errors.New("this device is already enrolled; run `phasionary sync logout` first")
 
-	httpClient = &http.Client{Timeout: 2 * time.Minute}
+	httpClient = &http.Client{Timeout: 2 * time.Minute, Transport: transport()}
 )
+
+// Dial fails fast so an absent server cannot hang the TUI; the 2 min budget is for the upload.
+func transport() http.RoundTripper {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.DialContext = (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	return t
+}
 
 type HTTPError struct {
 	Status  int
