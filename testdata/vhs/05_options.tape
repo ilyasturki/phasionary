@@ -51,8 +51,10 @@ Type ","
 Sleep 300ms
 Type "j"
 Sleep 200ms
-Type " "
+Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_changed.png"
+Type "d"
 Sleep 300ms
+Screenshot "/tmp/phas-vt/vhs-out/05_options_priority_reset.png"
 Escape
 Sleep 300ms
 

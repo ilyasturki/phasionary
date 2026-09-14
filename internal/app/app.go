@@ -412,6 +412,8 @@ func (m model) handleOptionsKey(msg tea.KeyPressMsg) model {
 		m.cycleSelectedOption(1)
 	case "h", "left":
 		m.cycleSelectedOption(-1)
+	case "d":
+		m.resetSelectedOption()
 	}
 	return m
 }

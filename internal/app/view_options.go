@@ -80,6 +80,15 @@ func onOffKey(on bool) string {
 	return "off"
 }
 
+const changedMark = " •"
+
+func (spec optionSpec) defaultValue() string { return spec.current(config.DefaultConfig()) }
+
+func (m *model) resetSelectedOption() {
+	spec := optionSpecs[m.ui.Options.selectedOption]
+	spec.apply(m, spec.defaultValue())
+}
+
 func (m *model) cycleSelectedOption(delta int) {
 	spec := optionSpecs[m.ui.Options.selectedOption]
 	cur := spec.current(m.deps.CfgManager.Get())
@@ -102,8 +111,10 @@ func (m model) optionsView() string {
 	}
 	lines = append(lines, ui.RenderHintsToWidth([]ui.Hint{
 		{Key: "h/l", Label: "change"},
+		{Key: "d", Label: "default"},
 		{Key: "j/k", Label: "move"},
-		{Key: "q/esc/enter", Label: "close"},
+		{Key: strings.TrimSpace(changedMark), Label: "changed"},
+		{Key: "q/esc", Label: "close"},
 	}, width))
 	return m.dialogStyle().Render(strings.Join(lines, "\n"))
 }
@@ -121,6 +132,9 @@ func (m model) optionRow(spec optionSpec, cfg config.Config, focused bool, width
 	}
 
 	left := base.Render("  ") + ui.DialogKey(base, focused).Render(spec.name)
+	if cur != spec.defaultValue() {
+		left += base.Render(changedMark)
+	}
 	right := strings.Join(values, base.Render("  ")) + base.Render("  ")
 	gap := max(width-lipgloss.Width(left)-lipgloss.Width(right), 1)
 	return left + base.Render(strings.Repeat(" ", gap)) + right

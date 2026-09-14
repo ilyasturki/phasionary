@@ -43,3 +43,28 @@ func TestOptionSpecs_EveryValueRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+func TestResetSelectedOption_RestoresDefault(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	m.ui.Options.selectedOption = 3 // Descriptions, whose apply also flips the screen flag
+	m.cycleSelectedOption(1)
+	require.Equal(t, "on", currentOptionValue(t, m, 3))
+	require.True(t, m.ui.Screen.ExpandDescriptions)
+
+	m.resetSelectedOption()
+	assert.Equal(t, "off", currentOptionValue(t, m, 3))
+	assert.False(t, m.ui.Screen.ExpandDescriptions, "reset goes through apply, not just the config")
+}
+
+func TestOptionRow_MarksChangedValues(t *testing.T) {
+	m := newTestModel(t, sampleProject())
+	spec := optionSpecs[1] // Priority Color
+	row := func() string { return m.optionRow(spec, m.deps.CfgManager.Get(), false, 60) }
+
+	assert.NotContains(t, row(), changedMark)
+	spec.apply(m, config.PriorityColorNone)
+	assert.Contains(t, row(), changedMark)
+	m.ui.Options.selectedOption = 1
+	m.resetSelectedOption()
+	assert.NotContains(t, row(), changedMark)
+}
